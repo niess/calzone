@@ -1,0 +1,3 @@
+[submodule "goupil"]
+	path = deps/goupil
+	url = https://github.com/niess/goupil.git

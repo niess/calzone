@@ -1,0 +1,18 @@
+[package]
+name = "calzone"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cxx = "1.0"
+enum-variants-strings = "0.3"
+indexmap = "2.2"
+process_path = "0.1"
+pyo3 = { version = "0.21", features = ["abi3", "extension-module"] }
+temp-dir = "0.1"
+
+[build-dependencies]
+cxx-build = "1.0"
