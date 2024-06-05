@@ -28,6 +28,7 @@ fn main() {
         "src/error.cc",
         "src/geometry.cc",
         "src/materials.cc",
+        "src/utils/units.cc",
     ];
 
     cxx_build::bridge("src/cxx.rs")

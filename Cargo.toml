@@ -12,6 +12,7 @@ enum-variants-strings = "0.3"
 indexmap = "2.2"
 process_path = "0.1"
 pyo3 = { version = "0.21", features = ["abi3", "extension-module"] }
+regex = "1.10"
 temp-dir = "0.1"
 
 [build-dependencies]

@@ -62,6 +62,13 @@ pub mod ffi {
         weight: u32,
     }
 
+    #[derive(Debug)]
+    struct UnitDefinition {
+        name: String,
+        symbol: String,
+        value: f64,
+    }
+
     unsafe extern "C++" {
         include!("calzone.h");
 
@@ -78,6 +85,9 @@ pub mod ffi {
         fn create_geometry() -> SharedPtr<GeometryBorrow>;
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn set_goupil(self: &GeometryBorrow);
+
+        // Units interface.
+        fn export_units(units: &mut Vec<UnitDefinition>);
     }
 
     extern "Rust" {

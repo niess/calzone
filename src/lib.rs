@@ -31,14 +31,16 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
             .unwrap();
     }
 
-    // Initialise errors interface.
+    // Initialise interfaces.
     error::initialise();
+    utils::units::initialise(py);
 
     // Register class object(s).
     module.add_class::<geometry::Geometry>()?;
 
     // Register function(s).
     module.add_function(wrap_pyfunction!(materials::elements, module)?)?;
+    module.add_function(wrap_pyfunction!(materials::load, module)?)?;
     module.add_function(wrap_pyfunction!(materials::molecules, module)?)?;
     module.add_function(wrap_pyfunction!(materials::mixtures, module)?)?;
 

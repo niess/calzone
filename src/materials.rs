@@ -2,9 +2,13 @@ use crate::error::variant_error;
 use crate::utils::{Extractor, Property, Tag, TryFromBound};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::types::PyDict;
 use super::cxx::ffi;
+use std::ffi::OsStr;
+use std::path::Path;
 
+mod gate;
 mod hash;
 
 
@@ -19,6 +23,15 @@ pub fn elements(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
         }
     }
     Ok(())
+}
+
+#[pyfunction]
+pub fn load<'py>(py: Python<'py>, path: &str) -> PyResult<Bound<'py, PyDict>> {
+    let path = Path::new(path);
+    match path.extension().and_then(OsStr::to_str) {
+        Some("db") => gate::load_gate_db(py, path),
+        _ => Err(PyNotImplementedError::new_err("")),
+    }
 }
 
 #[pyfunction]

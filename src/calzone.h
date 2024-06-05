@@ -45,6 +45,22 @@ private:
 
 std::shared_ptr<GeometryBorrow> create_geometry();
 
+
+// ============================================================================
+//
+// Materials interface.
+//
+// ============================================================================
+
 std::shared_ptr<Error> add_element(const Element &);
 std::shared_ptr<Error> add_mixture(const Mixture &);
 std::shared_ptr<Error> add_molecule(const Molecule &);
+
+
+// ============================================================================
+//
+// Units interface.
+//
+// ============================================================================
+
+void export_units(rust::Vec<UnitDefinition> & units);

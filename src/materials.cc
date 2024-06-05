@@ -160,9 +160,15 @@ std::shared_ptr<Error> add_mixture(const Mixture & mixture) {
         if (element != nullptr) {
             material->AddElement(element, component.weight);
         } else {
-            HashedMaterial hashed = get_material(component.name, false);
+            HashedMaterial hashed = get_material(component.name);
             if (hashed.material == nullptr) {
                 delete material;
+                std::string msg = "bad component for '";
+                msg += std::string(mixture.properties.name);
+                msg += "' material (undefined '";
+                msg += std::string(component.name);
+                msg += "')";
+                set_error(ErrorType::ValueError, msg.c_str());
                 return get_error();
             }
             material->AddMaterial(hashed.material, component.weight);
