@@ -12,8 +12,6 @@ use std::borrow::Cow;
 // ===============================================================================================
 
 pub trait TryFromBound {
-    const TYPE_NAME: &'static str;
-
     // Note that, despite trait functions all have default implementations, at least one of
     // `try_from_any` or `try_from_dict` must be overriden.
 
@@ -22,11 +20,7 @@ pub trait TryFromBound {
         Self: Sized
     {
         let value: Bound<PyDict> = extract(value)
-            .or_else(|| format!(
-                "bad properties for {} '{}'",
-                <Self as TryFromBound>::TYPE_NAME,
-                tag.path(),
-            ))?;
+            .or_else(|| tag.bad().what("properties").into())?;
         Self::try_from_dict(tag, &value)
     }
 
@@ -42,8 +36,6 @@ impl<T> TryFromBound for Vec<T>
 where
     T: TryFromBound + Sized,
 {
-    const TYPE_NAME: &'static str = T::TYPE_NAME;
-
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self>
     where
         Self: Sized
@@ -51,11 +43,8 @@ where
         let mut items = Vec::<T>::with_capacity(value.len());
         for (k, v) in value.iter() {
             let name: String = extract(&k)
-                .or_else(|| format!(
-                    "bad {}",
-                    <T as TryFromBound>::TYPE_NAME,
-                ))?;
-            let tag = tag.extend(&name);
+                .or_else(|| tag.bad_type())?;
+            let tag = tag.extend(&name, None);
             let item = T::try_from_any(&tag, &v)?;
             items.push(item);
         }
@@ -63,27 +52,47 @@ where
     }
 }
 
-/// A contextual `Tag` enclosing the name and the path of the object being extracted.
+/// A contextual `Tag` enclosing the type, the name and the path of the object being extracted.
 pub struct Tag<'a> {
+    typename: &'a str,
     name: &'a str,
     path: Cow<'a, str>,
 }
 
 impl<'a> Tag<'a> {
+    pub fn bad<'b>(&'b self) -> TaggedBad<'a, 'b> {
+        TaggedBad::new(self)
+    }
+
+    pub fn bad_type(&self) -> String {
+        format!("bad {}", self.typename)
+    }
+
+    pub fn cast<'b: 'a>(&'b self, typename: &'a str) -> Tag<'b> {
+        let path = Cow::Borrowed(self.path.as_ref());
+        Self { typename, name: self.name, path }
+    }
+
+    #[allow(dead_code)] // XXX needed?
+    pub fn cite(&self) -> String {
+        format!("'{}' {}", self.path, self.typename)
+    }
+
     /// Returns an empty `Tag`.
     pub fn empty() -> Self {
         const EMPTY: &'static str = "";
-        Self::new(EMPTY)
+        Self::new(EMPTY, EMPTY)
     }
 
-    /// Returns a new `Tag` with a path extended by `value`.
-    pub fn extend(&self, value: &'a str) -> Self {
+    /// Returns a new `Tag` with a path extended by `value`, and optionally a different type.
+    pub fn extend(&self, value: &'a str, typename: Option<&'a str>) -> Self {
+        let typename = typename.unwrap_or(self.typename);
         if self.name.is_empty() {
-            Self::new(value)
+            Self::new(typename, value)
         } else {
             let path = format!("{}.{}", self.path(), value);
             let path = Cow::Owned(path);
-            Self { name: value, path }
+            Self { typename: typename, name: value, path }
         }
     }
 
@@ -93,14 +102,53 @@ impl<'a> Tag<'a> {
     }
 
     /// Returns a new `Tag` initialised with `name`.
-    pub fn new(name: &'a str) -> Self {
+    pub fn new(typename: &'a str, name: &'a str) -> Self {
         let path = Cow::Borrowed(name);
-        Self { name, path }
+        Self { typename, name, path }
     }
 
     /// Returns the path of this `Tag`.
     pub fn path<'b>(&'b self) -> &'b str {
         &self.path
+    }
+}
+
+pub struct TaggedBad<'a, 'b> {
+    tag: &'b Tag<'a>,
+    what: Option<&'b str>,
+    why: Option<String>,
+}
+
+impl<'a, 'b> TaggedBad<'a, 'b> {
+    fn new(tag: &'b Tag<'a>) -> Self {
+        Self { tag, what: None, why: None }
+    }
+
+    pub fn what(mut self, what: &'b str) -> Self {
+        self.what = Some(what);
+        self
+    }
+
+    pub fn why(mut self, why: String) -> Self {
+        self.why = Some(why);
+        self
+    }
+}
+
+impl<'a, 'b> From<TaggedBad<'a, 'b>> for String {
+    fn from(value: TaggedBad<'a, 'b>) -> Self {
+        match value.what {
+            None => match value.why {
+                None => format!("bad '{}' {}", value.tag.path, value.tag.typename),
+                Some(why) => format!("bad '{}' {} ({})", value.tag.path, value.tag.typename, why),
+            },
+            Some(what) => match value.why {
+                None => format!("bad {} for '{}' {}", what, value.tag.path, value.tag.typename),
+                Some(why) => format!(
+                    "bad {} for '{}' {} ({})", what, value.tag.path, value.tag.typename, why,
+                ),
+            },
+        }
     }
 }
 
@@ -112,7 +160,6 @@ impl<'a> Tag<'a> {
 // ===============================================================================================
 
 pub struct Extractor<const N: usize> {
-    context: &'static str,
     properties: [Property; N],
 }
 
@@ -122,6 +169,7 @@ pub struct Property {
     default: PropertyDefault,
 }
 
+#[allow(dead_code)] // XXX needed?
 enum PropertyDefault {
     F64(f64),
     Optional,
@@ -148,27 +196,25 @@ pub enum PropertyValue<'py> {
 impl<const N: usize> Extractor<N> {
     pub fn extract<'a, 'py>(
         &self,
-        name: &str,
+        tag: &Tag,
         dict: &'a Bound<'py, PyDict>
     ) -> PyResult<[PropertyValue<'py>; N]> {
 
         // Extract properties from (key, value).
-        let context = format!("{} '{}'", self.context, name);
         let mut values: [PropertyValue; N] = std::array::from_fn(|_| PropertyValue::None);
         'items: for (k, v) in dict.iter() {
             let k: String = extract(&k)
-                .or_else(|| format!("bad key for {}", context))?;
+                .or_else(|| tag.bad().what("key").into())?;
             for (index, property) in self.properties.iter().enumerate() {
                 if k == property.name {
-                    values[index] = property.extract(context.as_str(), &v)?;
+                    values[index] = property.extract(tag, &v)?;
                     continue 'items;
                 }
             }
-            let message = format!(
-                "bad {} (unknown property '{}')",
-                context,
-                k,
-            );
+            let message: String = tag.bad().why(format!(
+                "unknown property '{}'",
+                k
+            )).into();
             return Err(PyValueError::new_err(message));
         }
 
@@ -177,11 +223,10 @@ impl<const N: usize> Extractor<N> {
             if values[index].is_none() {
                 let default = &self.properties[index].default;
                 if default.is_required() {
-                    let message = format!(
-                        "bad {} (missing '{}' property)",
-                        context,
+                    let message: String = tag.bad().why(format!(
+                        "missing '{}' property",
                         self.properties[index].name,
-                    );
+                    )).into();
                     return Err(PyValueError::new_err(message));
                 } else {
                     values[index] = default.into();
@@ -192,11 +237,12 @@ impl<const N: usize> Extractor<N> {
         Ok(values)
     }
 
-    pub const fn new(context: &'static str, properties: [Property; N]) -> Self {
-        Self { context, properties }
+    pub const fn new(properties: [Property; N]) -> Self {
+        Self { properties }
     }
 }
 
+#[allow(dead_code)] // XXX needed?
 impl Property {
     #[inline]
     const fn new(name: &'static str, tp: PropertyType, default: PropertyDefault) -> Self {
@@ -274,36 +320,32 @@ impl Property {
 
     pub fn extract<'a, 'py>(
         &self,
-        context: &str,
+        tag: &Tag,
         value: &'a Bound<'py, PyAny>
     ) -> PyResult<PropertyValue<'py>> {
+        let bad_property = || -> String {
+            let what = format!("'{}'", self.name);
+            tag.bad().what(&what).into()
+        };
         let value = match &self.tp {
             PropertyType::Dict => {
                 let value: Bound<PyDict> = extract(value)
-                    .or_else(|| format!(
-                        "bad '{}' for {}", self.name, context,
-                    ))?;
+                    .or_else(bad_property)?;
                 PropertyValue::Dict(value)
             },
             PropertyType::F64 => {
                 let value: f64 = extract(value)
-                    .or_else(|| format!(
-                        "bad '{}' for {}", self.name, context,
-                    ))?;
+                    .or_else(bad_property)?;
                 PropertyValue::F64(value)
             },
             PropertyType::String => {
                 let value: String = extract(value)
-                    .or_else(|| format!(
-                        "bad '{}' for {}", self.name, context,
-                    ))?;
+                    .or_else(bad_property)?;
                 PropertyValue::String(value)
             },
             PropertyType::U32 => {
                 let value: u32 = extract(value)
-                    .or_else(|| format!(
-                        "bad '{}' for {}", self.name, context,
-                    ))?;
+                    .or_else(bad_property)?;
                 PropertyValue::U32(value)
             },
         };
@@ -444,8 +486,6 @@ where
         T::type_name()
     }
 }
-
-// XXX 'a' or 'an'.
 
 impl TypeName for PyDict {
     fn type_name() -> &'static str { "a dict" }

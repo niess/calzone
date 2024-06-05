@@ -55,17 +55,16 @@ pub fn mixtures(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
 // ===============================================================================================
 
 impl TryFromBound for ffi::Element {
-    const TYPE_NAME: &'static str = "element";
-
     #[allow(non_snake_case)]
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
-        const EXTRACTOR: Extractor<3> = Extractor::new(ffi::Element::TYPE_NAME, [
+        const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("Z"),
             Property::required_f64("A"),
             Property::optional_str("symbol"),
         ]);
 
-        let [Z, A, symbol] = EXTRACTOR.extract(tag.path().as_ref(), value)?;
+        let tag = tag.cast("element");
+        let [Z, A, symbol] = EXTRACTOR.extract(&tag, value)?;
         let symbol = if symbol.is_none() { tag.name().to_string() } else { symbol.into() };
 
         let element = Self {
@@ -79,21 +78,16 @@ impl TryFromBound for ffi::Element {
 }
 
 impl TryFromBound for ffi::Molecule {
-    const TYPE_NAME: &'static str = "molecule";
-
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
-        const EXTRACTOR: Extractor<3> = Extractor::new(ffi::Molecule::TYPE_NAME, [
+        const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("density"),
             Property::required_dict("composition"),
             Property::optional_str("state"),
         ]);
 
-        let (properties, composition) = try_into_properties(
-            &EXTRACTOR, ffi::Molecule::TYPE_NAME, tag, value
-        )?;
-        let components = Vec::<ffi::MoleculeComponent>::try_from_dict(
-            tag, &composition
-        )?;
+        let tag = tag.cast("molecule");
+        let (properties, composition) = try_into_properties(&EXTRACTOR, &tag, value)?;
+        let components = Vec::<ffi::MoleculeComponent>::try_from_dict(&tag, &composition)?;
 
         let molecule = Self::new(properties, components);
         Ok(molecule)
@@ -101,20 +95,17 @@ impl TryFromBound for ffi::Molecule {
 }
 
 impl TryFromBound for ffi::Mixture {
-    const TYPE_NAME: &'static str = "mixture";
-
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
-        const EXTRACTOR: Extractor<3> = Extractor::new(ffi::Mixture::TYPE_NAME, [
+        const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("density"),
             Property::required_dict("composition"),
             Property::optional_str("state"),
         ]);
 
-        let (properties, composition) = try_into_properties(
-            &EXTRACTOR, ffi::Mixture::TYPE_NAME, tag, value
-        )?;
+        let tag = tag.cast("mixture");
+        let (properties, composition) = try_into_properties(&EXTRACTOR, &tag, value)?;
         let components = Vec::<ffi::MixtureComponent>::try_from_dict(
-            tag, &composition
+            &tag, &composition
         )?;
 
         let mixture = Self::new(properties, components);
@@ -124,12 +115,10 @@ impl TryFromBound for ffi::Mixture {
 
 fn try_into_properties<'py>(
     extractor: &Extractor<3>,
-    context: &str,
     tag: &Tag,
     value: &Bound<'py, PyDict>
 ) -> PyResult<(ffi::MaterialProperties, Bound<'py, PyDict>)> {
-    let path = tag.path();
-    let [density, composition, state] = extractor.extract(path.as_ref(), value)?;
+    let [density, composition, state] = extractor.extract(tag, value)?;
 
     let state: ffi::G4State = if state.is_none() {
         ffi::G4State::kStateUndefined
@@ -137,7 +126,7 @@ fn try_into_properties<'py>(
         let state: String = state.into();
         let state = State::from_str(state.as_str())
             .map_err(|options| {
-                let message = format!("bad 'state' for {} '{}'", context, path);
+                let message: String = tag.bad().what("state").into();
                 variant_error(message.as_str(), state.as_str(), options)
             })?;
         state.into()
@@ -171,12 +160,10 @@ impl From<State> for ffi::G4State {
 }
 
 impl TryFromBound for ffi::MoleculeComponent {
-    const TYPE_NAME: &'static str = "molecule component";
-
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let property = Property::required_u32("weight");
-        let context = format!("{} '{}'", ffi::MoleculeComponent::TYPE_NAME, tag.path());
-        let weight = property.extract(context.as_str(), value)?;
+        let tag = tag.cast("component");
+        let weight = property.extract(&tag, value)?;
 
         let component = Self {
             name: tag.name().to_string(),
@@ -187,12 +174,10 @@ impl TryFromBound for ffi::MoleculeComponent {
 }
 
 impl TryFromBound for ffi::MixtureComponent {
-    const TYPE_NAME: &'static str = "mixture component";
-
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let property = Property::required_f64("weight");
-        let context = format!("{} '{}'", ffi::MixtureComponent::TYPE_NAME, tag.path());
-        let weight = property.extract(context.as_str(), value)?;
+        let tag = tag.cast("component");
+        let weight = property.extract(&tag, value)?;
 
         let component = Self {
             name: tag.name().to_string(),
