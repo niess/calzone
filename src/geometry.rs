@@ -1,10 +1,19 @@
+use crate::utils::extract::{Tag, TryFromBound};
 use cxx::SharedPtr;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use super::cxx::ffi;
 use temp_dir::TempDir;
 
 mod goupil;
+mod volume;
 
+
+// ===============================================================================================
+//
+// Geometry interface.
+//
+// ===============================================================================================
 
 #[pyclass(frozen, module="calzone")]
 pub struct Geometry (SharedPtr<ffi::GeometryBorrow>);
@@ -15,9 +24,16 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 #[pymethods]
 impl Geometry {
     #[new]
-    fn new() -> Self {
+    #[pyo3(signature = (**kwargs,))]
+    fn new(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        if let Some(kwargs) = kwargs {
+            let volumes = Vec::<volume::Volume>::try_from_dict(&Tag::empty(), kwargs)?;
+        }
+
         let geometry = ffi::create_geometry();
-        Self (geometry)
+        let geometry = Self (geometry);
+
+        Ok(geometry)
     }
 
     fn dump(&self, path: Option<&str>) -> PyResult<()> {

@@ -1,8 +1,9 @@
-use indexmap::IndexMap; // XXX needed?
+use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::PyDict;
 use std::borrow::Cow;
+use super::float::{f64x3, f64x3x3};
 
 
 // ===============================================================================================
@@ -172,6 +173,8 @@ pub struct Property {
 #[allow(dead_code)] // XXX needed?
 enum PropertyDefault {
     F64(f64),
+    F64x3(f64x3),
+    F64x3x3(f64x3x3),
     Optional,
     Required,
     String(&'static str),
@@ -181,6 +184,8 @@ enum PropertyDefault {
 enum PropertyType {
     Dict,
     F64,
+    F64x3,
+    F64x3x3,
     String,
     U32,
 }
@@ -188,6 +193,8 @@ enum PropertyType {
 pub enum PropertyValue<'py> {
     Dict(Bound<'py, PyDict>),
     F64(f64),
+    F64x3(f64x3),
+    F64x3x3(f64x3x3),
     None,
     String(String),
     U32(u32),
@@ -197,7 +204,8 @@ impl<const N: usize> Extractor<N> {
     pub fn extract<'a, 'py>(
         &self,
         tag: &Tag,
-        dict: &'a Bound<'py, PyDict>
+        dict: &'a Bound<'py, PyDict>,
+        mut remainder: Option<&mut IndexMap<String, Bound<'py, PyAny>>>,
     ) -> PyResult<[PropertyValue<'py>; N]> {
 
         // Extract properties from (key, value).
@@ -211,11 +219,18 @@ impl<const N: usize> Extractor<N> {
                     continue 'items;
                 }
             }
-            let message: String = tag.bad().why(format!(
-                "unknown property '{}'",
-                k
-            )).into();
-            return Err(PyValueError::new_err(message));
+            match remainder.as_mut() {
+                None => {
+                    let message: String = tag.bad().why(format!(
+                        "unknown property '{}'",
+                        k
+                    )).into();
+                    return Err(PyValueError::new_err(message));
+                },
+                Some(remainder) => {
+                    let _unused = remainder.insert(k, v);
+                },
+            }
         }
 
         // Check for undefined properties, and apply default values.
@@ -237,6 +252,17 @@ impl<const N: usize> Extractor<N> {
         Ok(values)
     }
 
+    pub fn extract_any<'a, 'py>(
+        &self,
+        tag: &Tag,
+        any: &'a Bound<'py, PyAny>,
+        remainder: Option<&mut IndexMap<String, Bound<'py, PyAny>>>,
+    ) -> PyResult<[PropertyValue<'py>; N]> {
+        let dict: Bound<PyDict> = extract(any)
+            .or_else(|| tag.bad().what("properties").into())?;
+        self.extract(tag, &dict, remainder)
+    }
+
     pub const fn new(properties: [Property; N]) -> Self {
         Self { properties }
     }
@@ -256,6 +282,12 @@ impl Property {
         Self::new(name, tp, default)
     }
 
+    pub const fn new_mat(name: &'static str, default: f64x3x3) -> Self {
+        let tp = PropertyType::F64x3x3;
+        let default = PropertyDefault::F64x3x3(default);
+        Self::new(name, tp, default)
+    }
+
     pub const fn new_str(name: &'static str, default: &'static str) -> Self {
         let tp = PropertyType::F64;
         let default = PropertyDefault::String(default);
@@ -265,6 +297,12 @@ impl Property {
     pub const fn new_u32(name: &'static str, default: u32) -> Self {
         let tp = PropertyType::U32;
         let default = PropertyDefault::U32(default);
+        Self::new(name, tp, default)
+    }
+
+    pub const fn new_vec(name: &'static str, default: f64x3) -> Self {
+        let tp = PropertyType::F64x3;
+        let default = PropertyDefault::F64x3(default);
         Self::new(name, tp, default)
     }
 
@@ -281,6 +319,12 @@ impl Property {
         Self::new(name, tp, default)
     }
 
+    pub const fn optional_mat(name: &'static str) -> Self {
+        let tp = PropertyType::F64x3x3;
+        let default = PropertyDefault::Optional;
+        Self::new(name, tp, default)
+    }
+
     pub const fn optional_str(name: &'static str) -> Self {
         let tp = PropertyType::String;
         let default = PropertyDefault::Optional;
@@ -289,6 +333,12 @@ impl Property {
 
     pub const fn optional_u32(name: &'static str) -> Self {
         let tp = PropertyType::U32;
+        let default = PropertyDefault::Optional;
+        Self::new(name, tp, default)
+    }
+
+    pub const fn optional_vec(name: &'static str) -> Self {
+        let tp = PropertyType::F64x3;
         let default = PropertyDefault::Optional;
         Self::new(name, tp, default)
     }
@@ -306,6 +356,12 @@ impl Property {
         Self::new(name, tp, default)
     }
 
+    pub const fn required_mat(name: &'static str) -> Self {
+        let tp = PropertyType::F64x3x3;
+        let default = PropertyDefault::Required;
+        Self::new(name, tp, default)
+    }
+
     pub const fn required_str(name: &'static str) -> Self {
         let tp = PropertyType::String;
         let default = PropertyDefault::Required;
@@ -314,6 +370,12 @@ impl Property {
 
     pub const fn required_u32(name: &'static str) -> Self {
         let tp = PropertyType::U32;
+        let default = PropertyDefault::Required;
+        Self::new(name, tp, default)
+    }
+
+    pub const fn required_vec(name: &'static str) -> Self {
+        let tp = PropertyType::F64x3;
         let default = PropertyDefault::Required;
         Self::new(name, tp, default)
     }
@@ -337,6 +399,16 @@ impl Property {
                 let value: f64 = extract(value)
                     .or_else(bad_property)?;
                 PropertyValue::F64(value)
+            },
+            PropertyType::F64x3 => {
+                let value: f64x3 = extract(value)
+                    .or_else(bad_property)?;
+                PropertyValue::F64x3(value)
+            },
+            PropertyType::F64x3x3 => {
+                let value: f64x3x3 = extract(value)
+                    .or_else(bad_property)?;
+                PropertyValue::F64x3x3(value)
             },
             PropertyType::String => {
                 let value: String = extract(value)
@@ -375,6 +447,8 @@ impl<'py> From<&PropertyDefault> for PropertyValue<'py> {
     fn from(value: &PropertyDefault) -> Self {
         match value {
             PropertyDefault::F64(value) => Self::F64(*value),
+            PropertyDefault::F64x3(value) => Self::F64x3(*value),
+            PropertyDefault::F64x3x3(value) => Self::F64x3x3(*value),
             PropertyDefault::Optional => Self::None,
             PropertyDefault::String(value) => Self::String(value.to_string()),
             PropertyDefault::U32(value) => Self::U32(*value),
@@ -392,10 +466,68 @@ impl<'py> From<PropertyValue<'py>> for Bound<'py, PyDict> {
     }
 }
 
+impl<'py> From<PropertyValue<'py>> for Option<Bound<'py, PyDict>> {
+    fn from(value: PropertyValue<'py>) -> Option<Bound<'py, PyDict>> {
+        match value {
+            PropertyValue::Dict(value) => Some(value),
+            PropertyValue::None => None,
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl<'py> From<PropertyValue<'py>> for f64 {
     fn from(value: PropertyValue<'py>) -> f64 {
         match value {
             PropertyValue::F64(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<f64> {
+    fn from(value: PropertyValue<'py>) -> Option<f64> {
+        match value {
+            PropertyValue::F64(value) => Some(value),
+            PropertyValue::None => None,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for f64x3 {
+    fn from(value: PropertyValue<'py>) -> f64x3 {
+        match value {
+            PropertyValue::F64x3(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<f64x3> {
+    fn from(value: PropertyValue<'py>) -> Option<f64x3> {
+        match value {
+            PropertyValue::F64x3(value) => Some(value),
+            PropertyValue::None => None,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for f64x3x3 {
+    fn from(value: PropertyValue<'py>) -> f64x3x3 {
+        match value {
+            PropertyValue::F64x3x3(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<f64x3x3> {
+    fn from(value: PropertyValue<'py>) -> Option<f64x3x3> {
+        match value {
+            PropertyValue::F64x3x3(value) => Some(value),
+            PropertyValue::None => None,
             _ => unreachable!(),
         }
     }
@@ -410,10 +542,30 @@ impl<'py> From<PropertyValue<'py>> for String {
     }
 }
 
+impl<'py> From<PropertyValue<'py>> for Option<String> {
+    fn from(value: PropertyValue<'py>) -> Option<String> {
+        match value {
+            PropertyValue::None => None,
+            PropertyValue::String(value) => Some(value),
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl<'py> From<PropertyValue<'py>> for u32 {
     fn from(value: PropertyValue<'py>) -> u32 {
         match value {
             PropertyValue::U32(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<u32> {
+    fn from(value: PropertyValue<'py>) -> Option<u32> {
+        match value {
+            PropertyValue::None => None,
+            PropertyValue::U32(value) => Some(value),
             _ => unreachable!(),
         }
     }
@@ -487,16 +639,24 @@ where
     }
 }
 
+impl TypeName for f64 {
+    fn type_name() -> &'static str { "a float" }
+}
+
+impl TypeName for f64x3 {
+    fn type_name() -> &'static str { "a vector" }
+}
+
+impl TypeName for f64x3x3 {
+    fn type_name() -> &'static str { "a matrix" }
+}
+
 impl TypeName for PyDict {
     fn type_name() -> &'static str { "a dict" }
 }
 
 impl TypeName for String {
     fn type_name() -> &'static str { "a string" }
-}
-
-impl TypeName for f64 {
-    fn type_name() -> &'static str { "a float" }
 }
 
 impl TypeName for u32 {

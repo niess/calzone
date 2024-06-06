@@ -90,7 +90,7 @@ impl TryFromBound for ffi::Element {
         ]);
 
         let tag = tag.cast("element");
-        let [Z, A, symbol] = EXTRACTOR.extract(&tag, value)?;
+        let [Z, A, symbol] = EXTRACTOR.extract(&tag, value, None)?;
         let symbol = if symbol.is_none() { tag.name().to_string() } else { symbol.into() };
 
         let element = Self {
@@ -144,7 +144,7 @@ fn try_into_properties<'py>(
     tag: &Tag,
     value: &Bound<'py, PyDict>
 ) -> PyResult<(ffi::MaterialProperties, Bound<'py, PyDict>)> {
-    let [density, composition, state] = extractor.extract(tag, value)?;
+    let [density, composition, state] = extractor.extract(tag, value, None)?;
 
     let state: ffi::G4State = if state.is_none() {
         ffi::G4State::kStateUndefined
