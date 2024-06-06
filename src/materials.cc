@@ -1,6 +1,8 @@
 #include "calzone.h"
 // Standard library.
 #include <map>
+// fmt library.
+#include <fmt/core.h>
 // Geant4 interface.
 #include "G4Element.hh"
 #include "G4NistManager.hh"
@@ -28,9 +30,9 @@ static G4Element * get_element(const rust::String & name, bool ignore=true) {
         element = ELEMENTS.at(name);
     } catch (std::out_of_range & _) {
         if (!ignore) {
-            std::string msg = "bad element (undefined '";
-            msg += std::string(name);
-            msg += "')";
+            auto msg = fmt::format(
+                "bad element (undefined {})", std::string(name)
+            );
             set_error(ErrorType::ValueError, msg.c_str());
         }
     }
@@ -45,9 +47,10 @@ std::shared_ptr<Error> add_element(const Element & e) {
         if ((element->GetSymbol() != std::string(e.symbol)) ||
             (element->GetZ() != e.Z) ||
             (element->GetAtomicMassAmu() != e.A)) {
-            std::string msg = "bad element (redefinition of '";
-            msg += std::string(e.name);
-            msg += "')";
+            auto msg = fmt::format(
+                "bad element (redefinition of '{}')", 
+                std::string(e.name)
+            );
             set_error(ErrorType::ValueError, msg.c_str());
         }
         return get_error();
@@ -61,9 +64,10 @@ std::shared_ptr<Error> add_element(const Element & e) {
     );
     if (element == nullptr) {
         if (!any_error()) {
-            std::string msg = "bad element (could not create '";
-            msg += std::string(e.name);
-            msg += "')";
+            auto msg = fmt::format(
+                "bad element (could not create '{}')",
+                std::string(e.name)
+            );
             set_error(ErrorType::ValueError, msg.c_str());
         }
         return get_error();
@@ -103,9 +107,10 @@ static HashedMaterial get_material(
         hashed = MATERIALS.at(name);
     } catch (std::out_of_range & _) {
         if (!ignore) {
-            std::string msg = "bad material (undefined '";
-            msg += std::string(name);
-            msg += "')";
+            auto msg = fmt::format(
+                "bad material (undefined '{}')",
+                std::string(name)
+            );
             set_error(ErrorType::ValueError, msg.c_str());
         }
     }
@@ -118,17 +123,22 @@ static G4Material * create_material(
 ) {
     clear_error();
 
+    const double density = std::max(
+        properties.density * (CLHEP::g / CLHEP::cm3),
+        CLHEP::universe_mean_density
+    );
     auto material = new G4Material(
         std::string(properties.name),
-        properties.density,
+        density,
         n,
         properties.state
     );
     if (material == nullptr) {
         if (!any_error()) {
-            std::string msg = "bad material (could not create '";
-            msg += std::string(properties.name);
-            msg += "')";
+            auto msg = fmt::format(
+                "bad material (could not create '{}')",
+                std::string(properties.name)
+            );
             set_error(ErrorType::ValueError, msg.c_str());
         }
     }
@@ -140,9 +150,10 @@ std::shared_ptr<Error> add_mixture(const Mixture & mixture) {
     HashedMaterial hashed = get_material(mixture.properties.name);
     if (hashed.material != nullptr) {
         if (hashed.hash != hash) {
-            std::string msg = "bad material (redefinition of '";
-            msg += std::string(mixture.properties.name);
-            msg += "')";
+            auto msg = fmt::format(
+                "bad material (redefinition of '{}')",
+                std::string(mixture.properties.name)
+            );
             set_error(ErrorType::ValueError, msg.c_str());
         }
         return get_error();
@@ -163,11 +174,11 @@ std::shared_ptr<Error> add_mixture(const Mixture & mixture) {
             HashedMaterial hashed = get_material(component.name);
             if (hashed.material == nullptr) {
                 delete material;
-                std::string msg = "bad component for '";
-                msg += std::string(mixture.properties.name);
-                msg += "' material (undefined '";
-                msg += std::string(component.name);
-                msg += "')";
+                auto msg = fmt::format(
+                    "bad component for '{}' material (undefined '{}')",
+                    std::string(mixture.properties.name),
+                    std::string(component.name)
+                );
                 set_error(ErrorType::ValueError, msg.c_str());
                 return get_error();
             }
@@ -185,9 +196,10 @@ std::shared_ptr<Error> add_molecule(const Molecule & molecule) {
     HashedMaterial hashed = get_material(molecule.properties.name);
     if (hashed.material != nullptr) {
         if (hashed.hash != hash) {
-            std::string msg = "bad material (redefinition of '";
-            msg += std::string(molecule.properties.name);
-            msg += "')";
+            auto msg = fmt::format(
+                "bad material (redefinition of '{}')",
+                std::string(molecule.properties.name)
+            );
             set_error(ErrorType::ValueError, msg.c_str());
         }
         return get_error();
@@ -201,9 +213,15 @@ std::shared_ptr<Error> add_molecule(const Molecule & molecule) {
         return get_error();
     }
     for (auto component: molecule.components) {
-        auto element = get_element(component.name, false);
+        auto element = get_element(component.name);
         if (element == nullptr) {
             delete material;
+            auto msg = fmt::format(
+                "bad component for '{}' material (undefined '{}' element)",
+                std::string(molecule.properties.name),
+                std::string(component.name)
+            );
+            set_error(ErrorType::ValueError, msg.c_str());
             return get_error();
         }
         material->AddElement(element, (int)component.weight);

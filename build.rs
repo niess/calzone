@@ -24,6 +24,10 @@ fn main() {
     let goupil_source = Path::new(&goupil_prefix)
         .join("interfaces/geant4/G4Goupil.cc");
 
+    let fmt_prefix = "deps/fmt"; // XXX relative to this file?
+    let fmt_include = Path::new(&fmt_prefix)
+        .join("include");
+
     let sources = [
         "src/error.cc",
         "src/geometry.cc",
@@ -33,6 +37,8 @@ fn main() {
 
     cxx_build::bridge("src/cxx.rs")
         .std("c++17")
+        .define("FMT_HEADER_ONLY", "")
+        .include(&fmt_include)
         .include(&geant4_include)
         .include(&goupil_include)
         .include("src")

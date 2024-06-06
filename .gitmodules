@@ -1,3 +1,6 @@
 [submodule "goupil"]
 	path = deps/goupil
 	url = https://github.com/niess/goupil.git
+[submodule "fmt"]
+	path = deps/fmt
+	url = https://github.com/fmtlib/fmt.git

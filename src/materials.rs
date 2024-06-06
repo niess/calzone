@@ -26,12 +26,24 @@ pub fn elements(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
 }
 
 #[pyfunction]
-pub fn load<'py>(py: Python<'py>, path: &str) -> PyResult<Bound<'py, PyDict>> {
+pub fn load<'py>(py: Python<'py>, path: &str) -> PyResult<()> {
     let path = Path::new(path);
-    match path.extension().and_then(OsStr::to_str) {
+    let materials = match path.extension().and_then(OsStr::to_str) {
         Some("db") => gate::load_gate_db(py, path),
         _ => Err(PyNotImplementedError::new_err("")),
-    }
+    }?;
+
+    let get = |key: &str| -> PyResult<Bound<PyDict>> {
+        let value = materials.get_item(key)?.unwrap();
+        let dict: Bound<PyDict> = value.extract()?;
+        Ok(dict)
+    };
+
+    elements(Some(&get("elements")?))?;
+    molecules(Some(&get("molecules")?))?;
+    mixtures(Some(&get("mixtures")?))?;
+
+    Ok(())
 }
 
 #[pyfunction]
@@ -52,6 +64,7 @@ pub fn molecules(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
 pub fn mixtures(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
     if let Some(kwargs) = kwargs {
         let mixtures = Vec::<ffi::Mixture>::try_from_dict(&Tag::empty(), kwargs)?;
+        // XXX Sort mixtures before processing them?
         for mixture in mixtures {
             ffi::add_mixture(&mixture)
                 .to_result()?;
