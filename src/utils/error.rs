@@ -4,7 +4,7 @@ use pyo3::exceptions::{
     PyException, PyFileNotFoundError, PyKeyboardInterrupt, PyMemoryError, PyValueError
 };
 use pyo3::ffi::PyErr_CheckSignals;
-use super::cxx::ffi;
+use super::ffi;
 
 
 pub fn initialise() {

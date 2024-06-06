@@ -5,7 +5,6 @@ use pyo3::exceptions::PySystemError;
 use pyo3::sync::GILOnceCell;
 
 mod cxx;
-mod error;
 mod geometry;
 mod materials;
 mod utils;
@@ -32,7 +31,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     }
 
     // Initialise interfaces.
-    error::initialise();
+    utils::error::initialise();
     utils::units::initialise(py);
 
     // Register class object(s).

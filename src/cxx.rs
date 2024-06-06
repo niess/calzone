@@ -1,13 +1,12 @@
-use super::error::ctrlc_catched;
+use crate::utils::error::ctrlc_catched;
 
 #[cxx::bridge]
 pub mod ffi {
-    struct Element {
-        name: String,
-        symbol: String,
-        Z: f64,
-        A: f64,
-    }
+    // ===========================================================================================
+    //
+    // Errors interface.
+    //
+    // ===========================================================================================
 
     struct Error {
         tp: ErrorType,
@@ -22,6 +21,19 @@ pub mod ffi {
         KeyboardInterrupt,
         MemoryError,
         ValueError,
+    }
+
+    // ===========================================================================================
+    //
+    // Materials interface.
+    //
+    // ===========================================================================================
+
+    struct Element {
+        name: String,
+        symbol: String,
+        Z: f64,
+        A: f64,
     }
 
     #[repr(u32)]
@@ -62,6 +74,12 @@ pub mod ffi {
         weight: u32,
     }
 
+    // ===========================================================================================
+    //
+    // Units interface.
+    //
+    // ===========================================================================================
+
     #[derive(Debug)]
     struct UnitDefinition {
         name: String,
@@ -69,30 +87,45 @@ pub mod ffi {
         value: f64,
     }
 
+    // ===========================================================================================
+    //
+    // c++ imports.
+    //
+    // ===========================================================================================
+
     unsafe extern "C++" {
         include!("calzone.h");
 
-        // Error interface.
+        // Errors interface.
         fn initialise_errors();
 
         // Geometry interface.
-        type G4State;
-        fn add_element(element: &Element) -> SharedPtr<Error>;
-        fn add_mixture(element: &Mixture) -> SharedPtr<Error>;
-        fn add_molecule(element: &Molecule) -> SharedPtr<Error>;
-
         type GeometryBorrow;
         fn create_geometry() -> SharedPtr<GeometryBorrow>;
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn set_goupil(self: &GeometryBorrow);
 
+        // Material interface.
+        type G4State;
+        fn add_element(element: &Element) -> SharedPtr<Error>;
+        fn add_mixture(element: &Mixture) -> SharedPtr<Error>;
+        fn add_molecule(element: &Molecule) -> SharedPtr<Error>;
+
         // Units interface.
         fn export_units(units: &mut Vec<UnitDefinition>);
     }
 
+    // ===========================================================================================
+    //
+    // Rust exports.
+    //
+    // ===========================================================================================
+
     extern "Rust" {
+        // Errors interface.
         fn ctrlc_catched() -> bool;
 
+        // Materials interface.
         fn get_hash(self: &Mixture) -> u64;
         fn get_hash(self: &Molecule) -> u64;
     }

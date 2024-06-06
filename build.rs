@@ -29,9 +29,9 @@ fn main() {
         .join("include");
 
     let sources = [
-        "src/error.cc",
         "src/geometry.cc",
         "src/materials.cc",
+        "src/utils/error.cc",
         "src/utils/units.cc",
     ];
 

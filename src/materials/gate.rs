@@ -1,4 +1,4 @@
-use crate::error::variant_explain;
+use crate::utils::error::variant_explain;
 use crate::utils::units::{self, UnitError};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;

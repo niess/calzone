@@ -1,5 +1,5 @@
-use crate::error::variant_error;
-use crate::utils::{Extractor, Property, Tag, TryFromBound};
+use crate::utils::error::variant_error;
+use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use pyo3::exceptions::PyNotImplementedError;
