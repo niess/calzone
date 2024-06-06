@@ -1,4 +1,6 @@
+use crate::geometry::volume::Volume;
 use crate::utils::error::ctrlc_catched;
+
 
 #[cxx::bridge]
 pub mod ffi {
@@ -113,10 +115,11 @@ pub mod ffi {
 
         // Errors interface.
         fn initialise_errors();
+        fn get_error() -> SharedPtr<Error>;
 
         // Geometry interface.
         type GeometryBorrow;
-        fn create_geometry() -> SharedPtr<GeometryBorrow>;
+        fn create_geometry(volume: Box<Volume>) -> SharedPtr<GeometryBorrow>;
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn set_goupil(self: &GeometryBorrow);
 
@@ -139,6 +142,18 @@ pub mod ffi {
     extern "Rust" {
         // Errors interface.
         fn ctrlc_catched() -> bool;
+
+        // Geometry interface.
+        type Volume;
+
+        fn box_shape(self: &Volume) -> &BoxShape;
+        fn is_rotated(self: &Volume) -> bool;
+        fn material(self: &Volume) -> &String;
+        fn name(self: &Volume) -> &String;
+        fn position(self: &Volume) -> [f64; 3];
+        fn rotation(self: &Volume) -> &[[f64; 3]];
+        fn shape(self: &Volume) -> ShapeType;
+        fn volumes(self: &Volume) -> &Vec<Volume>;
 
         // Materials interface.
         fn get_hash(self: &Mixture) -> u64;

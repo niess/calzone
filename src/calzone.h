@@ -43,7 +43,7 @@ private:
     GeometryData * data;
 };
 
-std::shared_ptr<GeometryBorrow> create_geometry();
+std::shared_ptr<GeometryBorrow> create_geometry(rust::Box<Volume>);
 
 
 // ============================================================================
@@ -55,6 +55,9 @@ std::shared_ptr<GeometryBorrow> create_geometry();
 std::shared_ptr<Error> add_element(const Element &);
 std::shared_ptr<Error> add_mixture(const Mixture &);
 std::shared_ptr<Error> add_molecule(const Molecule &);
+
+class G4Material;
+G4Material * get_material(const rust::String & name);
 
 
 // ============================================================================

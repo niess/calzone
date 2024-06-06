@@ -87,7 +87,7 @@ struct HashedMaterial {
 
 static std::map<rust::String, HashedMaterial> MATERIALS;
 
-static HashedMaterial get_material(
+static HashedMaterial get_hashed_material(
     const rust::String & name,
     bool ignore=true
 ) {
@@ -101,7 +101,7 @@ static HashedMaterial get_material(
         nist->FindOrBuildMaterial(std::string(name)),
         0x0
     };
-    if ((hashed.material == nullptr) && (!ignore)) {
+    if ((hashed.material == nullptr) && (!ignore)) { // XXX needed?
         auto msg = fmt::format(
             "bad material (undefined '{}')",
             std::string(name)
@@ -110,6 +110,11 @@ static HashedMaterial get_material(
     }
 
     return hashed;
+}
+
+G4Material * get_material(const rust::String & name) {
+    auto hashed = get_hashed_material(name);
+    return hashed.material;
 }
 
 static G4Material * create_material(
@@ -142,7 +147,7 @@ static G4Material * create_material(
 
 std::shared_ptr<Error> add_mixture(const Mixture & mixture) {
     auto hash = mixture.get_hash();
-    HashedMaterial hashed = get_material(mixture.properties.name);
+    HashedMaterial hashed = get_hashed_material(mixture.properties.name);
     if (hashed.material != nullptr) {
         if (hashed.hash != hash) {
             auto msg = fmt::format(
@@ -166,7 +171,7 @@ std::shared_ptr<Error> add_mixture(const Mixture & mixture) {
         if (element != nullptr) {
             material->AddElement(element, component.weight);
         } else {
-            HashedMaterial hashed = get_material(component.name);
+            HashedMaterial hashed = get_hashed_material(component.name);
             if (hashed.material == nullptr) {
                 delete material;
                 auto msg = fmt::format(
@@ -188,7 +193,7 @@ std::shared_ptr<Error> add_mixture(const Mixture & mixture) {
 
 std::shared_ptr<Error> add_molecule(const Molecule & molecule) {
     auto hash = molecule.get_hash();
-    HashedMaterial hashed = get_material(molecule.properties.name);
+    HashedMaterial hashed = get_hashed_material(molecule.properties.name);
     if (hashed.material != nullptr) {
         if (hashed.hash != hash) {
             auto msg = fmt::format(

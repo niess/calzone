@@ -28,6 +28,14 @@ pub enum Shape {
     Box(ffi::BoxShape),
 }
 
+impl From<&Shape> for ffi::ShapeType {
+    fn from(value: &Shape) -> Self {
+        match value {
+            Shape::Box(_) => ffi::ShapeType::Box,
+        }
+    }
+}
+
 #[derive(EnumVariantsStrings)]
 #[enum_variants_strings_transform(transform="none")]
 enum ShapeType {
@@ -122,5 +130,53 @@ impl TryFromBound for ffi::BoxShape {
         };
         let shape = Self { size: size.into() };
         Ok(shape)
+    }
+}
+
+// ===============================================================================================
+//
+// C++ interface.
+//
+// ===============================================================================================
+
+impl Volume {
+    pub fn box_shape(&self) -> &ffi::BoxShape {
+        match &self.shape {
+            Shape::Box(shape) => &shape,
+        }
+    }
+
+    pub fn is_rotated(&self) -> bool {
+        return self.rotation.is_some()
+    }
+
+    pub fn material(&self) -> &String {
+        &self.material
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn position(&self) -> [f64; 3] {
+        match self.position {
+            None => f64x3::zero().into(),
+            Some(p) => p.into(),
+        }
+    }
+
+    pub fn rotation(&self) -> &[[f64; 3]] {
+        match self.rotation.as_ref() {
+            Some(rotation) => rotation.as_ref(),
+            None => unreachable!(),
+        }
+    }
+
+    pub fn shape(&self) -> ffi::ShapeType {
+        (&self.shape).into()
+    }
+
+    pub fn volumes(&self) -> &Vec<Volume> {
+        &self.volumes
     }
 }

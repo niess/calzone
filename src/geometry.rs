@@ -6,7 +6,7 @@ use super::cxx::ffi;
 use temp_dir::TempDir;
 
 mod goupil;
-mod volume;
+pub mod volume;
 
 
 // ===============================================================================================
@@ -24,13 +24,13 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 #[pymethods]
 impl Geometry {
     #[new]
-    #[pyo3(signature = (**kwargs,))]
-    fn new(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        if let Some(kwargs) = kwargs {
-            let volumes = Vec::<volume::Volume>::try_from_dict(&Tag::empty(), kwargs)?;
+    fn new(volumes: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let volume = volume::Volume::try_from_dict(&Tag::new("", "World"), volumes)?;
+        let geometry = ffi::create_geometry(Box::new(volume));
+        if geometry.is_null() {
+            ffi::get_error().to_result()?;
+            unreachable!()
         }
-
-        let geometry = ffi::create_geometry();
         let geometry = Self (geometry);
 
         Ok(geometry)
