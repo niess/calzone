@@ -150,10 +150,11 @@ pub mod ffi {
         fn is_rotated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
         fn name(self: &Volume) -> &String;
+        fn overlaps(self: &Volume) -> &[[String; 2]];
         fn position(self: &Volume) -> [f64; 3];
         fn rotation(self: &Volume) -> &[[f64; 3]];
         fn shape(self: &Volume) -> ShapeType;
-        fn volumes(self: &Volume) -> &Vec<Volume>;
+        fn volumes(self: &Volume) -> &[Volume];
 
         // Materials interface.
         fn get_hash(self: &Mixture) -> u64;

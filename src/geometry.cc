@@ -8,6 +8,7 @@
 #include "G4GDMLParser.hh"
 #include "G4NistManager.hh"
 #include "G4PVPlacement.hh"
+#include "G4SubtractionSolid.hh"
 // Goupil interface.
 #include "G4Goupil.hh"
 
@@ -43,7 +44,8 @@ std::map<const G4VPhysicalVolume *, GeometryData *> GeometryData::INSTANCES;
 static bool build_solids(
     const Volume & volume,
     const std::string & path,
-    std::map<std::string, G4VSolid *> & solids
+    std::map<std::string, G4VSolid *> & solids,
+    std::list<G4VSolid *> & orphans
 ) {
     auto name = std::string(volume.name());
     std::string pathname;
@@ -76,10 +78,24 @@ static bool build_solids(
     solids[pathname] = solid;
 
     // Build sub-solids.
-    auto & volumes = volume.volumes();
-    for (size_t i = 0; i < volumes.size(); i++) {
-        if (!build_solids(volumes[i], pathname, solids)) return false;
+    for (auto && v: volume.volumes()) {
+        if (!build_solids(v, pathname, solids, orphans)) return false;
     }
+
+    // Patch overlaps.
+    for (auto overlap: volume.overlaps()) {
+        const std::string path0 = fmt::format("{}.{}",
+            pathname, std::string(overlap[0]));
+        const std::string path1 = fmt::format("{}.{}",
+            pathname, std::string(overlap[1]));
+        auto solid0 = solids[path0];
+        auto boolean = new G4SubtractionSolid(
+            std::string(overlap[0]), solid0, solids[path1]
+        );
+        orphans.push_back(solid0);
+        solids[path0] = boolean;
+    }
+
     return true;
 }
 
@@ -149,9 +165,7 @@ static G4LogicalVolume * build_volumes(
     // XXX Set any sensitive detector.
 
     // Build sub-volumes.
-    auto & volumes = volume.volumes();
-    for (size_t i = 0; i < volumes.size(); i++) {
-        const Volume & v = volumes[i];
+    for (auto && v: volume.volumes()) {
         auto l = build_volumes(v, pathname, solids);
         if (l == nullptr) {
             drop_them_all(logical);
@@ -193,14 +207,12 @@ GeometryData::GeometryData(rust::Box<Volume> volume) {
     // Build solids.
     std::map<std::string, G4VSolid *> solids;
     const std::string path = "";
-    if (!build_solids(*volume, path, solids)) {
+    if (!build_solids(*volume, path, solids, this->orphans)) {
         for (auto item: solids) {
             delete item.second;
         }
         return;
     }
-
-    // XXX Patch overlaps.
 
     // Build volumes.
     auto logical = build_volumes(*volume, path, solids);

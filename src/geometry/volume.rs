@@ -1,11 +1,12 @@
 use crate::utils::error::variant_error;
-use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
+use crate::utils::extract::{extract, Extractor, Property, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::exceptions::PyValueError;
+use std::cmp::Ordering::{Equal, Greater};
 use super::ffi;
 
 
@@ -22,6 +23,7 @@ pub struct Volume {
     position: Option<f64x3>,
     rotation: Option<f64x3x3>,
     volumes: Vec<Volume>,
+    overlaps: Vec<[String; 2]>,
 }
 
 pub enum Shape {
@@ -52,16 +54,17 @@ enum ShapeType {
 impl TryFromBound for Volume {
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
         // Extract base properties.
-        const EXTRACTOR: Extractor<4> = Extractor::new([
+        const EXTRACTOR: Extractor<5> = Extractor::new([
             Property::required_str("material"),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
             Property::optional_dict("volumes"),
+            Property::optional_dict("overlaps"),
         ]);
 
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, position, rotation, volumes] = EXTRACTOR.extract(
+        let [material, position, rotation, volumes, overlaps] = EXTRACTOR.extract(
             &tag, value, Some(&mut remainder)
         )?;
 
@@ -70,6 +73,7 @@ impl TryFromBound for Volume {
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
         let volumes: Option<Bound<PyDict>> = volumes.into();
+        let overlaps: Option<Bound<PyDict>> = overlaps.into();
 
         // Extract shape properties.
         let get_shape_type = |shape: &str| -> PyResult<ShapeType> {
@@ -108,7 +112,68 @@ impl TryFromBound for Volume {
             },
         };
 
-        let volume = Self { name, material, shape, position, rotation, volumes };
+        // Extract overlaps.
+        let overlaps = match overlaps {
+            None => Vec::<[String; 2]>::new(),
+            Some(overlaps) => {
+                // Extract and flatten overlaps.
+                let mut o = Vec::<[String; 2]>::new();
+
+                let find = |name: &String| -> PyResult<()> {
+                    // Check that the overlaping volume is defined.
+                    match volumes.iter().find(|v| &v.name == name) {
+                        None => {
+                            let message: String = tag.bad().what("overlap").why(format!(
+                                "undefined '{}' volume",
+                                name,
+                            )).into();
+                            Err(PyValueError::new_err(message))
+                        }
+                        Some(_) => Ok(()),
+                    }
+                };
+
+                let mut push = |left: String, right: String| -> PyResult<()> {
+                    // Order and push an overlap pair.
+                    find(&left)?;
+                    find(&right)?;
+                    match left.cmp(&right) {
+                        Greater => o.push([right, left]),
+                        _ => o.push([left, right]),
+                    }
+                    Ok(())
+                };
+
+                for (left, right) in overlaps.iter() {
+                    let left: String = extract(&left)
+                        .or_else(|| tag.bad().what("left overlap").into())?;
+                    let result: PyResult<Vec<String>> = right.extract();
+                    match result {
+                        Err(_) => {
+                            let right: String = extract(&right)
+                                .expect("a string or a sequence of strings")
+                                .or_else(|| tag.bad().what("right overlap").into())?;
+                            push(left, right)?;
+                        },
+                        Ok(rights) => {
+                            for right in rights {
+                                push(left.clone(), right)?;
+                            }
+                        },
+                    }
+                }
+
+                // Sort overlaps.
+                o.sort_by(|a, b| match a[0].cmp(&b[0]) {
+                    Equal => a[1].cmp(&b[1]),
+                    other => other,
+                });
+                o.dedup(); // remove duplicates.
+                o
+            },
+        };
+
+        let volume = Self { name, material, shape, position, rotation, volumes, overlaps };
         Ok(volume)
     }
 }
@@ -158,6 +223,10 @@ impl Volume {
         &self.name
     }
 
+    pub fn overlaps(&self) -> &[[String; 2]] {
+        self.overlaps.as_slice()
+    }
+
     pub fn position(&self) -> [f64; 3] {
         match self.position {
             None => f64x3::zero().into(),
@@ -176,7 +245,7 @@ impl Volume {
         (&self.shape).into()
     }
 
-    pub fn volumes(&self) -> &Vec<Volume> {
-        &self.volumes
+    pub fn volumes(&self) -> &[Volume] {
+        self.volumes.as_slice()
     }
 }

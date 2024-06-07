@@ -578,7 +578,7 @@ impl<'py> From<PropertyValue<'py>> for Option<u32> {
 //
 // ===============================================================================================
 
-fn extract<'a, 'py, T>(
+pub fn extract<'a, 'py, T>(
     ob: &'a Bound<'py, PyAny>
 ) -> ExtractResult<'a, 'py, T>
 where
@@ -586,21 +586,33 @@ where
 {
     let result = T::extract_bound(ob)
         .map_err(|_| ob);
-    ExtractResult (result)
+    ExtractResult { result, expected: None }
 }
 
-struct ExtractResult<'a, 'py, T> (Result<T, &'a Bound<'py, PyAny>>);
+pub struct ExtractResult<'a, 'py, T> {
+    result: Result<T, &'a Bound<'py, PyAny>>,
+    expected: Option<&'static str>,
+}
 
 impl<'a, 'py, T> ExtractResult<'a, 'py, T>
 where
     T: FromPyObject<'py> + TypeName,
 {
+    pub fn expect(mut self, typename: &'static str) -> Self {
+        if let Err(_) = self.result.as_ref() {
+            self.expected = Some(typename);
+        }
+        self
+    }
+
     pub fn or(self, message: &str) -> PyResult<T> {
-        let value: T = self.0.map_err(|ob| {
+        let expected = self.expected
+            .unwrap_or_else(T::type_name);
+        let value: T = self.result.map_err(|ob| {
             let message = format!(
                 "{} (expected {}, found {})",
                 message,
-                T::type_name(),
+                expected,
                 ob,
             );
             PyValueError::new_err(message)
@@ -617,7 +629,7 @@ where
     }
 }
 
-trait TypeName {
+pub trait TypeName {
     fn type_name() -> &'static str;
 }
 
