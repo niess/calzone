@@ -5,7 +5,7 @@ use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use std::cmp::Ordering::{Equal, Greater};
 use super::ffi;
 
@@ -129,7 +129,18 @@ impl TryFromBound for Volume {
                             )).into();
                             Err(PyValueError::new_err(message))
                         }
-                        Some(_) => Ok(()),
+                        Some(v) => {
+                            // Check that the volume is not displaced.
+                            if v.position.is_some() || v.rotation.is_some() {
+                                let message: String = tag.bad().what("overlap").why(format!(
+                                    "displaced '{}' volume",
+                                    name,
+                                )).into();
+                                Err(PyNotImplementedError::new_err(message))
+                            } else {
+                                Ok(())
+                            }
+                        },
                     }
                 };
 

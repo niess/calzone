@@ -33,7 +33,8 @@ struct GeometryBorrow {
     GeometryBorrow(GeometryData *);
     ~GeometryBorrow();
 
-    // GDML interface.
+    // Geant4 interface.
+    std::shared_ptr<Error> check(int resolution) const;
     std::shared_ptr<Error> dump(rust::Str) const;
 
     // Goupil interface.

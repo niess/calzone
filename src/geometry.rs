@@ -44,6 +44,14 @@ impl Geometry {
         Ok(geometry)
     }
 
+    fn check(&self, resolution: Option<i32>) -> PyResult<()> {
+        let resolution = resolution.unwrap_or(1000);
+        self.0
+            .check(resolution)
+            .to_result()?;
+        Ok(())
+    }
+
     fn dump(&self, path: Option<&str>) -> PyResult<()> {
         let tmp = TempDir::new()?;
         let path = path.unwrap_or("geometry.gdml");

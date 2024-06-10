@@ -301,11 +301,31 @@ std::shared_ptr<GeometryBorrow> create_geometry(rust::Box<Volume> volume) {
 
 // ============================================================================
 //
-// GDML interface.
+// Geant4 interface.
 //
 // ============================================================================
 
+static void check_overlaps(G4VPhysicalVolume * volume, int resolution) {
+    volume->CheckOverlaps(resolution, 0.0, false);
+    if (any_error()) return;
+
+    auto && logical = volume->GetLogicalVolume();
+    int n = logical->GetNoDaughters();
+    for (int i = 0; i < n; i++) {
+        auto daughter = logical->GetDaughter(i);
+        check_overlaps(daughter, resolution);
+        if (any_error()) return;
+    }
+}
+
+std::shared_ptr<Error> GeometryBorrow::check(int resolution) const {
+    clear_error();
+    check_overlaps(this->data->world, resolution);
+    return get_error();
+}
+
 std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {
+    clear_error();
     G4GDMLParser parser;
     auto buffer = std::cout.rdbuf();
     std::cout.rdbuf(nullptr); // Disable cout temporarly.
