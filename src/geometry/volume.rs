@@ -1,12 +1,16 @@
 use crate::utils::error::variant_error;
-use crate::utils::extract::{extract, Extractor, Property, Tag, TryFromBound};
+use crate::utils::extract::{extract, Extractor, Property, PropertyValue, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
+use crate::utils::io::load_stl;
+use crate::utils::units::convert;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use std::cmp::Ordering::{Equal, Greater};
+use std::ffi::OsStr;
+use std::path::Path;
 use super::ffi;
 
 
@@ -28,12 +32,18 @@ pub struct Volume {
 
 pub enum Shape {
     Box(ffi::BoxShape),
+    Cylinder(ffi::CylinderShape),
+    Sphere(ffi::SphereShape),
+    Tessellation(ffi::TessellatedShape),
 }
 
 impl From<&Shape> for ffi::ShapeType {
     fn from(value: &Shape) -> Self {
         match value {
             Shape::Box(_) => ffi::ShapeType::Box,
+            Shape::Cylinder(_) => ffi::ShapeType::Cylinder,
+            Shape::Sphere(_) => ffi::ShapeType::Sphere,
+            Shape::Tessellation(_) => ffi::ShapeType::Tessellation,
         }
     }
 }
@@ -42,6 +52,9 @@ impl From<&Shape> for ffi::ShapeType {
 #[enum_variants_strings_transform(transform="none")]
 enum ShapeType {
     Box,
+    Cylinder,
+    Sphere,
+    Tessellation,
 }
 
 
@@ -101,6 +114,12 @@ impl TryFromBound for Volume {
         let shape_tag = tag.extend(shape_name, None);
         let shape = match shape_type {
             ShapeType::Box => Shape::Box(ffi::BoxShape::try_from_any(&shape_tag, shape)?),
+            ShapeType::Cylinder => Shape::Cylinder(
+                ffi::CylinderShape::try_from_any(&shape_tag, shape)?),
+            ShapeType::Sphere => Shape::Sphere(
+                ffi::SphereShape::try_from_any(&shape_tag, shape)?),
+            ShapeType::Tessellation => Shape::Tessellation(
+                ffi::TessellatedShape::try_from_any(&shape_tag, shape)?),
         };
 
         // Extract sub-volumes.
@@ -209,6 +228,87 @@ impl TryFromBound for ffi::BoxShape {
     }
 }
 
+impl TryFromBound for ffi::CylinderShape {
+    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
+        const EXTRACTOR: Extractor<3> = Extractor::new([
+            Property::required_f64("length"),
+            Property::required_f64("radius"),
+            Property::new_f64("thickness", 0.0),
+        ]);
+
+        let tag = tag.cast("Cylinder");
+        let [length, radius, thickness] = EXTRACTOR.extract_any(&tag, value, None)?;
+        let shape = Self {
+            length: length.into(),
+            radius: radius.into(),
+            thickness: thickness.into(),
+        };
+        Ok(shape)
+    }
+}
+
+impl TryFromBound for ffi::SphereShape {
+    fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let radius: PyResult<f64> = value.extract();
+        let radius: f64 = match radius {
+            Err(_) => {
+                const EXTRACTOR: Extractor<1> = Extractor::new([
+                    Property::required_f64("radius"),
+                ]);
+
+                let tag = tag.cast("Sphere");
+                let [size] = EXTRACTOR.extract_any(&tag, value, None)?;
+                size.into()
+            },
+            Ok(radius) => radius,
+        };
+        let shape = Self { radius: radius.into() };
+        Ok(shape)
+    }
+}
+
+impl TryFromBound for ffi::TessellatedShape {
+    fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let mut scale: f64 = 1.0;
+        let path: PyResult<String> = value.extract();
+        let path: String = match path {
+            Err(_) => {
+                const EXTRACTOR: Extractor<2> = Extractor::new([
+                    Property::required_str("path"),
+                    Property::optional_str("units"),
+                ]);
+
+                let tag = tag.cast("tessellation");
+                let [path, units] = EXTRACTOR.extract_any(&tag, value, None)?;
+                if let PropertyValue::String(units) = units {
+                    scale = convert(value.py(), units.as_str(), "cm")
+                        .map_err(|e| {
+                            let msg: String = tag.bad().what("units").why(format!("{}", e)).into();
+                            PyValueError::new_err(msg)
+                        })?;
+                }
+                path.into()
+            },
+            Ok(path) => path,
+        };
+
+        let path = Path::new(&path);
+        let mut facets = match path.extension().and_then(OsStr::to_str) {
+            Some("stl") => load_stl(&path),
+            _ => return Err(PyNotImplementedError::new_err("")),
+        }.map_err(|msg| {
+            let msg: String = tag.bad().why(msg).into();
+            PyValueError::new_err(msg)
+        })?;
+
+        let scale = scale as f32;
+        let _ = facets.iter_mut().map(|v| *v *= scale);
+        let shape = Self { facets };
+        Ok(shape)
+    }
+}
+
+
 // ===============================================================================================
 //
 // C++ interface.
@@ -219,6 +319,14 @@ impl Volume {
     pub fn box_shape(&self) -> &ffi::BoxShape {
         match &self.shape {
             Shape::Box(shape) => &shape,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn cylinder_shape(&self) -> &ffi::CylinderShape {
+        match &self.shape {
+            Shape::Cylinder(shape) => &shape,
+            _ => unreachable!(),
         }
     }
 
@@ -254,6 +362,20 @@ impl Volume {
 
     pub fn shape(&self) -> ffi::ShapeType {
         (&self.shape).into()
+    }
+
+    pub fn sphere_shape(&self) -> &ffi::SphereShape {
+        match &self.shape {
+            Shape::Sphere(shape) => &shape,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn tessellated_shape(&self) -> &ffi::TessellatedShape {
+        match &self.shape {
+            Shape::Tessellation(shape) => &shape,
+            _ => unreachable!(),
+        }
     }
 
     pub fn volumes(&self) -> &[Volume] {

@@ -35,9 +35,26 @@ pub mod ffi {
         size: [f64; 3],
     }
 
+    struct CylinderShape {
+        radius: f64,
+        length: f64,
+        thickness: f64,
+    }
+
     #[repr(i32)]
     enum ShapeType {
         Box,
+        Cylinder,
+        Sphere,
+        Tessellation,
+    }
+
+    struct SphereShape {
+        radius: f64,
+    }
+
+    struct TessellatedShape {
+        facets: Vec<f32>,
     }
 
     // ===========================================================================================
@@ -148,6 +165,7 @@ pub mod ffi {
         type Volume;
 
         fn box_shape(self: &Volume) -> &BoxShape;
+        fn cylinder_shape(self: &Volume) -> &CylinderShape;
         fn is_rotated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
         fn name(self: &Volume) -> &String;
@@ -155,6 +173,8 @@ pub mod ffi {
         fn position(self: &Volume) -> [f64; 3];
         fn rotation(self: &Volume) -> &[[f64; 3]];
         fn shape(self: &Volume) -> ShapeType;
+        fn sphere_shape(self: &Volume) -> &SphereShape;
+        fn tessellated_shape(self: &Volume) -> &TessellatedShape;
         fn volumes(self: &Volume) -> &[Volume];
 
         // Materials interface.

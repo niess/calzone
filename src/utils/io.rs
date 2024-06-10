@@ -8,6 +8,12 @@ use std::ops::Deref;
 use std::path::Path;
 
 
+// ===============================================================================================
+//
+// Dict config loader.
+//
+// ===============================================================================================
+
 pub fn load_toml<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
     let content = std::fs::read_to_string(path)?;
     let toml = py.import_bound("tomllib")
@@ -17,6 +23,13 @@ pub fn load_toml<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDic
     let dict: Bound<PyDict> = content.extract()?;
     Ok(dict)
 }
+
+
+// ===============================================================================================
+//
+// Generic dict argument.
+//
+// ===============================================================================================
 
 #[derive(FromPyObject)]
 pub enum DictLike<'py> {
@@ -44,4 +57,37 @@ impl<'py> DictLike<'py> {
         };
         Ok(dict)
     }
+}
+
+
+// ===============================================================================================
+//
+// Data loaders.
+//
+// ===============================================================================================
+
+pub fn load_stl<'py>(path: &Path) -> Result<Vec<f32>, String> {
+    let bad_format = || format!("bad STL format ({})", path.display());
+
+    let bytes = std::fs::read(path)
+        .map_err(|_| format!("bad STL path ({})", path.display()))?;
+    let data = bytes.get(80..84)
+        .ok_or_else(bad_format)?;
+    let facets: usize = u32::from_le_bytes(data.try_into().unwrap()).try_into().unwrap();
+    let mut values = Vec::<f32>::with_capacity(9 * facets);
+    for i in 0..facets {
+        let start: usize = (84 + 50 * i).try_into().unwrap();
+        let data = bytes.get(start..(start + 50))
+            .ok_or_else(bad_format)?;
+        for j in 0..3 {
+            let start = 12 * (j + 1);
+            for k in 0..3 {
+                let start = start + 4 * k;
+                let data = &data[start..(start + 4)];
+                let v = f32::from_le_bytes(data.try_into().unwrap());
+                values.push(v);
+            }
+        }
+    }
+    Ok(values)
 }

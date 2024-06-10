@@ -7,8 +7,12 @@
 #include "G4Box.hh"
 #include "G4GDMLParser.hh"
 #include "G4NistManager.hh"
+#include "G4Orb.hh"
 #include "G4PVPlacement.hh"
 #include "G4SubtractionSolid.hh"
+#include "G4TessellatedSolid.hh"
+#include "G4TriangularFacet.hh"
+#include "G4Tubs.hh"
 // Goupil interface.
 #include "G4Goupil.hh"
 
@@ -41,6 +45,44 @@ private:
 
 std::map<const G4VPhysicalVolume *, GeometryData *> GeometryData::INSTANCES;
 
+static G4TessellatedSolid * build_tessellation(const Volume & volume) {
+    auto name = std::string(volume.name());
+    auto solid = new G4TessellatedSolid(name);
+    if (solid == nullptr) {
+        set_error(ErrorType::MemoryError, "");
+        return nullptr;
+    }
+
+    auto shape = volume.tessellated_shape();
+    const size_t n = shape.facets.size() / 9;
+    float * data = shape.facets.data();
+    const float unit = (float)CLHEP::cm;
+    for (size_t i = 0; i < n; i++, data += 9) {
+        float * v0 = data;
+        float * v1 = v0 + 3;
+        float * v2 = v1 + 3;
+
+        auto facet = new G4TriangularFacet(
+            G4ThreeVector(v0[0] * unit, v0[1] * unit, v0[2] * unit),
+            G4ThreeVector(v1[0] * unit, v1[1] * unit, v1[2] * unit),
+            G4ThreeVector(v2[0] * unit, v2[1] * unit, v2[2] * unit),
+            ABSOLUTE
+        );
+        if (!solid->AddFacet((G4VFacet *)facet)) {
+            delete solid;
+            auto message = fmt::format(
+                "bad vertices for tessellation '{}'",
+                name
+            );
+            set_error(ErrorType::ValueError, message.c_str());
+            return nullptr;
+        }
+    }
+    solid->SetSolidClosed(true);
+
+    return solid;
+}
+
 static bool build_solids(
     const Volume & volume,
     const std::string & path,
@@ -57,22 +99,50 @@ static bool build_solids(
 
     G4VSolid * solid = nullptr;
     switch (volume.shape()) {
-        case ShapeType::Box:
-            auto shape = volume.box_shape();
-            solid = new G4Box(
-                std::string(name),
-                0.5 * shape.size[0] * CLHEP::cm,
-                0.5 * shape.size[1] * CLHEP::cm,
-                0.5 * shape.size[2] * CLHEP::cm
-            );
+        case ShapeType::Box: {
+                auto shape = volume.box_shape();
+                solid = new G4Box(
+                    std::string(name),
+                    0.5 * shape.size[0] * CLHEP::cm,
+                    0.5 * shape.size[1] * CLHEP::cm,
+                    0.5 * shape.size[2] * CLHEP::cm
+                );
+            }
+            break;
+        case ShapeType::Cylinder: {
+                auto shape = volume.cylinder_shape();
+                double rmin = (shape.thickness > 0.0) ?
+                    shape.radius - shape.thickness : 0.0;
+                solid = new G4Tubs(
+                    std::string(name),
+                    rmin * CLHEP::cm,
+                    shape.radius * CLHEP::cm,
+                    0.5 * shape.length * CLHEP::cm,
+                    0.0,
+                    CLHEP::twopi
+                );
+            }
+            break;
+        case ShapeType::Sphere: {
+                auto shape = volume.sphere_shape();
+                solid = new G4Orb(
+                    std::string(name),
+                    shape.radius * CLHEP::cm
+                );
+            }
+            break;
+        case ShapeType::Tessellation:
+            solid = build_tessellation(volume);
             break;
     }
     if (solid == nullptr) {
-        auto msg = fmt::format(
-            "bad '{}' volume (could not create solid)",
-            pathname
-        );
-        set_error(ErrorType::ValueError, msg.c_str());
+        if (!any_error()) {
+            auto msg = fmt::format(
+                "bad '{}' volume (could not create solid)",
+                pathname
+            );
+            set_error(ErrorType::ValueError, msg.c_str());
+        }
         return false;
     }
     solids[pathname] = solid;
