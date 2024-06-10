@@ -17,22 +17,14 @@
 
 static std::map<rust::String, G4Element *> ELEMENTS;
 
-static G4Element * get_element(const rust::String & name, bool ignore=true) {
+static G4Element * get_element(const rust::String & name) {
     try {
         return ELEMENTS.at(name);
     } catch (std::out_of_range & _) {}
 
     // Fallback to NIST database.
     auto nist = G4NistManager::Instance();
-    G4Element * element = nist->FindOrBuildElement(std::string(name));
-    if ((element == nullptr) && (!ignore)) {
-        auto msg = fmt::format(
-            "bad element (undefined {})", std::string(name)
-        );
-        set_error(ErrorType::ValueError, msg.c_str());
-    }
-
-    return element;
+    return nist->FindOrBuildElement(std::string(name));
 }
 
 std::shared_ptr<Error> add_element(const Element & e) {
@@ -87,10 +79,7 @@ struct HashedMaterial {
 
 static std::map<rust::String, HashedMaterial> MATERIALS;
 
-static HashedMaterial get_hashed_material(
-    const rust::String & name,
-    bool ignore=true
-) {
+static HashedMaterial get_hashed_material(const rust::String & name) {
     try {
         return MATERIALS.at(name);
     } catch (std::out_of_range & _) {}
@@ -101,13 +90,6 @@ static HashedMaterial get_hashed_material(
         nist->FindOrBuildMaterial(std::string(name)),
         0x0
     };
-    if ((hashed.material == nullptr) && (!ignore)) { // XXX needed?
-        auto msg = fmt::format(
-            "bad material (undefined '{}')",
-            std::string(name)
-        );
-        set_error(ErrorType::ValueError, msg.c_str());
-    }
 
     return hashed;
 }
