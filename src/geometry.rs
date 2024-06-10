@@ -1,7 +1,8 @@
-use crate::utils::extract::{Tag, TryFromBound};
+use crate::utils::extract::{extract, Tag, TryFromBound};
+use crate::utils::io::DictLike;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::exceptions::PyValueError;
 use super::cxx::ffi;
 use temp_dir::TempDir;
 
@@ -24,15 +25,22 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 #[pymethods]
 impl Geometry {
     #[new]
-    fn new(volumes: &Bound<'_, PyDict>) -> PyResult<Self> {
-        let volume = volume::Volume::try_from_dict(&Tag::new("", "World"), volumes)?;
+    fn new(arg: DictLike) -> PyResult<Self> {
+        let dict = arg.to_dict()?;
+        if dict.len() != 1 {
+            let msg = format!("bad geometry (expected one top volume, found {})", dict.len());
+            return Err(PyValueError::new_err(msg));
+        }
+        let (name, definition) = dict.iter().next().unwrap();
+        let name: String = extract(&name)
+            .or("bad geometry")?;
+        let volume = volume::Volume::try_from_any(&Tag::new("", name.as_str()), &definition)?;
         let geometry = ffi::create_geometry(Box::new(volume));
         if geometry.is_null() {
             ffi::get_error().to_result()?;
             unreachable!()
         }
         let geometry = Self (geometry);
-
         Ok(geometry)
     }
 

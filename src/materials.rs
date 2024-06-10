@@ -1,14 +1,12 @@
 use crate::utils::error::variant_error;
 use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
+use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
-use pyo3::exceptions::PyNotImplementedError;
 use pyo3::types::PyDict;
 use super::cxx::ffi;
-use std::ffi::OsStr;
-use std::path::Path;
 
-mod gate;
+pub mod gate;
 mod hash;
 
 
@@ -26,13 +24,8 @@ pub fn elements(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
 }
 
 #[pyfunction]
-pub fn load<'py>(py: Python<'py>, path: &str) -> PyResult<()> {
-    let path = Path::new(path);
-    let materials = match path.extension().and_then(OsStr::to_str) {
-        Some("db") => gate::load_gate_db(py, path),
-        _ => Err(PyNotImplementedError::new_err("")),
-    }?;
-
+pub fn load(arg: DictLike) -> PyResult<()> {
+    let materials = arg.to_dict()?;
     let get = |key: &str| -> PyResult<Bound<PyDict>> {
         let value = materials.get_item(key)?.unwrap();
         let dict: Bound<PyDict> = value.extract()?;
