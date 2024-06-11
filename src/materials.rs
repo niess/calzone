@@ -25,7 +25,7 @@ pub fn elements(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
 
 #[pyfunction]
 pub fn load(arg: DictLike) -> PyResult<()> {
-    let materials = arg.to_dict()?;
+    let (materials, _) = arg.resolve()?;
     let get = |key: &str| -> PyResult<Bound<PyDict>> {
         let value = materials.get_item(key)?.unwrap();
         let dict: Bound<PyDict> = value.extract()?;

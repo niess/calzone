@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::PyDict;
 use std::borrow::Cow;
+use std::path::Path;
 use super::float::{f64x3, f64x3x3};
 
 
@@ -45,7 +46,7 @@ where
         for (k, v) in value.iter() {
             let name: String = extract(&k)
                 .or_else(|| tag.bad_type())?;
-            let tag = tag.extend(&name, None);
+            let tag = tag.extend(&name, None, None);
             let item = T::try_from_any(&tag, &v)?;
             items.push(item);
         }
@@ -58,6 +59,7 @@ pub struct Tag<'a> {
     typename: &'a str,
     name: &'a str,
     path: Cow<'a, str>,
+    file: Option<&'a Path>,
 }
 
 impl<'a> Tag<'a> {
@@ -66,34 +68,49 @@ impl<'a> Tag<'a> {
     }
 
     pub fn bad_type(&self) -> String {
-        format!("bad {}", self.typename)
+        format!("{}bad {}", self.file_prefix(), self.typename)
     }
 
     pub fn cast<'b: 'a>(&'b self, typename: &'a str) -> Tag<'b> {
         let path = Cow::Borrowed(self.path.as_ref());
-        Self { typename, name: self.name, path }
-    }
-
-    #[allow(dead_code)] // XXX needed?
-    pub fn cite(&self) -> String {
-        format!("'{}' {}", self.path, self.typename)
+        Self { typename, name: self.name, path, file: self.file }
     }
 
     /// Returns an empty `Tag`.
     pub fn empty() -> Self {
         const EMPTY: &'static str = "";
-        Self::new(EMPTY, EMPTY)
+        Self::new(EMPTY, EMPTY, None)
     }
 
-    /// Returns a new `Tag` with a path extended by `value`, and optionally a different type.
-    pub fn extend(&self, value: &'a str, typename: Option<&'a str>) -> Self {
+    /// Returns a new `Tag` with a path extended by `value`, and optionally a different type or
+    /// file.
+    pub fn extend(
+        &self,
+        value: &'a str,
+        typename: Option<&'a str>,
+        file: Option<&'a Path>
+    ) -> Self {
         let typename = typename.unwrap_or(self.typename);
+        let file = file.or(self.file);
         if self.name.is_empty() {
-            Self::new(typename, value)
+            Self::new(typename, value, file)
         } else {
             let path = format!("{}.{}", self.path(), value);
             let path = Cow::Owned(path);
-            Self { typename: typename, name: value, path }
+            Self { typename: typename, name: value, path, file }
+        }
+    }
+
+    /// Returns the file of this `Tag`.
+    pub fn file(&self) -> Option<&'a Path> {
+        self.file
+    }
+
+    /// Returns the file prefix of this `Tag` (for errors printout).
+    pub fn file_prefix<'b>(&'b self) -> Cow<'b, str> {
+        match self.file {
+            None => Cow::Borrowed(""),
+            Some(file) => Cow::Owned(format!("{}: ", file.display())),
         }
     }
 
@@ -103,9 +120,9 @@ impl<'a> Tag<'a> {
     }
 
     /// Returns a new `Tag` initialised with `name`.
-    pub fn new(typename: &'a str, name: &'a str) -> Self {
+    pub fn new(typename: &'a str, name: &'a str, file: Option<&'a Path>) -> Self {
         let path = Cow::Borrowed(name);
-        Self { typename, name, path }
+        Self { typename, name, path, file }
     }
 
     /// Returns the path of this `Tag`.
@@ -138,15 +155,21 @@ impl<'a, 'b> TaggedBad<'a, 'b> {
 
 impl<'a, 'b> From<TaggedBad<'a, 'b>> for String {
     fn from(value: TaggedBad<'a, 'b>) -> Self {
+        let prefix = value.tag.file_prefix();
         match value.what {
             None => match value.why {
-                None => format!("bad '{}' {}", value.tag.path, value.tag.typename),
-                Some(why) => format!("bad '{}' {} ({})", value.tag.path, value.tag.typename, why),
+                None => format!("{}bad '{}' {}", prefix, value.tag.path, value.tag.typename),
+                Some(why) => format!(
+                    "{}bad '{}' {} ({})", prefix, value.tag.path, value.tag.typename, why,
+                ),
             },
             Some(what) => match value.why {
-                None => format!("bad {} for '{}' {}", what, value.tag.path, value.tag.typename),
+                None => format!(
+                    "{}bad {} for '{}' {}", prefix, what, value.tag.path, value.tag.typename,
+                ),
                 Some(why) => format!(
-                    "bad {} for '{}' {} ({})", what, value.tag.path, value.tag.typename, why,
+                    "{}bad {} for '{}' {} ({})",
+                    prefix, what, value.tag.path, value.tag.typename, why,
                 ),
             },
         }

@@ -8,6 +8,7 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
+use std::borrow::Cow;
 use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
 use std::path::Path;
@@ -69,7 +70,7 @@ impl TryFromBound for Volume {
         // Check volume name.
         match tag.name().chars().next() {
             None => {
-                let message = "bad material (empty name)";
+                let message = format!("{}bad material (empty name)", tag.file_prefix());
                 return Err(PyValueError::new_err(message));
             },
             Some(c) => if !c.is_uppercase() {
@@ -137,7 +138,7 @@ impl TryFromBound for Volume {
             )).into();
             return Err(PyValueError::new_err(message));
         }
-        let shape_tag = tag.extend(shape_name, Some("shape"));
+        let shape_tag = tag.extend(shape_name, Some("shape"), None);
         let shape = match shape_type {
             ShapeType::Box => Shape::Box(ffi::BoxShape::try_from_any(&shape_tag, shape)?),
             ShapeType::Cylinder => Shape::Cylinder(
@@ -152,7 +153,7 @@ impl TryFromBound for Volume {
         let volumes: PyResult<Vec<Volume>> = volumes
             .iter()
             .map(|(k, v)| {
-                let tag = tag.extend(&k, None);
+                let tag = tag.extend(&k, None, None);
                 Self::try_from_any(&tag, &v)
             })
             .collect();
@@ -319,7 +320,18 @@ impl TryFromBound for ffi::TessellatedShape {
             Ok(path) => path,
         };
 
-        let path = Path::new(&path);
+        let path = match tag.file() {
+            None => Cow::Borrowed(Path::new(&path)),
+            Some(file) => {
+                let mut file = file.to_path_buf();
+                if file.pop() {
+                    file.push(path);
+                    Cow::Owned(file)
+                } else {
+                    Cow::Borrowed(Path::new(&path))
+                }
+            },
+        };
         let mut facets = match path.extension().and_then(OsStr::to_str) {
             Some("stl") => load_stl(&path),
             _ => return Err(PyNotImplementedError::new_err("")),
@@ -329,7 +341,9 @@ impl TryFromBound for ffi::TessellatedShape {
         })?;
 
         let scale = scale as f32;
-        let _ = facets.iter_mut().map(|v| *v *= scale);
+        for value in &mut facets.iter_mut() {
+            *value *= scale;
+        }
         let shape = Self { facets };
         Ok(shape)
     }

@@ -5,7 +5,7 @@ use pyo3::types::{PyDict, PyString};
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::ops::Deref;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 
 // ===============================================================================================
@@ -40,9 +40,9 @@ pub enum DictLike<'py> {
 }
 
 impl<'py> DictLike<'py> {
-    pub fn to_dict<'a>(&'a self) -> PyResult<Cow<'a, Bound<'py, PyDict>>> {
-        let dict = match &self {
-            Self::Dict(dict) => Cow::Borrowed(dict),
+    pub fn resolve<'a>(&'a self) -> PyResult<(Cow<'a, Bound<'py, PyDict>>, Option<PathBuf>)> {
+        let result = match &self {
+            Self::Dict(dict) => (Cow::Borrowed(dict), None),
             Self::String(path) => {
                 let py = path.py();
                 let path = path.to_cow()?;
@@ -52,10 +52,10 @@ impl<'py> DictLike<'py> {
                     Some("toml") => load_toml(py, &path),
                     _ => Err(PyNotImplementedError::new_err("")),
                 }?;
-                Cow::Owned(dict)
+                (Cow::Owned(dict), Some(path.to_path_buf()))
             },
         };
-        Ok(dict)
+        Ok(result)
     }
 }
 

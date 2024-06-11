@@ -26,15 +26,17 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 impl Geometry {
     #[new]
     fn new(arg: DictLike) -> PyResult<Self> {
-        let dict = arg.to_dict()?;
+        let (dict, file) = arg.resolve()?;
         if dict.len() != 1 {
-            let msg = format!("bad geometry (expected one top volume, found {})", dict.len());
+            let msg = format!("bad geometry (expected 1 top volume, found {})", dict.len());
             return Err(PyValueError::new_err(msg));
         }
         let (name, definition) = dict.iter().next().unwrap();
         let name: String = extract(&name)
             .or("bad geometry")?;
-        let volume = volume::Volume::try_from_any(&Tag::new("", name.as_str()), &definition)?;
+        let file = file.as_ref().map(|f| f.as_path());
+        let tag = Tag::new("", name.as_str(), file);
+        let volume = volume::Volume::try_from_any(&tag, &definition)?;
         let geometry = ffi::create_geometry(Box::new(volume));
         if geometry.is_null() {
             ffi::get_error().to_result()?;
