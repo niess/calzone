@@ -67,10 +67,10 @@ impl<'py> DictLike<'py> {
 // ===============================================================================================
 
 pub fn load_stl<'py>(path: &Path) -> Result<Vec<f32>, String> {
-    let bad_format = || format!("bad STL format ({})", path.display());
+    let bad_format = || format!("{}: bad STL format)", path.display());
 
     let bytes = std::fs::read(path)
-        .map_err(|_| format!("bad STL path ({})", path.display()))?;
+        .map_err(|_| format!("could not read '{}'", path.display()))?;
     let data = bytes.get(80..84)
         .ok_or_else(bad_format)?;
     let facets: usize = u32::from_le_bytes(data.try_into().unwrap()).try_into().unwrap();

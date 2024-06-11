@@ -49,7 +49,7 @@ impl From<&Shape> for ffi::ShapeType {
 }
 
 #[derive(EnumVariantsStrings)]
-#[enum_variants_strings_transform(transform="none")]
+#[enum_variants_strings_transform(transform="lower_case")]
 enum ShapeType {
     Box,
     Cylinder,
@@ -66,18 +66,31 @@ enum ShapeType {
 
 impl TryFromBound for Volume {
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
+        // Check volume name.
+        match tag.name().chars().next() {
+            None => {
+                let message = "bad material (empty name)";
+                return Err(PyValueError::new_err(message));
+            },
+            Some(c) => if !c.is_uppercase() {
+                let message: String = tag.bad().what("name")
+                    .why("should be capitalized".to_string()).into();
+                return Err(PyValueError::new_err(message));
+            },
+        }
+
         // Extract base properties.
-        const EXTRACTOR: Extractor<5> = Extractor::new([
+        const EXTRACTOR: Extractor<4> = Extractor::new([
             Property::required_str("material"),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
-            Property::optional_dict("volumes"),
             Property::optional_dict("overlaps"),
+
         ]);
 
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, position, rotation, volumes, overlaps] = EXTRACTOR.extract(
+        let [material, position, rotation, overlaps] = EXTRACTOR.extract(
             &tag, value, Some(&mut remainder)
         )?;
 
@@ -85,8 +98,21 @@ impl TryFromBound for Volume {
         let material: String = material.into();
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
-        let volumes: Option<Bound<PyDict>> = volumes.into();
         let overlaps: Option<Bound<PyDict>> = overlaps.into();
+
+        // Split shape(s) and volumes from remainder.
+        let (volumes, shapes) = {
+            let mut volumes = Vec::<(String, Bound<PyAny>)>::new();
+            let mut shapes = Vec::<(String, Bound<PyAny>)>::new();
+            for (k, v) in remainder.drain(..) {
+                if k.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+                    volumes.push((k, v))
+                } else {
+                    shapes.push((k, v))
+                }
+            }
+            (volumes, shapes)
+        };
 
         // Extract shape properties.
         let get_shape_type = |shape: &str| -> PyResult<ShapeType> {
@@ -97,21 +123,21 @@ impl TryFromBound for Volume {
                 })
         };
 
-        if remainder.len() == 0 {
+        if shapes.len() == 0 {
             get_shape_type("None")?; // This always fails.
         }
-        let (shape_name, shape) = remainder.get_index(0).unwrap();
+        let (shape_name, shape) = shapes.get(0).unwrap();
         let shape_type = get_shape_type(shape_name)?;
-        if let Some((alt_name, _)) = remainder.get_index(1) {
+        if let Some((alt_name, _)) = shapes.get(1) {
             let _unused = get_shape_type(alt_name)?;
             let message: String = tag.bad().why(format!(
-                "multiple shape definitions ({}, {}, ?)",
+                "multiple shape definitions ({}, {}, ...)",
                 shape_name,
                 alt_name,
             )).into();
             return Err(PyValueError::new_err(message));
         }
-        let shape_tag = tag.extend(shape_name, None);
+        let shape_tag = tag.extend(shape_name, Some("shape"));
         let shape = match shape_type {
             ShapeType::Box => Shape::Box(ffi::BoxShape::try_from_any(&shape_tag, shape)?),
             ShapeType::Cylinder => Shape::Cylinder(
@@ -123,13 +149,14 @@ impl TryFromBound for Volume {
         };
 
         // Extract sub-volumes.
-        let volumes = match volumes {
-            None => Vec::<Volume>:: new(),
-            Some(volumes) => {
-                let volumes = Vec::<Self>::try_from_dict(&tag, &volumes)?;
-                volumes
-            },
-        };
+        let volumes: PyResult<Vec<Volume>> = volumes
+            .iter()
+            .map(|(k, v)| {
+                let tag = tag.extend(&k, None);
+                Self::try_from_any(&tag, &v)
+            })
+            .collect();
+        let volumes = volumes?;
 
         // Extract overlaps.
         let overlaps = match overlaps {
