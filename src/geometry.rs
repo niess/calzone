@@ -7,7 +7,10 @@ use super::cxx::ffi;
 use temp_dir::TempDir;
 
 mod goupil;
+mod map;
 pub mod volume;
+
+pub use map:: Map;
 
 
 // ===============================================================================================

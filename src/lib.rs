@@ -13,18 +13,6 @@ mod utils;
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
 
-use std::path::Path;
-use pyo3::exceptions::PyValueError;
-
-#[pyfunction]
-pub fn load_geotiff(py: Python, path: &str) -> PyResult<()> {
-    let path = Path::new(path);
-    utils::io::load_geotiff(py, path)
-        .map_err(|err| PyValueError::new_err(err))?;
-    Ok(())
-}
-
-
 #[pymodule]
 fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
 
@@ -49,14 +37,13 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
 
     // Register class object(s).
     module.add_class::<geometry::Geometry>()?;
+    module.add_class::<geometry::Map>()?;
 
     // Register function(s).
     module.add_function(wrap_pyfunction!(materials::elements, module)?)?;
     module.add_function(wrap_pyfunction!(materials::load, module)?)?;
     module.add_function(wrap_pyfunction!(materials::molecules, module)?)?;
     module.add_function(wrap_pyfunction!(materials::mixtures, module)?)?;
-
-    module.add_function(wrap_pyfunction!(load_geotiff, module)?)?; // XXX debug.
 
     Ok(())
 }

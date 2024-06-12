@@ -528,9 +528,10 @@ where
         if same {
             Ok(unsafe { &*(ob as *const PyUntypedArray as *const PyArray<T>) })
         } else {
+            let expected: Bound<PyAny> = dtype.extract(ob.py()).unwrap();
             Err(PyTypeError::new_err(format!(
-                "bad dtype (expected {:?}, found {:?})",
-                dtype,
+                "bad dtype (expected '{}', found '{}')",
+                expected,
                 unsafe { &*(array.descr as *mut PyAny) },
             )))
         }
