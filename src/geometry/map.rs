@@ -16,8 +16,6 @@ use std::path::Path;
 #[pyclass(module = "calzone")]
 pub struct Map {
     #[pyo3(get)]
-    name: String,
-    #[pyo3(get)]
     crs: Option<usize>,
     #[pyo3(get)]
     nx: usize,
@@ -38,19 +36,80 @@ pub struct Map {
 #[pymethods]
 impl Map {
     #[new]
-    fn new(py: Python, filename: &str) -> PyResult<Self> {
-        let path = Path::new(filename);
-        match path.extension().and_then(OsStr::to_str) {
-            Some("png") | Some("PNG") => Self::from_png(py, filename),
-            Some("tif") | Some("TIF") => Self::from_geotiff(py, filename),
-            Some(other) => {
-                let message = format!("bad map (unimplemented '{}' format)", other);
-                Err(PyNotImplementedError::new_err(message))
+    fn new(
+        py: Python,
+        map: MapLike,
+    ) -> PyResult<Self> {
+        match map {
+            MapLike::String(filename) => {
+                let path = Path::new(&filename);
+                match path.extension().and_then(OsStr::to_str) {
+                    Some("png") | Some("PNG") => Self::from_png(py, &filename),
+                    Some("tif") | Some("TIF") => Self::from_geotiff_file(py, &filename),
+                    Some(other) => {
+                        let message = format!("bad map (unimplemented '{}' format)", other);
+                        Err(PyNotImplementedError::new_err(message))
+                    },
+                    None => {
+                        Err(PyValueError::new_err("bad map (missing format)"))
+                    },
+                }
             },
-            None => {
-                Err(PyValueError::new_err("bad map (missing format)"))
+            MapLike::Any(any) => {
+                let geotiff = py.import_bound("geotiff")
+                    .and_then(|module| module.getattr("GeoTiff"))?;
+                if any.is_instance(&geotiff)? {
+                    Self::from_geotiff(&any)
+                } else {
+                    let message = format!(
+                        "bad map type (unimplemented conversion from '{}')",
+                        any.get_type(),
+                    );
+                    Err(PyNotImplementedError::new_err(message))
+                }
             },
         }
+    }
+
+    #[staticmethod]
+    fn from_array(
+        z: &Bound<PyUntypedArray>,
+        xlim: [f64; 2],
+        ylim: [f64; 2],
+        crs: Option<usize>,
+    ) -> PyResult<Self> {
+        let py = z.py();
+        let z: &PyUntypedArray = z.extract()?;
+
+        let [ny, nx] = {
+            let shape = z.shape();
+            if shape.len() != 2 {
+                let message = format!(
+                    "bad map shape (expected 2 dimensions, found {})",
+                    shape.len(),
+                );
+                return Err(PyValueError::new_err(message));
+            }
+            [shape[0], shape[1]]
+        };
+        let [x0, x1] = xlim;
+        let [y0, y1] = ylim;
+
+        let z = py.import_bound("numpy")
+            .and_then(|m| m.getattr("asarray"))
+            .and_then(|f| f.call1((z, "f32")))?;
+
+        let map = Self {
+            nx,
+            x0,
+            x1,
+            ny,
+            y0,
+            y1,
+            crs,
+            z: z.into(),
+        };
+        Ok(map)
     }
 
     fn dump(&self, py: Python, filename: String) -> PyResult<()> {
@@ -62,70 +121,14 @@ impl Map {
     }
 }
 
+#[derive(FromPyObject)]
+pub enum MapLike<'py> {
+    String(String),
+    Any(Bound<'py, PyAny>),
+}
+
 // Private interface.
 impl Map {
-    fn from_geotiff<'py>(py: Python, path: &str) -> PyResult<Self> {
-        // Open geotiff file and get metadata.
-        let geotiff = py.import_bound("geotiff")
-            .and_then(|module| module.getattr("GeoTiff"))
-            .and_then(|constr| constr.call1((path,)))?;
-
-        let crs = geotiff.getattr("crs_code")
-            .and_then(|crs| {
-                let crs: PyResult<usize> = crs.extract();
-                crs
-            })?;
-
-        let [[x0, y0], [x1, y1]] = geotiff.getattr("tif_bBox")
-            .and_then(|bbox| {
-                let bbox: PyResult<[[f64; 2]; 2]> = bbox.extract();
-                bbox
-            })?;
-
-        // Extract data to a numpy array.
-        let to_array = py.import_bound("numpy")
-            .and_then(|module| module.getattr("asarray"))?;
-
-        let array = geotiff.getattr("read")
-            .and_then(|readfn| readfn.call0())
-            .and_then(|arrayz| to_array.call1((arrayz, "f4")))
-            .and_then(|arrayf| {
-                let arrayf: PyResult<&PyArray<f32>> = arrayf.extract();
-                arrayf
-            })?;
-
-        let shape: [usize; 2] = array.shape()
-            .try_into()
-            .map_err(|shape: Vec<usize>| {
-                let message = format!(
-                    "bad shape (expected a size 2 array, found a size {} array)",
-                    shape.len(),
-                );
-                PyValueError::new_err(message)
-            })?;
-        let [ny, nx] = shape;
-
-        let path = Path::new(path);
-        let name = path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .unwrap_or("");
-
-        let z: &PyUntypedArray = array.into();
-        let map = Self {
-            name: name.to_string(),
-            crs: Some(crs),
-            nx,
-            x0,
-            x1,
-            ny,
-            y0,
-            y1,
-            z: z.into(),
-        };
-        Ok(map)
-    }
-
     fn tessellate(
         &self,
         py: Python,
@@ -266,6 +269,74 @@ impl Map {
 
 // ===============================================================================================
 //
+// Geotiff serialisation.
+//
+// ===============================================================================================
+
+impl Map {
+    fn from_geotiff<'py>(geotiff: &Bound<'py, PyAny>) -> PyResult<Self> {
+        // Get metadata.
+        let crs = geotiff.getattr("crs_code")
+            .and_then(|crs| {
+                let crs: PyResult<usize> = crs.extract();
+                crs
+            })?;
+
+        let [[x0, y0], [x1, y1]] = geotiff.getattr("tif_bBox")
+            .and_then(|bbox| {
+                let bbox: PyResult<[[f64; 2]; 2]> = bbox.extract();
+                bbox
+            })?;
+
+        // Extract data to a numpy array.
+        let py = geotiff.py();
+        let to_array = py.import_bound("numpy")
+            .and_then(|module| module.getattr("asarray"))?;
+
+        let array = geotiff.getattr("read")
+            .and_then(|readfn| readfn.call0())
+            .and_then(|arrayz| to_array.call1((arrayz, "f4")))
+            .and_then(|arrayf| {
+                let arrayf: PyResult<&PyArray<f32>> = arrayf.extract();
+                arrayf
+            })?;
+
+        let shape: [usize; 2] = array.shape()
+            .try_into()
+            .map_err(|shape: Vec<usize>| {
+                let message = format!(
+                    "bad shape (expected a size 2 array, found a size {} array)",
+                    shape.len(),
+                );
+                PyValueError::new_err(message)
+            })?;
+        let [ny, nx] = shape;
+
+        let z: &PyUntypedArray = array.into();
+        let map = Self {
+            crs: Some(crs),
+            nx,
+            x0,
+            x1,
+            ny,
+            y0,
+            y1,
+            z: z.into(),
+        };
+        Ok(map)
+    }
+
+    fn from_geotiff_file<'py>(py: Python, path: &str) -> PyResult<Self> {
+        py.import_bound("geotiff")
+            .and_then(|module| module.getattr("GeoTiff"))
+            .and_then(|constr| constr.call1((path,)))
+            .and_then(|object| Self::from_geotiff(&object))
+    }
+}
+
+
+// ===============================================================================================
+//
 // Png serialisation.
 //
 // ===============================================================================================
@@ -345,15 +416,8 @@ impl Map {
             };
         }
 
-        let path = Path::new(path);
-        let name = path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .unwrap_or("");
-
         let z: &PyUntypedArray = array.into();
         let map = Self {
-            name: name.to_string(),
             crs,
             nx,
             x0,
