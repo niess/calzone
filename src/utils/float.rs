@@ -25,6 +25,21 @@ impl f64x3 {
     pub const fn zero() -> Self {
         Self([0.0, 0.0, 0.0])
     }
+
+    #[inline]
+    pub fn x(&self) -> f64 {
+        self.0[0]
+    }
+
+    #[inline]
+    pub fn y(&self) -> f64 {
+        self.0[1]
+    }
+
+    #[inline]
+    pub fn z(&self) -> f64 {
+        self.0[2]
+    }
 }
 
 

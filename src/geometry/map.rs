@@ -1,4 +1,5 @@
 use crate::utils::float::f64x3;
+use crate::utils::io::dump_stl;
 use crate::utils::numpy::{PyArray, PyUntypedArray};
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
@@ -116,7 +117,17 @@ impl Map {
         let path = Path::new(&filename);
         match path.extension().and_then(OsStr::to_str) {
             Some("png") | Some("PNG") => self.to_png(py, &filename),
-            _ => unimplemented!(),
+            Some("stl") | Some("STL") => self.to_stl(py, &filename),
+            Some(other) => {
+                let message = format!(
+                    "bad export format (unimplemented conversion to '{}')",
+                    other,
+                );
+                Err(PyNotImplementedError::new_err(message))
+            },
+            None => {
+                Err(PyValueError::new_err("bad export format (missing file extension)"))
+            },
         }
     }
 }
@@ -129,16 +140,43 @@ pub enum MapLike<'py> {
 
 // Private interface.
 impl Map {
+    const DEFAULT_MIN_DEPTH: f64 = 10.0; // in map units.
+
     fn tessellate(
         &self,
         py: Python,
-        scale: Option<f64>,
-        origin: Option<f64x3>
+        scale: f64,
+        origin: Option<f64x3>,
+        min_depth: Option<f64>,
     ) -> PyResult<Vec<f32>> {
+        // Compute z limits.
         let z: &PyArray<f32> = self.z.extract(py)?;
         let z = unsafe { z.slice()? };
 
-        // Helpers for accessing data.
+        let mut zmin = f32::MAX;
+        let mut zmax = -f32::MAX;
+        for zi in z {
+            zmin = zmin.min(*zi);
+            zmax = zmax.max(*zi);
+        }
+
+        // Unpack or set the origin.
+        let scale = scale as f32;
+        let origin = origin.unwrap_or_else(|| {
+            let xc = 0.5 * (self.x0 + self.x1);
+            let yc = 0.5 * (self.y0 + self.y1);
+            let zc = (0.5 * (zmin + zmax)) as f64;
+            f64x3::new(xc, yc, zc)
+        });
+        let xc = origin.x() as f32;
+        let yc = origin.y() as f32;
+        let zc = origin.z() as f32;
+
+        // Set bottom z.
+        let min_depth = min_depth.unwrap_or(Self::DEFAULT_MIN_DEPTH);
+        let zbot = zmin - (min_depth as f32);
+
+        // Helpers for manipulating data.
         let (nx, ny) = (self.nx, self.ny);
         let kx = (self.x1 - self.x0) / ((nx - 1) as f64);
         let ky = (self.y1 - self.y0) / ((ny - 1) as f64);
@@ -152,8 +190,8 @@ impl Map {
                 self.x0 + kx * (index as f64)
             };
             x as f32
-        }
-        ;
+        };
+
         let get_y = |index: usize| -> f32 {
             let y = if index == 0 {
                 self.y0
@@ -172,36 +210,78 @@ impl Map {
         let size = 18 * (nx * ny + nx + ny - 2);
         let mut facets = Vec::<f32>::with_capacity(size);
 
-        let mut push_vertex = |x, y, z| {
-            facets.push(x);
-            facets.push(y);
-            facets.push(z);
+        struct Vertex (f32, f32, f32);
+
+        let vertex = |x: f32, y: f32, z: f32| -> Vertex {
+            Vertex ((x - xc) * scale, (y - yc) * scale, (z - zc) * scale)
+        };
+
+        #[derive(Clone, Copy)]
+        enum Orientation {
+            Left,
+            Right,
+        }
+
+        let mut push = |
+            orientation: Orientation,
+            v0: Vertex,
+            v1: Vertex,
+            v2: Vertex,
+            v3: Vertex
+        | {
+            match orientation {
+                Orientation::Left => {
+                    facets.extend_from_slice(&[
+                        v0.0, v0.1, v0.2,
+                        v1.0, v1.1, v1.2,
+                        v2.0, v2.1, v2.2,
+                        v2.0, v2.1, v2.2,
+                        v3.0, v3.1, v3.2,
+                        v0.0, v0.1, v0.2,
+                    ]);
+                },
+                Orientation::Right => {
+                    facets.extend_from_slice(&[
+                        v0.0, v0.1, v0.2,
+                        v3.0, v3.1, v3.2,
+                        v2.0, v2.1, v2.2,
+                        v2.0, v2.1, v2.2,
+                        v1.0, v1.1, v1.2,
+                        v0.0, v0.1, v0.2,
+                    ]);
+                },
+            }
+        };
+
+        let (left, right) = {
+            let sgn = (self.x1 - self.x0) * (self.y1 - self.y0);
+            if sgn > 0.0 {
+                (Orientation::Left, Orientation::Right)
+            } else if sgn < 0.0 {
+                (Orientation::Right, Orientation::Left)
+            } else {
+                return Ok(facets)
+            }
         };
 
         // Tessellate the topography surface.
-        let mut zmin = f32::MAX;
-        let mut y0 = get_x(0);
+        let mut y0 = get_y(0);
         for i in 0..(ny - 1) {
             let y1 = get_y(i + 1);
             let mut x0 = get_x(0);
             let mut z00 = get_z(i, 0);
-            zmin = zmin.min(z00);
             let mut z10 = get_z(i + 1, 0);
-            zmin = zmin.min(z10);
             for j in 0..(nx - 1) {
                 let x1 = get_x(j + 1);
                 let z01 = get_z(i, j + 1);
-                zmin = zmin.min(z01);
                 let z11 = get_z(i + 1, j + 1);
-                zmin = zmin.min(z11);
-
-                push_vertex(x0, y0, z00);
-                push_vertex(x1, y0, z01);
-                push_vertex(x1, y1, z11);
-                push_vertex(x1, y1, z11);
-                push_vertex(x0, y1, z10);
-                push_vertex(x0, y0, z00);
-
+                push(
+                    left,
+                    vertex(x0, y0, z00),
+                    vertex(x1, y0, z01),
+                    vertex(x1, y1, z11),
+                    vertex(x0, y1, z10),
+                );
                 x0 = x1;
                 z00 = z01;
                 z10 = z11;
@@ -209,60 +289,73 @@ impl Map {
             y0 = y1;
         }
 
-        // Tessellate topography sides.
+        // Tessellate the side faces.
         for i in [0, ny - 1] {
+            let orientation = match i {
+                0 => right,
+                _ => left,
+            };
             let mut x0 = get_x(0);
             let mut z0 = get_z(i, 0);
             let y = get_y(i);
             for j in 0..(nx - 1) {
                 let x1 = get_x(j + 1);
                 let z1 = get_z(i, j + 1);
-
-                push_vertex(x0, y, z0);
-                push_vertex(x1, y, z1);
-                push_vertex(x1, y, zmin);
-                push_vertex(x1, y, zmin);
-                push_vertex(x0, y, zmin);
-                push_vertex(x0, y, z0);
-
+                push(
+                    orientation,
+                    vertex(x0, y, z0),
+                    vertex(x1, y, z1),
+                    vertex(x1, y, zbot),
+                    vertex(x0, y, zbot),
+                );
                 x0 = x1;
                 z0 = z1;
             }
         }
 
         for j in [0, nx - 1] {
+            let orientation = match j {
+                0 => left,
+                _ => right,
+            };
             let mut y0 = get_y(0);
             let mut z0 = get_z(0, j);
             let x = get_x(j);
             for i in 0..(ny - 1) {
                 let y1 = get_y(i + 1);
                 let z1 = get_z(i + 1, j);
-
-                push_vertex(x, y0, z0);
-                push_vertex(x, y1, z1);
-                push_vertex(x, y1, zmin);
-                push_vertex(x, y1, zmin);
-                push_vertex(x, y0, zmin);
-                push_vertex(x, y0, z0);
-
+                push(
+                    orientation,
+                    vertex(x, y0, z0),
+                    vertex(x, y1, z1),
+                    vertex(x, y1, zbot),
+                    vertex(x, y0, zbot),
+                );
                 y0 = y1;
                 z0 = z1;
             }
         }
 
-        // Tessellate bottom.
+        // Tessellate the bottom face.
         let x0 = self.x0 as f32;
         let x1 = self.x1 as f32;
         let y0 = self.y0 as f32;
         let y1 = self.y1 as f32;
-        push_vertex(x0, y0, zmin);
-        push_vertex(x1, y0, zmin);
-        push_vertex(x1, y1, zmin);
-        push_vertex(x1, y1, zmin);
-        push_vertex(x0, y1, zmin);
-        push_vertex(x0, y0, zmin);
+        push(
+            right,
+            vertex(x0, y0, zbot),
+            vertex(x1, y0, zbot),
+            vertex(x1, y1, zbot),
+            vertex(x0, y1, zbot),
+        );
 
         Ok(facets)
+    }
+
+    fn to_stl(&self, py: Python, path: &str) -> PyResult<()> {
+        let facets = self.tessellate(py, 1.0, None, None)?;
+        let path = Path::new(path);
+        dump_stl(&facets, &path)
     }
 }
 
@@ -430,7 +523,7 @@ impl Map {
         Ok(map)
     }
 
-    fn to_png<'py>(&self, py: Python, path: &str) -> PyResult<()> {
+    fn to_png(&self, py: Python, path: &str) -> PyResult<()> {
         // Transform z-data.
         let z: &PyArray<f32> = self.z.extract(py)?;
         let array = PyArray::<u16>::empty(py, &z.shape())?;

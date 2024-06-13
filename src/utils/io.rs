@@ -69,14 +69,14 @@ impl<'py> DictLike<'py> {
 // ===============================================================================================
 
 
-pub fn dump_stl<'py>(facets: &[f32], path: &Path) -> PyResult<()> {
+pub fn dump_stl(facets: &[f32], path: &Path) -> PyResult<()> {
     let file = File::create(path)?;
     let mut buf = BufWriter::new(file);
     let header = [0_u8; 80];
     buf.write(&header)?;
     let size = facets.len() / 9;
     buf.write(&(size as u32).to_le_bytes())?;
-    let normal= [0.0_f32; 3];
+    let normal = [0.0_f32; 3];
     let control: u16 = 0;
     for i in 0..size {
         for j in 0..3 {
@@ -90,7 +90,7 @@ pub fn dump_stl<'py>(facets: &[f32], path: &Path) -> PyResult<()> {
     Ok(())
 }
 
-pub fn load_stl<'py>(path: &Path) -> Result<Vec<f32>, String> {
+pub fn load_stl(path: &Path) -> Result<Vec<f32>, String> {
     let bad_format = || format!("{}: bad STL format)", path.display());
 
     let bytes = std::fs::read(path)
