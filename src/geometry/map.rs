@@ -1,3 +1,4 @@
+use crate::utils::extract::{Extractor, Property, Tag};
 use crate::utils::float::f64x3;
 use crate::utils::io::dump_stl;
 use crate::utils::numpy::{PyArray, PyUntypedArray};
@@ -103,20 +104,48 @@ impl Map {
         Ok(map)
     }
 
-    fn dump(&self, py: Python, filename: String) -> PyResult<()> {
+    #[pyo3(signature = (filename, **kwargs,))]
+    fn dump<'py>(
+        &self,
+        py: Python<'py>,
+        filename: String,
+        kwargs: Option<&Bound<'py, PyDict>>
+    ) -> PyResult<()> {
         let path = Path::new(&filename);
         match path.extension().and_then(OsStr::to_str) {
-            Some("png") | Some("PNG") => self.to_png(py, &filename),
-            Some("stl") | Some("STL") => self.to_stl(py, &filename), // XXX origin, depth?
+            Some("png") | Some("PNG") => {
+                if let Some(kwargs) = kwargs {
+                    const EXTRACTOR: Extractor<0> = Extractor::new([]); // No arguments.
+                    let tag = Tag::new("dump", "", None);
+                    let _unused = EXTRACTOR.extract_any(&tag, kwargs, None)?;
+                }
+                self.to_png(py, &filename)
+            },
+            Some("stl") | Some("STL") => {
+                let mut origin: Option<f64x3> = None;
+                let mut min_depth: Option<f64> = None;
+                if let Some(kwargs) = kwargs {
+                    const EXTRACTOR: Extractor<2> = Extractor::new([
+                        Property::optional_vec("origin"),
+                        Property::optional_f64("min_depth"),
+                    ]);
+                    let tag = Tag::new("dump", "", None);
+                    let [center, depth] = EXTRACTOR.extract_any(&tag, kwargs, None)?;
+                    origin = center.into();
+                    min_depth = depth.into();
+                }
+                let facets = self.tessellate(py, origin, min_depth)?;
+                dump_stl(&facets, &path)
+            },
             Some(other) => {
                 let message = format!(
-                    "bad export format (unimplemented conversion to '{}')",
+                    "bad dump format (unimplemented conversion to '{}')",
                     other,
                 );
                 Err(PyNotImplementedError::new_err(message))
             },
             None => {
-                Err(PyValueError::new_err("bad export format (missing file extension)"))
+                Err(PyValueError::new_err("bad dump format (missing file extension)"))
             },
         }
     }
@@ -209,7 +238,7 @@ impl Map {
             z[i * nx + j]
         };
 
-        let size = 18 * (nx * ny + nx + ny - 2);
+        let size = 36 * (nx * ny - 1);
         let mut facets = Vec::<f32>::with_capacity(size);
 
         struct Vertex (f32, f32, f32);
@@ -339,25 +368,28 @@ impl Map {
         }
 
         // Tessellate the bottom face.
-        let x0 = self.x0 as f32;
-        let x1 = self.x1 as f32;
-        let y0 = self.y0 as f32;
-        let y1 = self.y1 as f32;
-        push(
-            right,
-            vertex(x0, y0, zbot),
-            vertex(x1, y0, zbot),
-            vertex(x1, y1, zbot),
-            vertex(x0, y1, zbot),
-        );
+        //
+        // Note that we need to reproduce the top grid, despite the bottom surface being flat,
+        // otherwise Geant4 does not recognise the mesh as being closed.
+        let mut y0 = get_y(0);
+        for i in 0..(ny - 1) {
+            let y1 = get_y(i + 1);
+            let mut x0 = get_x(0);
+            for j in 0..(nx - 1) {
+                let x1 = get_x(j + 1);
+                push(
+                    right,
+                    vertex(x0, y0, zbot),
+                    vertex(x1, y0, zbot),
+                    vertex(x1, y1, zbot),
+                    vertex(x0, y1, zbot),
+                );
+                x0 = x1;
+            }
+            y0 = y1;
+        }
 
         Ok(facets)
-    }
-
-    fn to_stl(&self, py: Python, path: &str) -> PyResult<()> {
-        let facets = self.tessellate(py, None, None)?;
-        let path = Path::new(path);
-        dump_stl(&facets, &path)
     }
 }
 
