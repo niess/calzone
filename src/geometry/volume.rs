@@ -13,6 +13,7 @@ use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
 use std::path::Path;
 use super::ffi;
+use super::map::Map;
 
 
 // ===============================================================================================
@@ -298,16 +299,20 @@ impl TryFromBound for ffi::SphereShape {
 impl TryFromBound for ffi::TessellatedShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let mut scale: f64 = 1.0;
+        let mut origin: Option<f64x3> = None;
+        let mut min_depth: Option<f64> = None;
         let path: PyResult<String> = value.extract();
         let path: String = match path {
             Err(_) => {
-                const EXTRACTOR: Extractor<2> = Extractor::new([
+                const EXTRACTOR: Extractor<4> = Extractor::new([
                     Property::required_str("path"),
                     Property::optional_str("units"),
+                    Property::optional_vec("origin"),
+                    Property::optional_f64("min_depth"),
                 ]);
 
                 let tag = tag.cast("tessellation");
-                let [path, units] = EXTRACTOR.extract_any(&tag, value, None)?;
+                let [path, units, center, depth] = EXTRACTOR.extract_any(&tag, value, None)?;
                 if let PropertyValue::String(units) = units {
                     scale = convert(value.py(), units.as_str(), "cm")
                         .map_err(|e| {
@@ -315,6 +320,8 @@ impl TryFromBound for ffi::TessellatedShape {
                             PyValueError::new_err(msg)
                         })?;
                 }
+                origin = center.into();
+                min_depth = depth.into();
                 path.into()
             },
             Ok(path) => path,
@@ -333,7 +340,29 @@ impl TryFromBound for ffi::TessellatedShape {
             },
         };
         let mut facets = match path.extension().and_then(OsStr::to_str) {
-            Some("stl") => load_stl(&path),
+            Some("stl") => {
+                if min_depth.is_some() {
+                    let msg: String = tag.bad()
+                        .what("min_depth")
+                        .why("invalid option for STL format".to_string())
+                        .into();
+                        return Err(PyValueError::new_err(msg));
+                } else if origin.is_some() {
+                    let msg: String = tag.bad()
+                        .what("origin")
+                        .why("invalid option for STL format".to_string())
+                        .into();
+                        return Err(PyValueError::new_err(msg));
+                } else {
+                    load_stl(&path)
+                }
+            },
+            Some("png") | Some("tif") => {
+                let py = value.py();
+                let map = Map::from_file(py, &path)?;
+                let facets = map.tessellate(py, origin, min_depth)?;
+                Ok(facets)
+            },
             _ => return Err(PyNotImplementedError::new_err("")),
         }.map_err(|msg| {
             let msg: String = tag.bad().why(msg).into();

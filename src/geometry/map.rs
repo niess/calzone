@@ -44,17 +44,7 @@ impl Map {
         match map {
             MapLike::String(filename) => {
                 let path = Path::new(&filename);
-                match path.extension().and_then(OsStr::to_str) {
-                    Some("png") | Some("PNG") => Self::from_png(py, &filename),
-                    Some("tif") | Some("TIF") => Self::from_geotiff_file(py, &filename),
-                    Some(other) => {
-                        let message = format!("bad map (unimplemented '{}' format)", other);
-                        Err(PyNotImplementedError::new_err(message))
-                    },
-                    None => {
-                        Err(PyValueError::new_err("bad map (missing format)"))
-                    },
-                }
+                Self::from_file(py, &path)
             },
             MapLike::Any(any) => {
                 let geotiff = py.import_bound("geotiff")
@@ -117,7 +107,7 @@ impl Map {
         let path = Path::new(&filename);
         match path.extension().and_then(OsStr::to_str) {
             Some("png") | Some("PNG") => self.to_png(py, &filename),
-            Some("stl") | Some("STL") => self.to_stl(py, &filename),
+            Some("stl") | Some("STL") => self.to_stl(py, &filename), // XXX origin, depth?
             Some(other) => {
                 let message = format!(
                     "bad export format (unimplemented conversion to '{}')",
@@ -138,14 +128,27 @@ pub enum MapLike<'py> {
     Any(Bound<'py, PyAny>),
 }
 
-// Private interface.
 impl Map {
     const DEFAULT_MIN_DEPTH: f64 = 10.0; // in map units.
 
-    fn tessellate(
+    pub fn from_file(py: Python, path: &Path) -> PyResult<Self> {
+        let filename = path.to_str().unwrap();
+        match path.extension().and_then(OsStr::to_str) {
+            Some("png") | Some("PNG") => Self::from_png(py, filename),
+            Some("tif") | Some("TIF") => Self::from_geotiff_file(py, filename),
+            Some(other) => {
+                let message = format!("bad map (unimplemented '{}' format)", other);
+                Err(PyNotImplementedError::new_err(message))
+            },
+            None => {
+                Err(PyValueError::new_err("bad map (missing format)"))
+            },
+        }
+    }
+
+    pub fn tessellate(
         &self,
         py: Python,
-        scale: f64,
         origin: Option<f64x3>,
         min_depth: Option<f64>,
     ) -> PyResult<Vec<f32>> {
@@ -161,7 +164,6 @@ impl Map {
         }
 
         // Unpack or set the origin.
-        let scale = scale as f32;
         let origin = origin.unwrap_or_else(|| {
             let xc = 0.5 * (self.x0 + self.x1);
             let yc = 0.5 * (self.y0 + self.y1);
@@ -213,7 +215,7 @@ impl Map {
         struct Vertex (f32, f32, f32);
 
         let vertex = |x: f32, y: f32, z: f32| -> Vertex {
-            Vertex ((x - xc) * scale, (y - yc) * scale, (z - zc) * scale)
+            Vertex (x - xc, y - yc, z - zc)
         };
 
         #[derive(Clone, Copy)]
@@ -353,7 +355,7 @@ impl Map {
     }
 
     fn to_stl(&self, py: Python, path: &str) -> PyResult<()> {
-        let facets = self.tessellate(py, 1.0, None, None)?;
+        let facets = self.tessellate(py, None, None)?;
         let path = Path::new(path);
         dump_stl(&facets, &path)
     }
