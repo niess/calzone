@@ -69,6 +69,16 @@ enum ShapeType {
 impl TryFromBound for Volume {
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
         // Check volume name.
+        for c in tag.name().chars() {
+            if !c.is_alphanumeric() {
+                let message: String = tag.bad().what("name")
+                    .why(format!(
+                        "expected an alphanumeric string, found '{}'",
+                        tag.name()
+                    )).into();
+                return Err(PyValueError::new_err(message));
+            }
+        }
         match tag.name().chars().next() {
             None => {
                 let message = format!("{}bad material (empty name)", tag.file_prefix());
