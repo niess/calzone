@@ -31,7 +31,6 @@ impl Geometry {
     fn new(arg: DictLike) -> PyResult<Self> {
         // XXX materials (dedicated Geometry entry?)
         // XXX from GDML (manage memory by diffing G4SolmidStore etc.).
-        // XXX Volumes introspection (see below).
         // XXX Envelopes (using G4vSolid::CalculateExtent, and possibly history).
         let (dict, file) = arg.resolve()?;
         if dict.len() != 1 {
@@ -51,6 +50,15 @@ impl Geometry {
         }
         let geometry = Self (geometry);
         Ok(geometry)
+    }
+
+    #[pyo3(name = "r#box")]
+    fn compute_box(&self, volume: &str, frame: Option<&str>) -> PyResult<[f64; 6]> {
+        let frame = frame.unwrap_or("");
+        let bbox = self.0.compute_box(volume, frame);
+        ffi::get_error()
+            .to_result()
+            .and_then(|_| Ok(bbox))
     }
 
     fn check(&self, resolution: Option<i32>) -> PyResult<()> {

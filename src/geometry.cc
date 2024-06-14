@@ -13,6 +13,8 @@
 #include "G4TessellatedSolid.hh"
 #include "G4TriangularFacet.hh"
 #include "G4Tubs.hh"
+#include "G4VisExtent.hh"
+#include "G4VoxelLimits.hh"
 // Goupil interface.
 #include "G4Goupil.hh"
 
@@ -36,6 +38,7 @@ struct GeometryData {
     static GeometryData * get(const G4VPhysicalVolume *);
 
     G4VPhysicalVolume * world = nullptr;
+    std::map<std::string, const G4VPhysicalVolume *> elements;
 
 private:
     size_t rc = 0;
@@ -193,7 +196,8 @@ static void drop_them_all(const G4VPhysicalVolume * volume) {
 static G4LogicalVolume * build_volumes(
     const Volume & volume,
     const std::string & path,
-    std::map<std::string, G4VSolid *> & solids
+    std::map<std::string, G4VSolid *> & solids,
+    std::map<std::string, const G4VPhysicalVolume *> & elements
 ) {
     auto name = std::string(volume.name());
     std::string pathname;
@@ -236,7 +240,7 @@ static G4LogicalVolume * build_volumes(
 
     // Build sub-volumes.
     for (auto && v: volume.volumes()) {
-        auto l = build_volumes(v, pathname, solids);
+        auto l = build_volumes(v, pathname, solids, elements);
         if (l == nullptr) {
             drop_them_all(logical);
             return nullptr;
@@ -256,11 +260,13 @@ static G4LogicalVolume * build_volumes(
             p[1] * CLHEP::cm,
             p[2] * CLHEP::cm
         );
-        new G4PVPlacement(
+        auto v_name = std::string(v.name());
+        auto v_path = fmt::format("{}.{}", pathname, v_name);
+        elements[v_path] = new G4PVPlacement(
             rotation,
             position,
             l,
-            std::string(v.name()),
+            v_name,
             logical,
             false,
             0
@@ -285,7 +291,7 @@ GeometryData::GeometryData(rust::Box<Volume> volume) {
     }
 
     // Build volumes.
-    auto logical = build_volumes(*volume, path, solids);
+    auto logical = build_volumes(*volume, path, solids, this->elements);
     if (logical == nullptr) {
         for (auto item: solids) {
             delete item.second;
@@ -301,16 +307,17 @@ GeometryData::GeometryData(rust::Box<Volume> volume) {
     }
 
     // Register the world volume.
+    auto world_name = std::string(volume->name());
     this->world = new G4PVPlacement(
         nullptr,
         G4ThreeVector(0.0, 0.0, 0.0),
         logical,
-        std::string(volume->name()),
+        world_name,
         nullptr,
         false,
         0
     );
-
+    this->elements[world_name] = this->world;
     this->INSTANCES[this->world] = this;
 }
 
@@ -322,6 +329,7 @@ GeometryData::~GeometryData() {
             delete solid;
         }
         this->orphans.clear();
+        this->elements.clear();
     }
 }
 
@@ -392,6 +400,83 @@ std::shared_ptr<Error> GeometryBorrow::check(int resolution) const {
     clear_error();
     check_overlaps(this->data->world, resolution);
     return get_error();
+}
+
+std::array<double, 6> GeometryBorrow::compute_box(
+    rust::Str volume_path_,
+    rust::Str frame_path
+) const {
+    auto get_volume = [&] (std::string & path) {
+        auto volume = this->data->elements[path];
+        if (volume == nullptr) {
+            auto msg = fmt::format("unknown volume '{}'", path);
+            set_error(ErrorType::ValueError, msg.c_str());
+        }
+        return volume;
+    };
+
+    std::array<double, 6> box = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    auto volume_path = std::string(volume_path_);
+    auto volume = get_volume(volume_path);
+    if (volume == nullptr) {
+        return box;
+    }
+
+    auto solid = volume->GetLogicalVolume()->GetSolid();
+    auto transform = G4AffineTransform();
+    if (!frame_path.empty() && (volume_path_ != frame_path)) {
+        auto current_path = std::string(frame_path);
+        if (volume_path.rfind(current_path, 0) != 0) {
+            auto msg = fmt::format(
+                "'{}' does not contain '{}'",
+                current_path,
+                volume_path
+            );
+            set_error(ErrorType::ValueError, msg.c_str());
+            return box;
+        }
+
+        std::istringstream remainder(
+            volume_path.substr(current_path.size() + 1)
+        );
+        for (;;) {
+            auto ref = get_volume(current_path);
+            if (ref == nullptr) {
+                return box;
+            }
+
+            transform *= G4AffineTransform(
+                ref->GetRotation(),
+                ref->GetTranslation()
+            );
+
+            std::string stem;
+            std::getline(remainder, stem, '.');
+            if (stem.empty()) break;
+            current_path = fmt::format("{}.{}", current_path, stem);
+        }
+    }
+
+    if (transform.IsTranslated() || transform.IsRotated()) {
+        auto limits = G4VoxelLimits();
+        solid->CalculateExtent(kXAxis, limits, transform, box[0], box[1]);
+        solid->CalculateExtent(kYAxis, limits, transform, box[2], box[3]);
+        solid->CalculateExtent(kZAxis, limits, transform, box[4], box[5]);
+    } else {
+        auto extent = solid->GetExtent();
+        box[0] = extent.GetXmin();
+        box[1] = extent.GetXmax();
+        box[2] = extent.GetYmin();
+        box[3] = extent.GetYmax();
+        box[4] = extent.GetZmin();
+        box[5] = extent.GetZmax();
+    }
+
+    for (auto && value: box) {
+        value /= CLHEP::cm;
+    }
+
+    return box;
 }
 
 std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {

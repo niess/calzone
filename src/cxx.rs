@@ -137,7 +137,9 @@ pub mod ffi {
         // Geometry interface.
         type GeometryBorrow;
         fn create_geometry(volume: Box<Volume>) -> SharedPtr<GeometryBorrow>;
+
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
+        fn compute_box(self: &GeometryBorrow, volume: &str, frame: &str) -> [f64; 6];
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn set_goupil(self: &GeometryBorrow);
 
