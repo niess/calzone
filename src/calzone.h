@@ -36,8 +36,9 @@ struct GeometryBorrow {
     // Geant4 interface.
     std::shared_ptr<Error> check(int resolution) const;
     std::array<double, 6> compute_box(rust::Str, rust::Str) const;
+    std::array<double, 3> compute_origin(rust::Str, rust::Str) const;
+    VolumeInfo describe_volume(rust::Str) const;
     std::shared_ptr<Error> dump(rust::Str) const;
-
 
     // Goupil interface.
     void set_goupil() const;

@@ -402,61 +402,91 @@ std::shared_ptr<Error> GeometryBorrow::check(int resolution) const {
     return get_error();
 }
 
-std::array<double, 6> GeometryBorrow::compute_box(
-    rust::Str volume_path_,
-    rust::Str frame_path
-) const {
-    auto get_volume = [&] (std::string & path) {
-        auto volume = this->data->elements[path];
-        if (volume == nullptr) {
-            auto msg = fmt::format("unknown volume '{}'", path);
-            set_error(ErrorType::ValueError, msg.c_str());
-        }
-        return volume;
-    };
+static const G4VPhysicalVolume * get_volume(
+    std::string & path,
+    std::map<std::string, const G4VPhysicalVolume *> & elements
+) {
+    // XXX This (and below 'get_transform') is fragile for imported GDML.
 
-    std::array<double, 6> box = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    auto volume_path = std::string(volume_path_);
-    auto volume = get_volume(volume_path);
+    auto volume = elements[path];
     if (volume == nullptr) {
+        auto msg = fmt::format("unknown volume '{}'", path);
+        set_error(ErrorType::ValueError, msg.c_str());
+    }
+    return volume;
+}
+
+std::pair<G4AffineTransform, const G4VPhysicalVolume *> get_transform(
+    std::string & volume,
+    std::string & frame,
+    std::map<std::string, const G4VPhysicalVolume *> & elements
+) {
+    auto transform = G4AffineTransform();
+    if (volume == frame) {
+        return std::make_pair(transform, nullptr);
+    }
+
+    auto current = std::string(frame);
+    if (volume.rfind(current, 0) != 0) {
+        auto msg = fmt::format(
+            "'{}' does not contain '{}'",
+            current,
+            volume
+        );
+        set_error(ErrorType::ValueError, msg.c_str());
+        return std::make_pair(transform, nullptr);
+    }
+
+    std::istringstream remainder(volume.substr(current.size() + 1));
+    const G4VPhysicalVolume * ref;
+    for (;;) {
+        ref = get_volume(current, elements);
+        if (ref == nullptr) {
+            return std::make_pair(transform, nullptr);
+        }
+
+        transform *= G4AffineTransform(
+            ref->GetRotation(),
+            ref->GetTranslation()
+        );
+
+        std::string stem;
+        std::getline(remainder, stem, '.');
+        if (stem.empty()) break;
+        current = fmt::format("{}.{}", current, stem);
+    }
+
+    return std::make_pair(transform, ref);
+}
+
+std::array<double, 6> GeometryBorrow::compute_box(
+    rust::Str volume_,
+    rust::Str frame_
+) const {
+    std::array<double, 6> box = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    auto volume = std::string(volume_);
+    std::string frame;
+    if (frame_.empty()) {
+        frame = this->data->world->GetName();
+    } else {
+        frame = std::string(frame_);
+    }
+
+    auto result = get_transform(volume, frame, this->data->elements);
+    if (any_error()) {
         return box;
     }
 
-    auto solid = volume->GetLogicalVolume()->GetSolid();
-    auto transform = G4AffineTransform();
-    if (!frame_path.empty() && (volume_path_ != frame_path)) {
-        auto current_path = std::string(frame_path);
-        if (volume_path.rfind(current_path, 0) != 0) {
-            auto msg = fmt::format(
-                "'{}' does not contain '{}'",
-                current_path,
-                volume_path
-            );
-            set_error(ErrorType::ValueError, msg.c_str());
+    G4AffineTransform transform = std::move(result.first);
+    const G4VPhysicalVolume * physical = std::move(result.second);
+    if (physical == nullptr) {
+        physical = get_volume(volume, this->data->elements);
+        if (physical == nullptr) {
             return box;
-        }
-
-        std::istringstream remainder(
-            volume_path.substr(current_path.size() + 1)
-        );
-        for (;;) {
-            auto ref = get_volume(current_path);
-            if (ref == nullptr) {
-                return box;
-            }
-
-            transform *= G4AffineTransform(
-                ref->GetRotation(),
-                ref->GetTranslation()
-            );
-
-            std::string stem;
-            std::getline(remainder, stem, '.');
-            if (stem.empty()) break;
-            current_path = fmt::format("{}.{}", current_path, stem);
         }
     }
 
+    auto solid = physical->GetLogicalVolume()->GetSolid();
     if (transform.IsTranslated() || transform.IsRotated()) {
         auto limits = G4VoxelLimits();
         solid->CalculateExtent(kXAxis, limits, transform, box[0], box[1]);
@@ -477,6 +507,45 @@ std::array<double, 6> GeometryBorrow::compute_box(
     }
 
     return box;
+}
+
+std::array<double, 3> GeometryBorrow::compute_origin(
+    rust::Str volume_,
+    rust::Str frame_
+) const {
+    std::array<double, 3> origin = { 0.0, 0.0, 0.0 };
+    auto volume = std::string(volume_);
+    std::string frame;
+    if (frame_.empty()) {
+        frame = this->data->world->GetName();
+    } else {
+        frame = std::string(frame_);
+    }
+
+    auto result = get_transform(volume, frame, this->data->elements);
+    if (any_error()) {
+        return origin;
+    }
+
+    G4AffineTransform transform = std::move(result.first);
+    auto p = transform.TransformPoint(G4ThreeVector(0.0, 0.0, 0.0));
+    for (auto i = 0; i < 3; i++) {
+        origin[i] = p[i] / CLHEP::cm;
+    }
+
+    return origin;
+}
+
+VolumeInfo GeometryBorrow::describe_volume(rust::Str name_) const {
+    VolumeInfo info;
+    auto name = std::string(name_);
+    auto volume = get_volume(name, this->data->elements);
+    if (volume != nullptr) {
+        auto logical = volume->GetLogicalVolume();
+        info.material = rust::String(logical->GetMaterial()->GetName());
+        info.solid = rust::String(logical->GetSolid()->GetName());
+    }
+    return info;
 }
 
 std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {

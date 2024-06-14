@@ -24,14 +24,26 @@ impl ffi::Error {
                 Err(Geant4Exception::new_err(self.message.clone()))
             },
             ffi::ErrorType::KeyboardInterrupt => {
-                Err(PyKeyboardInterrupt::new_err(""))
+                Err(PyKeyboardInterrupt::new_err("Ctrl+C catched"))
             },
             ffi::ErrorType::MemoryError => {
-                Err(PyMemoryError::new_err(""))
+                Err(PyMemoryError::new_err("could not allocate memory"))
             },
             ffi::ErrorType::ValueError => {
                 Err(PyValueError::new_err(self.message.clone()))
             },
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn value(&self) -> Option<&str> {
+        match self.tp {
+            ffi::ErrorType::None => None,
+            ffi::ErrorType::FileNotFoundError => Some(self.message.as_str()),
+            ffi::ErrorType::Geant4Exception => Some(self.message.as_str()),
+            ffi::ErrorType::KeyboardInterrupt => Some("Ctrl+C catched"),
+            ffi::ErrorType::MemoryError => Some("could not allocate memory"),
+            ffi::ErrorType::ValueError => Some(self.message.as_str()),
             _ => unreachable!(),
         }
     }
