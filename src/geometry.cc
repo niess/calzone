@@ -39,6 +39,7 @@ struct GeometryData {
 
     G4VPhysicalVolume * world = nullptr;
     std::map<std::string, const G4VPhysicalVolume *> elements;
+    std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> mothers;
 
 private:
     size_t rc = 0;
@@ -48,9 +49,11 @@ private:
 
 std::map<const G4VPhysicalVolume *, GeometryData *> GeometryData::INSTANCES;
 
-static G4TessellatedSolid * build_tessellation(const Volume & volume) {
-    auto name = std::string(volume.name());
-    auto solid = new G4TessellatedSolid(name);
+static G4TessellatedSolid * build_tessellation(
+    const std::string & pathname,
+    const Volume & volume
+) {
+    auto solid = new G4TessellatedSolid(pathname);
     if (solid == nullptr) {
         set_error(ErrorType::MemoryError, "");
         return nullptr;
@@ -75,7 +78,7 @@ static G4TessellatedSolid * build_tessellation(const Volume & volume) {
             delete solid;
             auto message = fmt::format(
                 "bad vertices for tessellation '{}'",
-                name
+                pathname
             );
             set_error(ErrorType::ValueError, message.c_str());
             return nullptr;
@@ -105,7 +108,7 @@ static bool build_solids(
         case ShapeType::Box: {
                 auto shape = volume.box_shape();
                 solid = new G4Box(
-                    std::string(name),
+                    std::string(pathname),
                     0.5 * shape.size[0] * CLHEP::cm,
                     0.5 * shape.size[1] * CLHEP::cm,
                     0.5 * shape.size[2] * CLHEP::cm
@@ -117,7 +120,7 @@ static bool build_solids(
                 double rmin = (shape.thickness > 0.0) ?
                     shape.radius - shape.thickness : 0.0;
                 solid = new G4Tubs(
-                    std::string(name),
+                    std::string(pathname),
                     rmin * CLHEP::cm,
                     shape.radius * CLHEP::cm,
                     0.5 * shape.length * CLHEP::cm,
@@ -129,13 +132,13 @@ static bool build_solids(
         case ShapeType::Sphere: {
                 auto shape = volume.sphere_shape();
                 solid = new G4Orb(
-                    std::string(name),
+                    std::string(pathname),
                     shape.radius * CLHEP::cm
                 );
             }
             break;
         case ShapeType::Tessellation:
-            solid = build_tessellation(volume);
+            solid = build_tessellation(pathname, volume);
             break;
     }
     if (solid == nullptr) {
@@ -196,8 +199,7 @@ static void drop_them_all(const G4VPhysicalVolume * volume) {
 static G4LogicalVolume * build_volumes(
     const Volume & volume,
     const std::string & path,
-    std::map<std::string, G4VSolid *> & solids,
-    std::map<std::string, const G4VPhysicalVolume *> & elements
+    std::map<std::string, G4VSolid *> & solids
 ) {
     auto name = std::string(volume.name());
     std::string pathname;
@@ -225,7 +227,7 @@ static G4LogicalVolume * build_volumes(
     solids.erase(i);
 
     // Build logical volume.
-    auto logical = new G4LogicalVolume(solid, material, name);
+    auto logical = new G4LogicalVolume(solid, material, pathname);
     if (logical == nullptr) {
         delete solid;
         auto msg = fmt::format(
@@ -240,7 +242,7 @@ static G4LogicalVolume * build_volumes(
 
     // Build sub-volumes.
     for (auto && v: volume.volumes()) {
-        auto l = build_volumes(v, pathname, solids, elements);
+        auto l = build_volumes(v, pathname, solids);
         if (l == nullptr) {
             drop_them_all(logical);
             return nullptr;
@@ -262,11 +264,11 @@ static G4LogicalVolume * build_volumes(
         );
         auto v_name = std::string(v.name());
         auto v_path = fmt::format("{}.{}", pathname, v_name);
-        elements[v_path] = new G4PVPlacement(
+        new G4PVPlacement(
             rotation,
             position,
             l,
-            v_name,
+            v_path,
             logical,
             false,
             0
@@ -274,6 +276,21 @@ static G4LogicalVolume * build_volumes(
     }
 
     return logical;
+}
+
+static void map_volumes(
+    const G4VPhysicalVolume * self,
+    std::map<std::string, const G4VPhysicalVolume *> & elements,
+    std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> & mothers
+) {
+    auto * logical = self->GetLogicalVolume();
+    int n = logical->GetNoDaughters();
+    for (int i = 0; i < n; i++) {
+        auto daughter = logical->GetDaughter(i);
+        elements[daughter->GetName()] = daughter;
+        mothers[daughter] = self;
+        map_volumes(daughter, elements, mothers);
+    }
 }
 
 GeometryData::GeometryData(rust::Box<Volume> volume) {
@@ -291,7 +308,7 @@ GeometryData::GeometryData(rust::Box<Volume> volume) {
     }
 
     // Build volumes.
-    auto logical = build_volumes(*volume, path, solids, this->elements);
+    auto logical = build_volumes(*volume, path, solids);
     if (logical == nullptr) {
         for (auto item: solids) {
             delete item.second;
@@ -318,7 +335,11 @@ GeometryData::GeometryData(rust::Box<Volume> volume) {
         0
     );
     this->elements[world_name] = this->world;
+    this->mothers[this->world] = nullptr;
     this->INSTANCES[this->world] = this;
+
+    // Map volumes hierarchy.
+    map_volumes(this->world, this->elements, this->mothers);
 }
 
 GeometryData::~GeometryData() {
@@ -406,8 +427,6 @@ static const G4VPhysicalVolume * get_volume(
     std::string & path,
     std::map<std::string, const G4VPhysicalVolume *> & elements
 ) {
-    // XXX This (and below 'get_transform') is fragile for imported GDML.
-
     auto volume = elements[path];
     if (volume == nullptr) {
         auto msg = fmt::format("unknown volume '{}'", path);
@@ -419,44 +438,45 @@ static const G4VPhysicalVolume * get_volume(
 std::pair<G4AffineTransform, const G4VPhysicalVolume *> get_transform(
     std::string & volume,
     std::string & frame,
-    std::map<std::string, const G4VPhysicalVolume *> & elements
+    std::map<std::string, const G4VPhysicalVolume *> & elements,
+    std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> & mothers
 ) {
     auto transform = G4AffineTransform();
     if (volume == frame) {
         return std::make_pair(transform, nullptr);
     }
 
-    auto current = std::string(frame);
-    if (volume.rfind(current, 0) != 0) {
-        auto msg = fmt::format(
-            "'{}' does not contain '{}'",
-            current,
-            volume
-        );
-        set_error(ErrorType::ValueError, msg.c_str());
+    const G4VPhysicalVolume * current = get_volume(volume, elements);
+    const G4VPhysicalVolume * target = get_volume(frame, elements);
+    if (any_error()) {
         return std::make_pair(transform, nullptr);
     }
 
-    std::istringstream remainder(volume.substr(current.size() + 1));
-    const G4VPhysicalVolume * ref;
-    for (;;) {
-        ref = get_volume(current, elements);
-        if (ref == nullptr) {
+    std::list<const G4VPhysicalVolume *> volumes;
+    while (current != target) {
+        volumes.push_back(current);
+        current = mothers[current];
+        if (current == nullptr) {
+            auto msg = fmt::format(
+                "'{}' does not contain '{}'",
+                frame,
+                volume
+            );
+            set_error(ErrorType::ValueError, msg.c_str());
             return std::make_pair(transform, nullptr);
         }
-
-        transform *= G4AffineTransform(
-            ref->GetRotation(),
-            ref->GetTranslation()
-        );
-
-        std::string stem;
-        std::getline(remainder, stem, '.');
-        if (stem.empty()) break;
-        current = fmt::format("{}.{}", current, stem);
     }
 
-    return std::make_pair(transform, ref);
+    while (!volumes.empty()) {
+        current = volumes.back();
+        transform *= G4AffineTransform(
+            current->GetRotation(),
+            current->GetTranslation()
+        );
+        volumes.pop_back();
+    }
+
+    return std::make_pair(transform, current);
 }
 
 std::array<double, 6> GeometryBorrow::compute_box(
@@ -472,7 +492,12 @@ std::array<double, 6> GeometryBorrow::compute_box(
         frame = std::string(frame_);
     }
 
-    auto result = get_transform(volume, frame, this->data->elements);
+    auto result = get_transform(
+        volume,
+        frame,
+        this->data->elements,
+        this->data->mothers
+    );
     if (any_error()) {
         return box;
     }
@@ -522,7 +547,12 @@ std::array<double, 3> GeometryBorrow::compute_origin(
         frame = std::string(frame_);
     }
 
-    auto result = get_transform(volume, frame, this->data->elements);
+    auto result = get_transform(
+        volume,
+        frame,
+        this->data->elements,
+        this->data->mothers
+    );
     if (any_error()) {
         return origin;
     }
@@ -544,6 +574,19 @@ VolumeInfo GeometryBorrow::describe_volume(rust::Str name_) const {
         auto logical = volume->GetLogicalVolume();
         info.material = rust::String(logical->GetMaterial()->GetName());
         info.solid = rust::String(logical->GetSolid()->GetName());
+        auto mother = this->data->mothers[volume];
+        if (mother == nullptr) {
+            info.mother = rust::String("");
+        } else {
+            info.mother = rust::String(mother->GetName());
+        }
+        int n = logical->GetNoDaughters();
+        for (int i = 0; i < n; i++) {
+            auto daughter = logical->GetDaughter(i);
+            info.daughters.push_back(
+                std::move(std::string(daughter->GetName()
+            )));
+        }
     }
     return info;
 }

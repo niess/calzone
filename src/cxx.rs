@@ -60,6 +60,8 @@ pub mod ffi {
     struct VolumeInfo { // From Geant4.
         material: String,
         solid: String,
+        mother: String,
+        daughters: Vec<String>,
     }
 
     // ===========================================================================================

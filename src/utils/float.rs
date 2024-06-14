@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use std::mem::transmute;
+use super::numpy::PyArray;
 
 
 // ===============================================================================================
@@ -61,6 +62,18 @@ impl From<&[f64; 3]> for f64x3 {
     }
 }
 
+impl IntoPy<PyObject> for f64x3 {
+    fn into_py(self, py: Python) -> PyObject {
+        let result = PyArray::<f64>::empty(py, &[3]).unwrap();
+        result.set(0, self.0[0]).unwrap();
+        result.set(1, self.0[1]).unwrap();
+        result.set(2, self.0[2]).unwrap();
+        result.readonly();
+        result
+            .as_any()
+            .into_py(py)
+    }
+}
 
 // ===============================================================================================
 //

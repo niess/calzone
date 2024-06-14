@@ -1,8 +1,11 @@
 use crate::utils::extract::{extract, Tag, TryFromBound};
+use crate::utils::float::f64x3;
 use crate::utils::io::DictLike;
+use crate::utils::numpy::PyArray;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyIndexError, PyValueError};
+use pyo3::types::PyTuple;
 use super::cxx::ffi;
 use temp_dir::TempDir;
 
@@ -53,16 +56,24 @@ impl Geometry {
     }
 
     fn __getitem__(&self, volume: &str) -> PyResult<Volume> {
-        let ffi::VolumeInfo { material, solid } = self.0.describe_volume(volume);
+        let ffi::VolumeInfo { material, solid, mother, daughters } =
+            self.0.describe_volume(volume);
         if let Some(msg) = ffi::get_error().value() {
             let msg = format!("bad volume ({})", msg);
             return Err(PyIndexError::new_err(msg));
         }
+        let mother = if mother.is_empty() {
+            None
+        } else {
+            Some(mother)
+        };
         let volume = Volume {
             geometry: self.0.clone(),
             name: volume.to_string(),
             material,
             solid,
+            mother,
+            daughters,
         };
         Ok(volume)
     }
@@ -116,25 +127,50 @@ pub struct Volume {
     material: String,
     #[pyo3(get)]
     solid: String,
+    #[pyo3(get)]
+    mother: Option<String>,
+    daughters: Vec<String>,
 }
 
 #[pymethods]
 impl Volume {
+    #[getter]
+    fn get_daughters<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
+        PyTuple::new_bound(py, &self.daughters)
+    }
+
     #[pyo3(name = "r#box")]
-    fn compute_box(&self, frame: Option<&str>) -> PyResult<[f64; 6]> {
+    fn compute_box(
+        &self,
+        py: Python,
+        frame: Option<&str>
+    ) -> PyResult<PyObject> {
         let frame = frame.unwrap_or("");
         let bbox = self.geometry.compute_box(self.name.as_str(), frame);
-        ffi::get_error()
-            .to_result() // XXX map_err (below as well)
-            .and_then(|_| Ok(bbox))
+        if let Some(msg) = ffi::get_error().value() {
+            let msg = format!("bad box operation ({})", msg);
+            return Err(PyValueError::new_err(msg));
+        }
+
+        let result = PyArray::<f64>::empty(py, &[2, 3]).unwrap();
+        result.set(0, bbox[0]).unwrap();
+        result.set(1, bbox[2]).unwrap();
+        result.set(2, bbox[4]).unwrap();
+        result.set(3, bbox[1]).unwrap();
+        result.set(4, bbox[3]).unwrap();
+        result.set(5, bbox[5]).unwrap();
+        result.readonly();
+        Ok(result.as_any().into_py(py))
     }
 
     #[pyo3(name = "origin")]
-    fn compute_origin(&self, frame: Option<&str>) -> PyResult<[f64; 3]> {
+    fn compute_origin(&self, frame: Option<&str>) -> PyResult<f64x3> {
         let frame = frame.unwrap_or("");
         let origin = self.geometry.compute_origin(self.name.as_str(), frame);
-        ffi::get_error()
-            .to_result()
-            .and_then(|_| Ok(origin))
+        if let Some(msg) = ffi::get_error().value() {
+            let msg = format!("bad origin operation ({})", msg);
+            return Err(PyValueError::new_err(msg));
+        }
+        Ok((&origin).into())
     }
 }
