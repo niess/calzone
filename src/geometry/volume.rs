@@ -1,7 +1,7 @@
 use crate::utils::error::variant_error;
 use crate::utils::extract::{extract, Extractor, Property, PropertyValue, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
-use crate::utils::io::{DictLike, load_stl};
+use crate::utils::io::load_stl;
 use crate::utils::units::convert;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
@@ -63,21 +63,6 @@ enum ShapeType {
 }
 
 impl Volume {
-    pub fn new(volume: DictLike) -> PyResult<Self> {
-        let (volume, file) = volume.resolve()?;
-        if volume.len() != 1 {
-            let msg = format!("bad volume(s) (expected 1 top volume, found {})", volume.len());
-            return Err(PyValueError::new_err(msg));
-        }
-        let (name, definition) = volume.iter().next().unwrap();
-        let name: String = extract(&name)
-            .or("bad volume(s)")?;
-        let file = file.as_ref().map(|f| f.as_path());
-        let tag = Tag::new("volume(s)", name.as_str(), file);
-        let volume = Self::try_from_any(&tag, &definition)?;
-        Ok(volume)
-    }
-
     pub(super) fn check(name: &str) -> Result<(), &'static str> {
         for c in name.chars() {
             if !c.is_alphanumeric() {

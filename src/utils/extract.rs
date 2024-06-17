@@ -76,12 +76,6 @@ impl<'a> Tag<'a> {
         Self { typename, name: self.name, path, file: self.file }
     }
 
-    /// Returns an empty `Tag`.
-    pub fn empty() -> Self {
-        const EMPTY: &'static str = "";
-        Self::new(EMPTY, EMPTY, None)
-    }
-
     /// Returns a new `Tag` with a path extended by `value`, and optionally a different type or
     /// file.
     pub fn extend(
@@ -156,21 +150,19 @@ impl<'a, 'b> TaggedBad<'a, 'b> {
 impl<'a, 'b> From<TaggedBad<'a, 'b>> for String {
     fn from(value: TaggedBad<'a, 'b>) -> Self {
         let prefix = value.tag.file_prefix();
+        let tag = if value.tag.path.is_empty() {
+            value.tag.typename.to_string()
+        } else {
+            format!("'{}' {}", value.tag.path, value.tag.typename)
+        };
         match value.what {
             None => match value.why {
-                None => format!("{}bad '{}' {}", prefix, value.tag.path, value.tag.typename),
-                Some(why) => format!(
-                    "{}bad '{}' {} ({})", prefix, value.tag.path, value.tag.typename, why,
-                ),
+                None => format!("{}bad {}", prefix, tag),
+                Some(why) => format!("{}bad {} ({})", prefix, tag, why),
             },
             Some(what) => match value.why {
-                None => format!(
-                    "{}bad {} for '{}' {}", prefix, what, value.tag.path, value.tag.typename,
-                ),
-                Some(why) => format!(
-                    "{}bad {} for '{}' {} ({})",
-                    prefix, what, value.tag.path, value.tag.typename, why,
-                ),
+                None => format!("{}bad {} for {}", prefix, what, tag),
+                Some(why) => format!("{}bad {} for {} ({})", prefix, what, tag, why),
             },
         }
     }
@@ -205,6 +197,7 @@ enum PropertyDefault {
 }
 
 enum PropertyType {
+    Any,
     Dict,
     F64,
     F64x3,
@@ -214,6 +207,7 @@ enum PropertyType {
 }
 
 pub enum PropertyValue<'py> {
+    Any(Bound<'py, PyAny>),
     Dict(Bound<'py, PyDict>),
     F64(f64),
     F64x3(f64x3),
@@ -330,6 +324,12 @@ impl Property {
     }
 
     // Optional constructors.
+    pub const fn optional_any(name: &'static str) -> Self {
+        let tp = PropertyType::Any;
+        let default = PropertyDefault::Optional;
+        Self::new(name, tp, default)
+    }
+
     pub const fn optional_dict(name: &'static str) -> Self {
         let tp = PropertyType::Dict;
         let default = PropertyDefault::Optional;
@@ -413,6 +413,11 @@ impl Property {
             tag.bad().what(&what).into()
         };
         let value = match &self.tp {
+            PropertyType::Any => {
+                let value: Bound<PyAny> = extract(value)
+                    .or_else(bad_property)?;
+                PropertyValue::Any(value)
+            },
             PropertyType::Dict => {
                 let value: Bound<PyDict> = extract(value)
                     .or_else(bad_property)?;
@@ -476,6 +481,25 @@ impl<'py> From<&PropertyDefault> for PropertyValue<'py> {
             PropertyDefault::String(value) => Self::String(value.to_string()),
             PropertyDefault::U32(value) => Self::U32(*value),
             _ => unreachable!()
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Bound<'py, PyAny> {
+    fn from(value: PropertyValue<'py>) -> Bound<'py, PyAny> {
+        match value {
+            PropertyValue::Any(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<Bound<'py, PyAny>> {
+    fn from(value: PropertyValue<'py>) -> Option<Bound<'py, PyAny>> {
+        match value {
+            PropertyValue::Any(value) => Some(value),
+            PropertyValue::None => None,
+            _ => unreachable!(),
         }
     }
 }
@@ -684,6 +708,10 @@ impl TypeName for f64x3 {
 
 impl TypeName for f64x3x3 {
     fn type_name() -> &'static str { "a 'matrix'" }
+}
+
+impl TypeName for PyAny {
+    fn type_name() -> &'static str { "an 'object'" }
 }
 
 impl TypeName for PyDict {

@@ -4,6 +4,7 @@ use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use pyo3::exceptions::PyValueError;
 use super::cxx::ffi;
 
 pub mod gate;
@@ -11,61 +12,121 @@ mod hash;
 
 
 #[pyfunction]
-#[pyo3(signature = (**kwargs,))]
-pub fn elements(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
-    if let Some(kwargs) = kwargs {
-        let elements = Vec::<ffi::Element>::try_from_dict(&Tag::empty(), kwargs)?;
-        for element in elements {
+pub fn load(arg: DictLike) -> PyResult<()> {
+    let (materials, file) = arg.resolve(None)?;
+    let tag = Tag::new("", "materials", file.as_deref());
+    let materials = MaterialsDefinition::try_from_dict(&tag, &materials)?;
+    materials.build()?;
+    Ok(())
+}
+
+
+// ===============================================================================================
+//
+// Geometry definition.
+//
+// This is a thin wrapper collecting the top volume description and some optional material
+// definitions.
+//
+// ===============================================================================================
+
+pub struct MaterialsDefinition {
+    elements: Vec<ffi::Element>,
+    molecules: Vec<ffi::Molecule>,
+    mixtures: Vec<ffi::Mixture>,
+}
+
+impl MaterialsDefinition {
+    pub fn build(&self) -> PyResult<()> {
+        for element in &self.elements {
             ffi::add_element(&element)
                 .to_result()?;
         }
-    }
-    Ok(())
-}
-
-#[pyfunction]
-pub fn load(arg: DictLike) -> PyResult<()> {
-    let (materials, _) = arg.resolve()?;
-    let get = |key: &str| -> PyResult<Bound<PyDict>> {
-        let value = materials.get_item(key)?.unwrap();
-        let dict: Bound<PyDict> = value.extract()?;
-        Ok(dict)
-    };
-
-    elements(Some(&get("elements")?))?;
-    molecules(Some(&get("molecules")?))?;
-    mixtures(Some(&get("mixtures")?))?;
-
-    Ok(())
-}
-
-#[pyfunction]
-#[pyo3(signature = (**kwargs,))]
-pub fn molecules(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
-    if let Some(kwargs) = kwargs {
-        let molecules = Vec::<ffi::Molecule>::try_from_dict(&Tag::empty(), kwargs)?;
-        for molecule in molecules {
+        for molecule in &self.molecules {
             ffi::add_molecule(&molecule)
                 .to_result()?;
         }
-    }
-    Ok(())
-}
-
-#[pyfunction]
-#[pyo3(signature = (**kwargs,))]
-pub fn mixtures(kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
-    if let Some(kwargs) = kwargs {
-        let mixtures = Vec::<ffi::Mixture>::try_from_dict(&Tag::empty(), kwargs)?;
         // XXX Sort mixtures before processing them?
-        for mixture in mixtures {
-            ffi::add_mixture(&mixture)
+        for mixtures in &self.mixtures {
+            ffi::add_mixture(&mixtures)
                 .to_result()?;
         }
+        Ok(())
     }
-    Ok(())
+
+    pub fn extend(&mut self, mut other: Self) {
+        for e in other.elements.drain(..) {
+            self.elements.push(e);
+        }
+        for m in other.molecules.drain(..) {
+            self.molecules.push(m);
+        }
+        for m in other.mixtures.drain(..) {
+            self.mixtures.push(m);
+        }
+    }
 }
 
+impl TryFromBound for MaterialsDefinition {
+    fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let py = value.py();
+        let tag = tag.cast("materials");
+        let materials: DictLike = value
+            .extract()
+            .map_err(|err| {
+                let msg: String = tag.bad().why(format!("{}", err.value_bound(py))).into();
+                PyValueError::new_err(msg)
+            })?;
+        let (materials, file) = materials.resolve(tag.file())
+            .map_err(|err| {
+                let msg: String = tag.bad().why(format!("{}", err.value_bound(py))).into();
+                PyValueError::new_err(msg)
+            })?;
+        let tag = if file.is_some() {
+            Tag::new("materials", "", file.as_deref())
+        } else {
+            tag
+        };
+
+        const EXTRACTOR: Extractor<3> = Extractor::new([
+            Property::optional_dict("elements"),
+            Property::optional_dict("molecules"),
+            Property::optional_dict("mixtures"),
+        ]);
+        let [elements, molecules, mixtures] = EXTRACTOR.extract(&tag, &materials, None)?;
+
+        let elements: Option<Bound<PyDict>> = elements.into();
+        let elements = match elements {
+            None => Vec::new(),
+            Some(elements) => {
+                let tag = tag.cast("element");
+                Vec::<ffi::Element>::try_from_dict(&tag, &elements)?
+            },
+        };
+
+        let molecules: Option<Bound<PyDict>> = molecules.into();
+        let molecules = match molecules {
+            None => Vec::new(),
+            Some(molecules) => {
+                let tag = tag.cast("molecules");
+                Vec::<ffi::Molecule>::try_from_dict(&tag, &molecules)?
+            },
+        };
+
+        let mixtures: Option<Bound<PyDict>> = mixtures.into();
+        let mixtures = match mixtures {
+            None => Vec::new(),
+            Some(mixtures) => {
+                let tag = tag.cast("mixtures");
+                Vec::<ffi::Mixture>::try_from_dict(&tag, &mixtures)?
+            },
+        };
+
+        let materials = Self { elements, molecules, mixtures };
+        Ok(materials)
+    }
+
+}
 
 // ===============================================================================================
 //

@@ -2,7 +2,7 @@ use crate::utils::error::variant_explain;
 use crate::utils::units::{self, UnitError};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyFileNotFoundError, PyValueError};
 use pyo3::types::PyDict;
 use regex::{Captures, CaptureMatches, Regex};
 use std::fmt;
@@ -12,7 +12,14 @@ use std::path::Path;
 
 pub fn load_gate_db<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
     // Load text file.
-    let text = std::fs::read_to_string(path)?;
+    let text = std::fs::read_to_string(path)
+        .map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => {
+                let path = format!("No such file or directory '{}'", path.display());
+                PyFileNotFoundError::new_err(path)
+            },
+            _ => err.into(),
+        })?;
 
     // Process lines.
     Processor::new(py, &text)

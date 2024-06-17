@@ -1,7 +1,10 @@
+use crate::materials::MaterialsDefinition;
+use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
 use cxx::SharedPtr;
+use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::types::PyTuple;
@@ -31,7 +34,6 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 impl Geometry {
     #[new]
     fn new(volume: DictLike) -> PyResult<Self> {
-        // XXX materials (dedicated Geometry entry?)
         // XXX from GDML (manage memory by diffing G4SolidStore etc.).
         let builder = GeometryBuilder::new(volume)?;
         let geometry = builder.build()?;
@@ -102,19 +104,25 @@ impl Geometry {
 // ===============================================================================================
 
 #[pyclass]
-pub struct GeometryBuilder (Box<volume::Volume>);
+pub struct GeometryBuilder (GeometryDefinition);
 
 #[pymethods]
 impl GeometryBuilder {
     #[new]
-    fn new(volume: DictLike) -> PyResult<Self> {
-        let volume = volume::Volume::new(volume)?;
-        let builder = Self (Box::new(volume));
+    fn new(definition: DictLike) -> PyResult<Self> {
+        let definition = GeometryDefinition::new(definition)?;
+        let builder = Self (definition);
         Ok(builder)
     }
 
     fn build(&self) -> PyResult<Geometry> {
-        let geometry = ffi::create_geometry(&self.0);
+        // build materials.
+        if let Some(materials) = self.0.materials.as_ref() {
+            materials.build()?;
+        }
+
+        // Build volumes.
+        let geometry = ffi::create_geometry(&self.0.volume);
         if geometry.is_null() {
             ffi::get_error().to_result()?;
             unreachable!()
@@ -137,7 +145,7 @@ impl GeometryBuilder {
             }
         }
         let builder = slf.borrow();
-        let msg = if builder.0.name() == volume {
+        let msg = if builder.0.volume.name() == volume {
             format!("cannot delete top volume '{}'", volume)
         } else {
             format!("unknown '{}' volume", volume)
@@ -182,7 +190,7 @@ impl GeometryBuilder {
         position: Option<f64x3>,
         rotation: Option<f64x3x3>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
-        let mut volume = volume::Volume::new(volume)?;
+        let GeometryDefinition { mut volume, materials } = GeometryDefinition::new(volume)?;
         if let Some(position) = position {
             volume.position = Some(position);
         }
@@ -191,12 +199,18 @@ impl GeometryBuilder {
         }
         let mut builder = slf.borrow_mut();
         let mother = match mother {
-            None => &mut builder.0,
+            None => &mut builder.0.volume,
             Some(mother) => builder.find_mut(mother)?,
         };
         match mother.volumes.iter_mut().find(|v| v.name() == volume.name()) {
-            None => mother.volumes.push(volume),
-            Some(v) => *v = volume,
+            None => mother.volumes.push(*volume),
+            Some(v) => *v = *volume,
+        }
+        if let Some(materials) = materials {
+            match &mut builder.0.materials {
+                None => builder.0.materials = Some(materials),
+                Some(m) => m.extend(materials),
+            }
         }
         Ok(slf)
     }
@@ -208,7 +222,7 @@ impl GeometryBuilder {
         let volume = match names.next() {
             None => None,
             Some(name) => {
-                let volume = self.0.as_mut();
+                let volume = self.0.volume.as_mut();
                 if name != volume.name() {
                     None
                 } else {
@@ -227,6 +241,57 @@ impl GeometryBuilder {
             let msg = format!("bad geometry operation (unknown '{}' volume)", path);
             PyValueError::new_err(msg)
         })
+    }
+}
+
+// ===============================================================================================
+//
+// Geometry definition.
+//
+// This is a thin wrapper collecting the top volume description and some optional material
+// definitions.
+//
+// ===============================================================================================
+
+struct GeometryDefinition {
+    volume: Box<volume::Volume>,
+    materials: Option<MaterialsDefinition>,
+}
+
+impl GeometryDefinition {
+    pub fn new(definition: DictLike) -> PyResult<Self> {
+        let (definition, file) = definition.resolve(None)?;
+
+        const EXTRACTOR: Extractor<1> = Extractor::new([
+            Property::optional_any("materials"),
+        ]);
+
+        let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
+        let tag = Tag::new("geometry", "", file.as_deref());
+        let [materials] = EXTRACTOR.extract(
+            &tag, &definition, Some(&mut remainder)
+        )?;
+
+        if remainder.len() != 1 {
+            let msg = format!("bad volume(s) (expected 1 top volume, found {})", remainder.len());
+            return Err(PyValueError::new_err(msg));
+        }
+        let (name, volume) = remainder.iter().next().unwrap();
+        let tag = Tag::new("", name.as_str(), file.as_deref());
+        let volume = volume::Volume::try_from_any(&tag, &volume)?;
+        let volume = Box::new(volume);
+
+        let materials: Option<Bound<PyAny>> = materials.into();
+        let materials: PyResult<Option<MaterialsDefinition>> = materials
+            .map(|materials| {
+                let tag = Tag::new("", "", file.as_deref());
+                MaterialsDefinition::try_from_any(&tag, &materials)
+            })
+            .transpose();
+        let materials = materials?;
+
+        let definition = Self { volume, materials };
+        Ok(definition)
     }
 }
 

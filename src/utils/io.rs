@@ -1,6 +1,6 @@
 use crate::materials::gate::load_gate_db;
 use pyo3::prelude::*;
-use pyo3::exceptions::PyNotImplementedError;
+use pyo3::exceptions::{PyFileNotFoundError, PyNotImplementedError};
 use pyo3::types::{PyDict, PyString};
 use std::borrow::Cow;
 use std::ffi::OsStr;
@@ -17,7 +17,14 @@ use std::path::{Path, PathBuf};
 // ===============================================================================================
 
 pub fn load_toml<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
-    let content = std::fs::read_to_string(path)?;
+    let content = std::fs::read_to_string(path)
+        .map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => {
+                let path = format!("No such file or directory '{}'", path.display());
+                PyFileNotFoundError::new_err(path)
+            },
+            _ => err.into(),
+        })?;
     let toml = py.import_bound("tomllib")
         .or_else(|_| py.import_bound("tomli"))?;
     let loads = toml.getattr("loads")?;
@@ -42,13 +49,28 @@ pub enum DictLike<'py> {
 }
 
 impl<'py> DictLike<'py> {
-    pub fn resolve<'a>(&'a self) -> PyResult<(Cow<'a, Bound<'py, PyDict>>, Option<PathBuf>)> {
+    pub fn resolve<'a>(
+        &'a self,
+        file: Option<&Path>
+    ) -> PyResult<(Cow<'a, Bound<'py, PyDict>>, Option<PathBuf>)> {
         let result = match &self {
             Self::Dict(dict) => (Cow::Borrowed(dict), None),
             Self::String(path) => {
                 let py = path.py();
                 let path = path.to_cow()?;
                 let path = Path::new(path.deref());
+                let path = match file {
+                    None => Cow::Borrowed(path),
+                    Some(file) => {
+                        let mut file = file.to_path_buf();
+                        if file.pop() {
+                            file.push(path);
+                            Cow::Owned(file)
+                        } else {
+                            Cow::Borrowed(Path::new(&path))
+                        }
+                    },
+                };
                 let dict = match path.extension().and_then(OsStr::to_str) {
                     Some("db") => load_gate_db(py, &path),
                     Some("toml") => load_toml(py, &path),

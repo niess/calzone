@@ -41,10 +41,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add_class::<geometry::Map>()?;
 
     // Register function(s).
-    module.add_function(wrap_pyfunction!(materials::elements, module)?)?;
     module.add_function(wrap_pyfunction!(materials::load, module)?)?;
-    module.add_function(wrap_pyfunction!(materials::molecules, module)?)?;
-    module.add_function(wrap_pyfunction!(materials::mixtures, module)?)?;
 
     Ok(())
 }
