@@ -1,5 +1,4 @@
-use crate::utils::extract::{extract, Tag, TryFromBound};
-use crate::utils::float::f64x3;
+use crate::utils::float::{f64x3, f64x3x3};
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
 use cxx::SharedPtr;
@@ -31,26 +30,11 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 #[pymethods]
 impl Geometry {
     #[new]
-    fn new(arg: DictLike) -> PyResult<Self> {
+    fn new(volume: DictLike) -> PyResult<Self> {
         // XXX materials (dedicated Geometry entry?)
         // XXX from GDML (manage memory by diffing G4SolidStore etc.).
-        let (dict, file) = arg.resolve()?;
-        if dict.len() != 1 {
-            let msg = format!("bad geometry (expected 1 top volume, found {})", dict.len());
-            return Err(PyValueError::new_err(msg));
-        }
-        let (name, definition) = dict.iter().next().unwrap();
-        let name: String = extract(&name)
-            .or("bad geometry")?;
-        let file = file.as_ref().map(|f| f.as_path());
-        let tag = Tag::new("", name.as_str(), file);
-        let volume = volume::Volume::try_from_any(&tag, &definition)?;
-        let geometry = ffi::create_geometry(Box::new(volume));
-        if geometry.is_null() {
-            ffi::get_error().to_result()?;
-            unreachable!()
-        }
-        let geometry = Self (geometry);
+        let builder = GeometryBuilder::new(volume)?;
+        let geometry = builder.build()?;
         Ok(geometry)
     }
 
@@ -108,6 +92,141 @@ impl Geometry {
         self.0.set_goupil();
         let args = (file,);
         external_geometry.call1(args)
+    }
+}
+
+// ===============================================================================================
+//
+// Builder interface.
+//
+// ===============================================================================================
+
+#[pyclass]
+pub struct GeometryBuilder (Box<volume::Volume>);
+
+#[pymethods]
+impl GeometryBuilder {
+    #[new]
+    fn new(volume: DictLike) -> PyResult<Self> {
+        let volume = volume::Volume::new(volume)?;
+        let builder = Self (Box::new(volume));
+        Ok(builder)
+    }
+
+    fn build(&self) -> PyResult<Geometry> {
+        let geometry = ffi::create_geometry(&self.0);
+        if geometry.is_null() {
+            ffi::get_error().to_result()?;
+            unreachable!()
+        }
+        let geometry = Geometry (geometry);
+        Ok(geometry)
+    }
+
+    fn delete<'py>(
+        slf: Bound<'py, GeometryBuilder>,
+        volume: &str,
+    ) -> PyResult<Bound<'py, GeometryBuilder>> {
+        if let Some((mother, name)) = volume.rsplit_once('.') {
+            let mut builder = slf.borrow_mut();
+            let mother = builder.find_mut(mother)?;
+            let n = mother.volumes.len();
+            mother.volumes.retain(|v| v.name != name);
+            if mother.volumes.len() < n {
+                return Ok(slf);
+            }
+        }
+        let builder = slf.borrow();
+        let msg = if builder.0.name() == volume {
+            format!("cannot delete top volume '{}'", volume)
+        } else {
+            format!("unknown '{}' volume", volume)
+        };
+        Err(PyValueError::new_err(format!("bad geometry operation ({})", msg)))
+    }
+
+    fn modify<'py>(
+        slf: Bound<'py, GeometryBuilder>,
+        volume: &str,
+        name: Option<String>,
+        material: Option<String>,
+        position: Option<f64x3>,
+        rotation: Option<f64x3x3>,
+    ) -> PyResult<Bound<'py, GeometryBuilder>> {
+        let mut builder = slf.borrow_mut();
+        let volume = builder.find_mut(volume)?;
+        if let Some(name) = name {
+            volume::Volume::check(&name)
+                .map_err(|msg| {
+                    let msg = format!("bad name '{}' ({})", name, msg);
+                    PyValueError::new_err(msg)
+                })?;
+            volume.name = name;
+        }
+        if let Some(material) = material {
+            volume.material = material;
+        }
+        if let Some(position) = position {
+            volume.position = Some(position);
+        }
+        if let Some(rotation) = rotation {
+            volume.rotation = Some(rotation);
+        }
+        Ok(slf)
+    }
+
+    fn place<'py>(
+        slf: Bound<'py, GeometryBuilder>,
+        volume: DictLike,
+        mother: Option<&str>,
+        position: Option<f64x3>,
+        rotation: Option<f64x3x3>,
+    ) -> PyResult<Bound<'py, GeometryBuilder>> {
+        let mut volume = volume::Volume::new(volume)?;
+        if let Some(position) = position {
+            volume.position = Some(position);
+        }
+        if let Some(rotation) = rotation {
+            volume.rotation = Some(rotation);
+        }
+        let mut builder = slf.borrow_mut();
+        let mother = match mother {
+            None => &mut builder.0,
+            Some(mother) => builder.find_mut(mother)?,
+        };
+        match mother.volumes.iter_mut().find(|v| v.name() == volume.name()) {
+            None => mother.volumes.push(volume),
+            Some(v) => *v = volume,
+        }
+        Ok(slf)
+    }
+}
+
+impl GeometryBuilder {
+    fn find_mut<'a>(&'a mut self, path: &str) -> PyResult<&'a mut volume::Volume> {
+        let mut names = path.split(".");
+        let volume = match names.next() {
+            None => None,
+            Some(name) => {
+                let volume = self.0.as_mut();
+                if name != volume.name() {
+                    None
+                } else {
+                    let mut volume = Some(volume);
+                    for name in names {
+                        volume = volume.unwrap().volumes.iter_mut().find(|v| v.name() == name);
+                        if volume.is_none() {
+                            break
+                        }
+                    }
+                    volume
+                }
+            },
+        };
+        volume.ok_or_else(|| {
+            let msg = format!("bad geometry operation (unknown '{}' volume)", path);
+            PyValueError::new_err(msg)
+        })
     }
 }
 

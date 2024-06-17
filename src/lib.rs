@@ -37,6 +37,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
 
     // Register class object(s).
     module.add_class::<geometry::Geometry>()?;
+    module.add_class::<geometry::GeometryBuilder>()?;
     module.add_class::<geometry::Map>()?;
 
     // Register function(s).

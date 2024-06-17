@@ -1,7 +1,7 @@
 use crate::utils::error::variant_error;
 use crate::utils::extract::{extract, Extractor, Property, PropertyValue, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
-use crate::utils::io::load_stl;
+use crate::utils::io::{DictLike, load_stl};
 use crate::utils::units::convert;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
@@ -23,12 +23,12 @@ use super::map::Map;
 // ===============================================================================================
 
 pub struct Volume {
-    name: String,
-    material: String,
+    pub(super) name: String,
+    pub(super) material: String,
     shape: Shape,
-    position: Option<f64x3>,
-    rotation: Option<f64x3x3>,
-    volumes: Vec<Volume>,
+    pub(super) position: Option<f64x3>,
+    pub(super) rotation: Option<f64x3x3>,
+    pub(super) volumes: Vec<Volume>,
     overlaps: Vec<[String; 2]>,
 }
 
@@ -62,6 +62,39 @@ enum ShapeType {
     Tessellation,
 }
 
+impl Volume {
+    pub fn new(volume: DictLike) -> PyResult<Self> {
+        let (volume, file) = volume.resolve()?;
+        if volume.len() != 1 {
+            let msg = format!("bad volume(s) (expected 1 top volume, found {})", volume.len());
+            return Err(PyValueError::new_err(msg));
+        }
+        let (name, definition) = volume.iter().next().unwrap();
+        let name: String = extract(&name)
+            .or("bad volume(s)")?;
+        let file = file.as_ref().map(|f| f.as_path());
+        let tag = Tag::new("volume(s)", name.as_str(), file);
+        let volume = Self::try_from_any(&tag, &definition)?;
+        Ok(volume)
+    }
+
+    pub(super) fn check(name: &str) -> Result<(), &'static str> {
+        for c in name.chars() {
+            if !c.is_alphanumeric() {
+                return Err("expected an alphanumeric string");
+            }
+        }
+        match name.chars().next() {
+            None => {
+                return Err("empty string");
+            },
+            Some(c) => if !c.is_uppercase() {
+                return Err("should be capitalized");
+            },
+        }
+        Ok(())
+    }
+}
 
 // ===============================================================================================
 //
@@ -72,27 +105,11 @@ enum ShapeType {
 impl TryFromBound for Volume {
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
         // Check volume name.
-        for c in tag.name().chars() {
-            if !c.is_alphanumeric() {
-                let message: String = tag.bad().what("name")
-                    .why(format!(
-                        "expected an alphanumeric string, found '{}'",
-                        tag.name()
-                    )).into();
-                return Err(PyValueError::new_err(message));
-            }
-        }
-        match tag.name().chars().next() {
-            None => {
-                let message = format!("{}bad material (empty name)", tag.file_prefix());
-                return Err(PyValueError::new_err(message));
-            },
-            Some(c) => if !c.is_uppercase() {
-                let message: String = tag.bad().what("name")
-                    .why("should be capitalized".to_string()).into();
-                return Err(PyValueError::new_err(message));
-            },
-        }
+        Self::check(tag.name())
+            .map_err(|msg| {
+                let msg: String = tag.bad().what("name").why(msg.to_string()).into();
+                PyValueError::new_err(msg)
+            })?;
 
         // Extract base properties.
         const EXTRACTOR: Extractor<4> = Extractor::new([
@@ -460,6 +477,10 @@ impl Volume {
 
     pub fn is_rotated(&self) -> bool {
         return self.rotation.is_some()
+    }
+
+    pub fn is_translated(&self) -> bool {
+        return self.position.is_some()
     }
 
     pub fn material(&self) -> &String {

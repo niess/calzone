@@ -29,7 +29,7 @@
 // ============================================================================
 
 struct GeometryData {
-    GeometryData(rust::Box<Volume> volume);
+    GeometryData(const rust::Box<Volume> & volume);
     ~GeometryData();
 
     GeometryData * clone();
@@ -43,7 +43,7 @@ struct GeometryData {
 
 private:
     size_t rc = 0;
-    std::list <G4VSolid *> orphans;
+    std::list <const G4VSolid *> orphans;
     static std::map<const G4VPhysicalVolume *, GeometryData *> INSTANCES;
 };
 
@@ -53,7 +53,7 @@ static G4VSolid * build_envelope(
     const std::string & pathname,
     const Volume & volume,
     std::list<const G4VSolid *> & daughters,
-    std::list<G4VSolid *> & orphans
+    std::list<const G4VSolid *> & orphans
 ) {
     auto get_transform = [&](const Volume & v) -> G4AffineTransform {
         auto && p = v.position();
@@ -206,11 +206,11 @@ static G4TessellatedSolid * build_tessellation(
     return solid;
 }
 
-static const G4VSolid * build_solids(
+static G4VSolid * build_solids(
     const Volume & volume,
     const std::string & path,
     std::map<std::string, G4VSolid *> & solids,
-    std::list<G4VSolid *> & orphans
+    std::list<const G4VSolid *> & orphans
 ) {
     auto name = std::string(volume.name());
     std::string pathname;
@@ -376,6 +376,11 @@ static G4LogicalVolume * build_volumes(
         }
 
         auto && p = v.position();
+        auto position = G4ThreeVector(
+            p[0] * CLHEP::cm,
+            p[1] * CLHEP::cm,
+            p[2] * CLHEP::cm
+        );
         G4RotationMatrix * rotation = nullptr;
         if (v.is_rotated()) {
             auto && m = v.rotation();
@@ -384,11 +389,6 @@ static G4LogicalVolume * build_volumes(
             auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
             rotation->setRows(rowX, rowY, rowZ);
         }
-        auto position = G4ThreeVector(
-            p[0] * CLHEP::cm,
-            p[1] * CLHEP::cm,
-            p[2] * CLHEP::cm
-        );
         auto v_name = std::string(v.name());
         auto v_path = fmt::format("{}.{}", pathname, v_name);
         new G4PVPlacement(
@@ -420,18 +420,46 @@ static void map_volumes(
     }
 }
 
-GeometryData::GeometryData(rust::Box<Volume> volume) {
+GeometryData::GeometryData(const rust::Box<Volume> & volume) {
     clear_error();
     this->world = nullptr;
 
     // Build solids.
     std::map<std::string, G4VSolid *> solids;
     const std::string path = "";
-    if (build_solids(*volume, path, solids, this->orphans) == nullptr) {
+    auto top_solid = build_solids(*volume, path, solids, this->orphans);
+    if (top_solid == nullptr) {
         for (auto item: solids) {
             delete item.second;
         }
         return;
+    }
+
+    // Displace top solid (if requested).
+    if ((volume->is_translated() || volume->is_rotated())) {
+        auto && p = volume->position();
+        auto position = G4ThreeVector(
+            p[0] * CLHEP::cm,
+            p[1] * CLHEP::cm,
+            p[2] * CLHEP::cm
+        );
+        G4RotationMatrix * rotation = nullptr;
+        if (volume->is_rotated()) {
+            auto && m = volume->rotation();
+            auto rowX = G4ThreeVector(m[0][0], m[0][1], m[0][2]);
+            auto rowY = G4ThreeVector(m[1][0], m[1][1], m[1][2]);
+            auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
+            rotation->setRows(rowX, rowY, rowZ);
+        }
+        this->orphans.push_back(top_solid);
+        auto name = std::string(volume->name());
+        top_solid = new G4DisplacedSolid(
+            name,
+            top_solid,
+            rotation,
+            position
+        );
+        solids[name] = top_solid;
     }
 
     // Build volumes.
@@ -514,8 +542,10 @@ GeometryBorrow::~GeometryBorrow() {
     this->data->drop();
 }
 
-std::shared_ptr<GeometryBorrow> create_geometry(rust::Box<Volume> volume) {
-    auto data = new GeometryData(std::move(volume));
+std::shared_ptr<GeometryBorrow> create_geometry(
+    const rust::Box<Volume> & volume
+) {
+    auto data = new GeometryData(volume);
     if (any_error()) {
         delete data;
         return nullptr;

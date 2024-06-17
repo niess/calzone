@@ -149,7 +149,7 @@ pub mod ffi {
 
         // Geometry interface.
         type GeometryBorrow;
-        fn create_geometry(volume: Box<Volume>) -> SharedPtr<GeometryBorrow>;
+        fn create_geometry(volume: &Box<Volume>) -> SharedPtr<GeometryBorrow>;
 
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
         fn compute_box(self: &GeometryBorrow, volume: &str, frame: &str) -> [f64; 6];
@@ -185,6 +185,7 @@ pub mod ffi {
         fn cylinder_shape(self: &Volume) -> &CylinderShape;
         fn envelope_shape(self: &Volume) -> &EnvelopeShape;
         fn is_rotated(self: &Volume) -> bool;
+        fn is_translated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
         fn name(self: &Volume) -> &String;
         fn overlaps(self: &Volume) -> &[[String; 2]];
