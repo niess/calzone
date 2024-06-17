@@ -312,7 +312,7 @@ impl Property {
     }
 
     pub const fn new_str(name: &'static str, default: &'static str) -> Self {
-        let tp = PropertyType::F64;
+        let tp = PropertyType::String;
         let default = PropertyDefault::String(default);
         Self::new(name, tp, default)
     }
@@ -633,7 +633,7 @@ where
             .unwrap_or_else(T::type_name);
         let value: T = self.result.map_err(|ob| {
             let message = format!(
-                "{} (expected {}, found {})",
+                "{} (expected {}, found '{}')",
                 message,
                 expected,
                 ob,
@@ -675,19 +675,19 @@ where
 }
 
 impl TypeName for f64 {
-    fn type_name() -> &'static str { "a float" }
+    fn type_name() -> &'static str { "a 'float'" }
 }
 
 impl TypeName for f64x3 {
-    fn type_name() -> &'static str { "a vector" }
+    fn type_name() -> &'static str { "a 'vector'" }
 }
 
 impl TypeName for f64x3x3 {
-    fn type_name() -> &'static str { "a matrix" }
+    fn type_name() -> &'static str { "a 'matrix'" }
 }
 
 impl TypeName for PyDict {
-    fn type_name() -> &'static str { "a dict" }
+    fn type_name() -> &'static str { "a 'dict'" }
 }
 
 impl TypeName for String {

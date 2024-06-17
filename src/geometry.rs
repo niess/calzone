@@ -33,8 +33,8 @@ impl Geometry {
     #[new]
     fn new(arg: DictLike) -> PyResult<Self> {
         // XXX materials (dedicated Geometry entry?)
-        // XXX from GDML (manage memory by diffing G4SolmidStore etc.).
-        // XXX Envelopes (using G4vSolid::CalculateExtent, and possibly history).
+        // XXX from GDML (manage memory by diffing G4SolidStore etc.).
+        // XXX Displaced solids to tessellated DEMs?
         let (dict, file) = arg.resolve()?;
         if dict.len() != 1 {
             let msg = format!("bad geometry (expected 1 top volume, found {})", dict.len());

@@ -41,10 +41,16 @@ pub mod ffi {
         thickness: f64,
     }
 
+    struct EnvelopeShape {
+        shape: ShapeType,
+        safety: f64,
+    }
+
     #[repr(i32)]
     enum ShapeType {
         Box,
         Cylinder,
+        Envelope,
         Sphere,
         Tessellation,
     }
@@ -177,6 +183,7 @@ pub mod ffi {
 
         fn box_shape(self: &Volume) -> &BoxShape;
         fn cylinder_shape(self: &Volume) -> &CylinderShape;
+        fn envelope_shape(self: &Volume) -> &EnvelopeShape;
         fn is_rotated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
         fn name(self: &Volume) -> &String;

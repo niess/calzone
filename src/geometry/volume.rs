@@ -35,6 +35,7 @@ pub struct Volume {
 pub enum Shape {
     Box(ffi::BoxShape),
     Cylinder(ffi::CylinderShape),
+    Envelope(ffi::EnvelopeShape),
     Sphere(ffi::SphereShape),
     Tessellation(ffi::TessellatedShape),
 }
@@ -44,6 +45,7 @@ impl From<&Shape> for ffi::ShapeType {
         match value {
             Shape::Box(_) => ffi::ShapeType::Box,
             Shape::Cylinder(_) => ffi::ShapeType::Cylinder,
+            Shape::Envelope(_) => ffi::ShapeType::Envelope,
             Shape::Sphere(_) => ffi::ShapeType::Sphere,
             Shape::Tessellation(_) => ffi::ShapeType::Tessellation,
         }
@@ -55,6 +57,7 @@ impl From<&Shape> for ffi::ShapeType {
 enum ShapeType {
     Box,
     Cylinder,
+    Envelope,
     Sphere,
     Tessellation,
 }
@@ -154,6 +157,8 @@ impl TryFromBound for Volume {
             ShapeType::Box => Shape::Box(ffi::BoxShape::try_from_any(&shape_tag, shape)?),
             ShapeType::Cylinder => Shape::Cylinder(
                 ffi::CylinderShape::try_from_any(&shape_tag, shape)?),
+            ShapeType::Envelope => Shape::Envelope(
+                ffi::EnvelopeShape::try_from_any(&shape_tag, shape)?),
             ShapeType::Sphere => Shape::Sphere(
                 ffi::SphereShape::try_from_any(&shape_tag, shape)?),
             ShapeType::Tessellation => Shape::Tessellation(
@@ -286,6 +291,42 @@ impl TryFromBound for ffi::CylinderShape {
     }
 }
 
+impl TryFromBound for ffi::EnvelopeShape {
+    fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let mut safety: Option<f64> = None;
+        let shape: PyResult<String> = value.extract();
+        let shape: String = match shape {
+            Err(_) => {
+                const EXTRACTOR: Extractor<2> = Extractor::new([
+                    Property::new_str("shape", "box"),
+                    Property::optional_f64("safety"),
+                ]);
+
+                let tag = tag.cast("Envelope");
+                let [shape, sfty] = EXTRACTOR.extract_any(&tag, value, None)?;
+                safety = sfty.into();
+                shape.into()
+            },
+            Ok(shape) => shape,
+        };
+        let shape: ffi::ShapeType = ShapeType::from_str(shape.as_str())
+            .and_then(|shape| match shape {
+                ShapeType::Box => Ok(ffi::ShapeType::Box),
+                ShapeType::Cylinder => Ok(ffi::ShapeType::Cylinder),
+                ShapeType::Sphere => Ok(ffi::ShapeType::Sphere),
+                _ => Err(&[]),
+            })
+            .map_err(|_| {
+                let message: String = tag.bad().what("shape").into();
+                let options = ["box", "cylinder", "sphere"];
+                variant_error(message.as_str(), shape.as_str(), &options)
+            })?;
+        let safety = safety.unwrap_or(0.01);
+        let envelope = Self { shape, safety };
+        Ok(envelope)
+    }
+}
+
 impl TryFromBound for ffi::SphereShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let radius: PyResult<f64> = value.extract();
@@ -406,6 +447,13 @@ impl Volume {
     pub fn cylinder_shape(&self) -> &ffi::CylinderShape {
         match &self.shape {
             Shape::Cylinder(shape) => &shape,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn envelope_shape(&self) -> &ffi::EnvelopeShape {
+        match &self.shape {
+            Shape::Envelope(shape) => &shape,
             _ => unreachable!(),
         }
     }

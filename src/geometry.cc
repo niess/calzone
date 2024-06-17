@@ -49,6 +49,123 @@ private:
 
 std::map<const G4VPhysicalVolume *, GeometryData *> GeometryData::INSTANCES;
 
+static G4VSolid * build_envelope(
+    const std::string & pathname,
+    const Volume & volume,
+    std::list<const G4VSolid *> & daughters,
+    std::list<G4VSolid *> & orphans
+) {
+    auto get_transform = [&](const Volume & v) -> G4AffineTransform {
+        auto && p = v.position();
+        auto translation = G4ThreeVector(
+            p[0] * CLHEP::cm,
+            p[1] * CLHEP::cm,
+            p[2] * CLHEP::cm
+        );
+        if (v.is_rotated()) {
+            G4RotationMatrix rotation;
+            auto && m = v.rotation();
+            auto rowX = G4ThreeVector(m[0][0], m[0][1], m[0][2]);
+            auto rowY = G4ThreeVector(m[1][0], m[1][1], m[1][2]);
+            auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
+            rotation.setRows(rowX, rowY, rowZ);
+            return G4AffineTransform(rotation, translation);
+        } else {
+            return G4AffineTransform(translation);
+        }
+    };
+
+    // Compute limits along X, Y and Z axis.
+    auto envelope = volume.envelope_shape();
+    std::array<double, 3> min = { DBL_MAX, DBL_MAX, DBL_MAX };
+    std::array<double, 3> max = { -DBL_MAX, -DBL_MAX, -DBL_MAX };
+    for (auto && v: volume.volumes()) {
+        std::array<double, 3> mi;
+        std::array<double, 3> mx;
+        const G4VSolid * s = daughters.front();
+        daughters.pop_front();
+        auto t = get_transform(v);
+        if (t.IsTranslated() || t.IsRotated()) {
+            auto l = G4VoxelLimits();
+            s->CalculateExtent(kXAxis, l, t, mi[0], mx[0]);
+            s->CalculateExtent(kYAxis, l, t, mi[1], mx[1]);
+            s->CalculateExtent(kZAxis, l, t, mi[2], mx[2]);
+        } else {
+            auto extent = s->GetExtent();
+            mi[0] = extent.GetXmin();
+            mx[0] = extent.GetXmax();
+            mi[1] = extent.GetYmin();
+            mx[1] = extent.GetYmax();
+            mi[2] = extent.GetZmin();
+            mx[2] = extent.GetZmax();
+        }
+        for (size_t i = 0; i < mi.size(); i++) {
+            if (mi[i] < min[i]) min[i] = mi[i];
+            if (mx[i] > max[i]) max[i] = mx[i];
+        }
+    }
+    auto safety = envelope.safety * CLHEP::cm;
+
+    // Create bounding solid.
+    G4VSolid * solid;
+    switch (envelope.shape) {
+        case ShapeType::Box:
+            solid = new G4Box(
+                pathname,
+                0.5 * (max[0] - min[0]) + safety,
+                0.5 * (max[1] - min[1]) + safety,
+                0.5 * (max[2] - min[2]) + safety
+            );
+            break;
+        case ShapeType::Cylinder: {
+                const double dx = max[0] - min[0];
+                const double dy = max[1] - min[1];
+                const double radius = 0.5 * std::sqrt(dx * dx + dy * dy);
+                solid = new G4Tubs(
+                    pathname,
+                    0.0,
+                    radius + safety,
+                    0.5 * (max[2] - min[2]) + safety,
+                    0.0,
+                    CLHEP::twopi
+                );
+            }
+            break;
+        case ShapeType::Sphere: {
+                const double dx = max[0] - min[0];
+                const double dy = max[1] - min[1];
+                const double dz = max[2] - min[2];
+                const double radius =
+                    0.5 * std::sqrt(dx * dx + dy * dy + dz * dz);
+                solid = new G4Orb(
+                    pathname,
+                    radius + safety
+                );
+            }
+            break;
+        default:
+            return nullptr; // unreachable
+    }
+
+    // Translate solid, if not already centered.
+    auto tx = 0.5 * (max[0] + min[0]);
+    auto ty = 0.5 * (max[1] + min[1]);
+    auto tz = 0.5 * (max[2] + min[2]);
+    if ((tx == 0.0) && (ty == 0.0) && (tz == 0.0)) {
+        return solid;
+    } else {
+        orphans.push_back(solid);
+        auto translation = G4ThreeVector(tx, ty, tz);
+        auto displaced = new G4DisplacedSolid(
+            pathname,
+            solid,
+            nullptr,
+            translation
+        );
+        return displaced;
+    }
+}
+
 static G4TessellatedSolid * build_tessellation(
     const std::string & pathname,
     const Volume & volume
@@ -89,7 +206,7 @@ static G4TessellatedSolid * build_tessellation(
     return solid;
 }
 
-static bool build_solids(
+static const G4VSolid * build_solids(
     const Volume & volume,
     const std::string & path,
     std::map<std::string, G4VSolid *> & solids,
@@ -103,6 +220,32 @@ static bool build_solids(
         pathname = fmt::format("{}.{}", path, name);
     }
 
+    // Build sub-solids.
+    std::list<const G4VSolid *> daughters;
+    for (auto && v: volume.volumes()) {
+        auto s = build_solids(v, pathname, solids, orphans);
+        if (s == nullptr) {
+            return nullptr;
+        } else {
+            daughters.push_back(s);
+        }
+    }
+
+    // Patch overlaps.
+    for (auto overlap: volume.overlaps()) {
+        const std::string path0 = fmt::format("{}.{}",
+            pathname, std::string(overlap[0]));
+        const std::string path1 = fmt::format("{}.{}",
+            pathname, std::string(overlap[1]));
+        auto solid0 = solids[path0];
+        auto boolean = new G4SubtractionSolid(
+            std::string(overlap[0]), solid0, solids[path1]
+        );
+        orphans.push_back(solid0);
+        solids[path0] = boolean;
+    }
+
+    // Build current solid.
     G4VSolid * solid = nullptr;
     switch (volume.shape()) {
         case ShapeType::Box: {
@@ -129,6 +272,9 @@ static bool build_solids(
                 );
             }
             break;
+        case ShapeType::Envelope:
+            solid = build_envelope(pathname, volume, daughters, orphans);
+            break;
         case ShapeType::Sphere: {
                 auto shape = volume.sphere_shape();
                 solid = new G4Orb(
@@ -149,30 +295,11 @@ static bool build_solids(
             );
             set_error(ErrorType::ValueError, msg.c_str());
         }
-        return false;
+        return nullptr;
     }
     solids[pathname] = solid;
 
-    // Build sub-solids.
-    for (auto && v: volume.volumes()) {
-        if (!build_solids(v, pathname, solids, orphans)) return false;
-    }
-
-    // Patch overlaps.
-    for (auto overlap: volume.overlaps()) {
-        const std::string path0 = fmt::format("{}.{}",
-            pathname, std::string(overlap[0]));
-        const std::string path1 = fmt::format("{}.{}",
-            pathname, std::string(overlap[1]));
-        auto solid0 = solids[path0];
-        auto boolean = new G4SubtractionSolid(
-            std::string(overlap[0]), solid0, solids[path1]
-        );
-        orphans.push_back(solid0);
-        solids[path0] = boolean;
-    }
-
-    return true;
+    return solid;
 }
 
 static void drop_them_all(const G4VPhysicalVolume * volume);
@@ -300,7 +427,7 @@ GeometryData::GeometryData(rust::Box<Volume> volume) {
     // Build solids.
     std::map<std::string, G4VSolid *> solids;
     const std::string path = "";
-    if (!build_solids(*volume, path, solids, this->orphans)) {
+    if (build_solids(*volume, path, solids, this->orphans) == nullptr) {
         for (auto item: solids) {
             delete item.second;
         }
