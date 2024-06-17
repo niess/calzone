@@ -181,31 +181,28 @@ impl Map {
         origin: Option<f64x3>,
         min_depth: Option<f64>,
     ) -> PyResult<Vec<f32>> {
-        // Compute z limits.
+        // Unpack or set the origin.
+        let (xc, yc, zc) = origin
+            .map(|origin| {
+                let xc = origin.x() as f32;
+                let yc = origin.y() as f32;
+                let zc = origin.z() as f32;
+                (xc, yc, zc)
+            })
+            .unwrap_or_else(|| (0.0, 0.0, 0.0));
+
+        // Set bottom z.
         let z: &PyArray<f32> = self.z.extract(py)?;
         let z = unsafe { z.slice()? };
 
-        let mut zmin = f32::MAX;
-        let mut zmax = -f32::MAX;
-        for zi in z {
-            zmin = zmin.min(*zi);
-            zmax = zmax.max(*zi);
-        }
-
-        // Unpack or set the origin.
-        let origin = origin.unwrap_or_else(|| {
-            let xc = 0.5 * (self.x0 + self.x1);
-            let yc = 0.5 * (self.y0 + self.y1);
-            let zc = (0.5 * (zmin + zmax)) as f64;
-            f64x3::new(xc, yc, zc)
-        });
-        let xc = origin.x() as f32;
-        let yc = origin.y() as f32;
-        let zc = origin.z() as f32;
-
-        // Set bottom z.
-        let min_depth = min_depth.unwrap_or(Self::DEFAULT_MIN_DEPTH);
-        let zbot = zmin - (min_depth as f32);
+        let zbot = {
+            let mut zmin = f32::MAX;
+            for zi in z {
+                zmin = zmin.min(*zi);
+            }
+            let min_depth = min_depth.unwrap_or(Self::DEFAULT_MIN_DEPTH);
+            zmin - (min_depth as f32)
+        };
 
         // Helpers for manipulating data.
         let (nx, ny) = (self.nx, self.ny);
