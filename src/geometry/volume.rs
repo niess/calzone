@@ -1,3 +1,4 @@
+use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
 use crate::utils::error::variant_error;
 use crate::utils::extract::{extract, Extractor, Property, PropertyValue, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
@@ -7,7 +8,7 @@ use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::exceptions::{PyNotImplementedError, PyValueError};
+use pyo3::exceptions::{PyNotImplementedError};
 use std::borrow::Cow;
 use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
@@ -91,10 +92,7 @@ impl TryFromBound for Volume {
     fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
         // Check volume name.
         Self::check(tag.name())
-            .map_err(|msg| {
-                let msg: String = tag.bad().what("name").why(msg.to_string()).into();
-                PyValueError::new_err(msg)
-            })?;
+            .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
 
         // Extract base properties.
         const EXTRACTOR: Extractor<4> = Extractor::new([
@@ -147,12 +145,12 @@ impl TryFromBound for Volume {
         let shape_type = get_shape_type(shape_name)?;
         if let Some((alt_name, _)) = shapes.get(1) {
             let _unused = get_shape_type(alt_name)?;
-            let message: String = tag.bad().why(format!(
-                "multiple shape definitions ({}, {}, ...)",
+            let err = tag.bad().why(format!(
+                "multiple shape definitions ({}, {}, ..)",
                 shape_name,
                 alt_name,
-            )).into();
-            return Err(PyValueError::new_err(message));
+            )).to_err(ValueError);
+            return Err(err);
         }
         let shape_tag = tag.extend(shape_name, Some("shape"), None);
         let shape = match shape_type {
@@ -188,20 +186,20 @@ impl TryFromBound for Volume {
                     // Check that the overlaping volume is defined.
                     match volumes.iter().find(|v| &v.name == name) {
                         None => {
-                            let message: String = tag.bad().what("overlap").why(format!(
+                            let err = tag.bad().what("overlap").why(format!(
                                 "undefined '{}' volume",
                                 name,
-                            )).into();
-                            Err(PyValueError::new_err(message))
+                            )).to_err(ValueError);
+                            Err(err)
                         }
                         Some(v) => {
                             // Check that the volume is not displaced.
                             if v.position.is_some() || v.rotation.is_some() {
-                                let message: String = tag.bad().what("overlap").why(format!(
+                                let err = tag.bad().what("overlap").why(format!(
                                     "displaced '{}' volume",
                                     name,
-                                )).into();
-                                Err(PyNotImplementedError::new_err(message))
+                                )).to_err(NotImplementedError);
+                                Err(err)
                             } else {
                                 Ok(())
                             }
@@ -368,10 +366,9 @@ impl TryFromBound for ffi::TessellatedShape {
                 let [path, units, center, depth] = EXTRACTOR.extract_any(&tag, value, None)?;
                 if let PropertyValue::String(units) = units {
                     scale = convert(value.py(), units.as_str(), "cm")
-                        .map_err(|e| {
-                            let msg: String = tag.bad().what("units").why(format!("{}", e)).into();
-                            PyValueError::new_err(msg)
-                        })?;
+                        .map_err(|e|
+                            tag.bad().what("units").why(format!("{}", e)).to_err(ValueError)
+                        )?;
                 }
                 origin = center.into();
                 min_depth = depth.into();
@@ -395,17 +392,17 @@ impl TryFromBound for ffi::TessellatedShape {
         let mut facets = match path.extension().and_then(OsStr::to_str) {
             Some("stl") => {
                 if min_depth.is_some() {
-                    let msg: String = tag.bad()
+                    let err = tag.bad()
                         .what("min_depth")
                         .why("invalid option for STL format".to_string())
-                        .into();
-                        return Err(PyValueError::new_err(msg));
+                        .to_err(ValueError);
+                        return Err(err);
                 } else if origin.is_some() {
-                    let msg: String = tag.bad()
+                    let err = tag.bad()
                         .what("origin")
                         .why("invalid option for STL format".to_string())
-                        .into();
-                        return Err(PyValueError::new_err(msg));
+                        .to_err(ValueError);
+                        return Err(err);
                 } else {
                     load_stl(&path)
                 }
@@ -417,10 +414,7 @@ impl TryFromBound for ffi::TessellatedShape {
                 Ok(facets)
             },
             _ => return Err(PyNotImplementedError::new_err("")),
-        }.map_err(|msg| {
-            let msg: String = tag.bad().why(msg).into();
-            PyValueError::new_err(msg)
-        })?;
+        }.map_err(|msg| tag.bad().why(msg).to_err(ValueError))?;
 
         let scale = scale as f32;
         for value in &mut facets.iter_mut() {

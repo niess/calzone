@@ -1,9 +1,10 @@
+use crate::utils::error::Error;
+use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
 use crate::utils::extract::{Extractor, Property, Tag};
 use crate::utils::float::f64x3;
 use crate::utils::io::dump_stl;
 use crate::utils::numpy::{PyArray, PyUntypedArray};
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::types::PyDict;
 use std::ffi::OsStr;
 use std::path::Path;
@@ -53,11 +54,12 @@ impl Map {
                 if any.is_instance(&geotiff)? {
                     Self::from_geotiff(&any)
                 } else {
-                    let message = format!(
-                        "bad map type (unimplemented conversion from '{}')",
+                    let why = format!(
+                        "unimplemented conversion from '{}'",
                         any.get_type(),
                     );
-                    Err(PyNotImplementedError::new_err(message))
+                    let err = Error::new(NotImplementedError).what("map type").why(&why);
+                    Err(err.into())
                 }
             },
         }
@@ -76,11 +78,12 @@ impl Map {
         let [ny, nx] = {
             let shape = z.shape();
             if shape.len() != 2 {
-                let message = format!(
-                    "bad map shape (expected 2 dimensions, found {})",
+                let why = format!(
+                    "expected 2 dimensions, found {}",
                     shape.len(),
                 );
-                return Err(PyValueError::new_err(message));
+                let err = Error::new(ValueError).what("map shape").why(&why);
+                return Err(err.into());
             }
             [shape[0], shape[1]]
         };
@@ -138,14 +141,16 @@ impl Map {
                 dump_stl(&facets, &path)
             },
             Some(other) => {
-                let message = format!(
-                    "bad dump format (unimplemented conversion to '{}')",
+                let why = format!(
+                    "unimplemented conversion to '{}'",
                     other,
                 );
-                Err(PyNotImplementedError::new_err(message))
+                let err = Error::new(NotImplementedError).what("dump format").why(&why);
+                Err(err.into())
             },
             None => {
-                Err(PyValueError::new_err("bad dump format (missing file extension)"))
+                let err = Error::new(ValueError).what("dump format").why("missing file extension");
+                Err(err.into())
             },
         }
     }
@@ -166,11 +171,13 @@ impl Map {
             Some("png") | Some("PNG") => Self::from_png(py, filename),
             Some("tif") | Some("TIF") => Self::from_geotiff_file(py, filename),
             Some(other) => {
-                let message = format!("bad map (unimplemented '{}' format)", other);
-                Err(PyNotImplementedError::new_err(message))
+                let why = format!("unimplemented '{}' format", other);
+                let err = Error::new(NotImplementedError).what("map").why(&why);
+                Err(err.into())
             },
             None => {
-                Err(PyValueError::new_err("bad map (missing format)"))
+                let err = Error::new(ValueError).what("map").why("missing format");
+                Err(err.into())
             },
         }
     }
@@ -428,11 +435,11 @@ impl Map {
         let shape: [usize; 2] = array.shape()
             .try_into()
             .map_err(|shape: Vec<usize>| {
-                let message = format!(
-                    "bad shape (expected a size 2 array, found a size {} array)",
+                let why = format!(
+                    "expected a size 2 array, found a size {} array",
                     shape.len(),
                 );
-                PyValueError::new_err(message)
+                Error::new(ValueError).what("shape").why(&why).to_err()
             })?;
         let [ny, nx] = shape;
 

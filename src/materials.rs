@@ -1,10 +1,10 @@
+use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::error::variant_error;
 use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::exceptions::PyValueError;
 use super::cxx::ffi;
 
 pub mod gate;
@@ -73,15 +73,13 @@ impl TryFromBound for MaterialsDefinition {
         let tag = tag.cast("materials");
         let materials: DictLike = value
             .extract()
-            .map_err(|err| {
-                let msg: String = tag.bad().why(format!("{}", err.value_bound(py))).into();
-                PyValueError::new_err(msg)
-            })?;
+            .map_err(|err|
+                tag.bad().why(format!("{}", err.value_bound(py))).to_err(ValueError)
+            )?;
         let (materials, file) = materials.resolve(tag.file())
-            .map_err(|err| {
-                let msg: String = tag.bad().why(format!("{}", err.value_bound(py))).into();
-                PyValueError::new_err(msg)
-            })?;
+            .map_err(|err|
+                tag.bad().why(format!("{}", err.value_bound(py))).to_err(ValueError)
+            )?;
         let tag = if file.is_some() {
             Tag::new("materials", "", file.as_deref())
         } else {

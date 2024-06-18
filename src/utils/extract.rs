@@ -4,6 +4,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::types::PyDict;
 use std::borrow::Cow;
 use std::path::Path;
+use super::error::{Error, ErrorKind};
 use super::float::{f64x3, f64x3x3};
 
 
@@ -108,6 +109,15 @@ impl<'a> Tag<'a> {
         }
     }
 
+    /// Returns the qualified name of this `Tag`.
+    pub fn qualified_name(&self) -> String {
+        if self.path.is_empty() {
+            self.typename.to_string()
+        } else {
+            format!("'{}' {}", self.path, self.typename)
+        }
+    }
+
     /// Returns the name of this `Tag`.
     pub fn name(&self) -> &'a str {
         self.name
@@ -136,6 +146,17 @@ impl<'a, 'b> TaggedBad<'a, 'b> {
         Self { tag, what: None, why: None }
     }
 
+    pub fn to_err(&self, kind: ErrorKind) -> PyErr {
+        let prefix = self.tag.file_prefix();
+        let tag = self.tag.qualified_name();
+        Error::new(kind)
+            .r#where(prefix.as_ref())
+            .who(tag.as_str())
+            .maybe_what(self.what)
+            .maybe_why(self.why.as_deref())
+            .into()
+    }
+
     pub fn what(mut self, what: &'b str) -> Self {
         self.what = Some(what);
         self
@@ -150,21 +171,13 @@ impl<'a, 'b> TaggedBad<'a, 'b> {
 impl<'a, 'b> From<TaggedBad<'a, 'b>> for String {
     fn from(value: TaggedBad<'a, 'b>) -> Self {
         let prefix = value.tag.file_prefix();
-        let tag = if value.tag.path.is_empty() {
-            value.tag.typename.to_string()
-        } else {
-            format!("'{}' {}", value.tag.path, value.tag.typename)
-        };
-        match value.what {
-            None => match value.why {
-                None => format!("{}bad {}", prefix, tag),
-                Some(why) => format!("{}bad {} ({})", prefix, tag, why),
-            },
-            Some(what) => match value.why {
-                None => format!("{}bad {} for {}", prefix, what, tag),
-                Some(why) => format!("{}bad {} for {} ({})", prefix, what, tag, why),
-            },
-        }
+        let tag = value.tag.qualified_name();
+        Error::default()
+            .r#where(prefix.as_ref())
+            .who(tag.as_str())
+            .maybe_what(value.what)
+            .maybe_why(value.why.as_deref())
+            .into()
     }
 }
 
@@ -238,11 +251,11 @@ impl<const N: usize> Extractor<N> {
             }
             match remainder.as_mut() {
                 None => {
-                    let message: String = tag.bad().why(format!(
+                    let err = tag.bad().why(format!(
                         "unknown property '{}'",
                         k
-                    )).into();
-                    return Err(PyValueError::new_err(message));
+                    )).to_err(ErrorKind::ValueError);
+                    return Err(err);
                 },
                 Some(remainder) => {
                     let _unused = remainder.insert(k, v);
@@ -255,11 +268,11 @@ impl<const N: usize> Extractor<N> {
             if values[index].is_none() {
                 let default = &self.properties[index].default;
                 if default.is_required() {
-                    let message: String = tag.bad().why(format!(
+                    let err = tag.bad().why(format!(
                         "missing '{}' property",
                         self.properties[index].name,
-                    )).into();
-                    return Err(PyValueError::new_err(message));
+                    )).to_err(ErrorKind::ValueError);
+                    return Err(err);
                 } else {
                     values[index] = default.into();
                 }

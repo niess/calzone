@@ -1,12 +1,13 @@
 use crate::materials::MaterialsDefinition;
 use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
+use crate::utils::error::Error;
+use crate::utils::error::ErrorKind::{IndexError, ValueError};
 use crate::utils::float::{f64x3, f64x3x3};
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
 use cxx::SharedPtr;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::types::PyTuple;
 use super::cxx::ffi;
 use temp_dir::TempDir;
@@ -44,8 +45,8 @@ impl Geometry {
         let ffi::VolumeInfo { material, solid, mother, daughters } =
             self.0.describe_volume(volume);
         if let Some(msg) = ffi::get_error().value() {
-            let msg = format!("bad volume ({})", msg);
-            return Err(PyIndexError::new_err(msg));
+            let err = Error::new(IndexError).what("volume").why(msg);
+            return Err(err.into())
         }
         let mother = if mother.is_empty() {
             None
@@ -145,12 +146,13 @@ impl GeometryBuilder {
             }
         }
         let builder = slf.borrow();
-        let msg = if builder.0.volume.name() == volume {
+        let why = if builder.0.volume.name() == volume {
             format!("cannot delete top volume '{}'", volume)
         } else {
             format!("unknown '{}' volume", volume)
         };
-        Err(PyValueError::new_err(format!("bad geometry operation ({})", msg)))
+        let err = Error::new(ValueError).what("geometry operation").why(&why);
+        Err(err.into())
     }
 
     fn modify<'py>(
@@ -165,9 +167,9 @@ impl GeometryBuilder {
         let volume = builder.find_mut(volume)?;
         if let Some(name) = name {
             volume::Volume::check(&name)
-                .map_err(|msg| {
-                    let msg = format!("bad name '{}' ({})", name, msg);
-                    PyValueError::new_err(msg)
+                .map_err(|why| {
+                    let what = format!("name '{}'", name);
+                    Error::new(ValueError).what(&what).why(why).to_err()
                 })?;
             volume.name = name;
         }
@@ -238,8 +240,8 @@ impl GeometryBuilder {
             },
         };
         volume.ok_or_else(|| {
-            let msg = format!("bad geometry operation (unknown '{}' volume)", path);
-            PyValueError::new_err(msg)
+            let why = format!("unknown '{}' volume", path);
+            Error::new(ValueError).what("geometry operation").why(&why).to_err()
         })
     }
 }
@@ -273,8 +275,9 @@ impl GeometryDefinition {
         )?;
 
         if remainder.len() != 1 {
-            let msg = format!("bad volume(s) (expected 1 top volume, found {})", remainder.len());
-            return Err(PyValueError::new_err(msg));
+            let why = format!("expected 1 top volume, found {}", remainder.len());
+            let err = Error::new(ValueError).what("geometry").why(&why);
+            return Err(err.into());
         }
         let (name, volume) = remainder.iter().next().unwrap();
         let tag = Tag::new("", name.as_str(), file.as_deref());
@@ -330,9 +333,9 @@ impl Volume {
     ) -> PyResult<PyObject> {
         let frame = frame.unwrap_or("");
         let bbox = self.geometry.compute_box(self.name.as_str(), frame);
-        if let Some(msg) = ffi::get_error().value() {
-            let msg = format!("bad box operation ({})", msg);
-            return Err(PyValueError::new_err(msg));
+        if let Some(why) = ffi::get_error().value() {
+            let err = Error::new(ValueError).what("box operation").why(why);
+            return Err(err.into());
         }
 
         let result = PyArray::<f64>::empty(py, &[2, 3]).unwrap();
@@ -350,9 +353,9 @@ impl Volume {
     fn compute_origin(&self, frame: Option<&str>) -> PyResult<f64x3> {
         let frame = frame.unwrap_or("");
         let origin = self.geometry.compute_origin(self.name.as_str(), frame);
-        if let Some(msg) = ffi::get_error().value() {
-            let msg = format!("bad origin operation ({})", msg);
-            return Err(PyValueError::new_err(msg));
+        if let Some(why) = ffi::get_error().value() {
+            let err = Error::new(ValueError).what("origin operation").why(why);
+            return Err(err.into());
         }
         Ok((&origin).into())
     }

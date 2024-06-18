@@ -20,6 +20,7 @@ pub mod ffi {
         None,
         FileNotFoundError,
         Geant4Exception,
+        IndexError,
         KeyboardInterrupt,
         MemoryError,
         ValueError,
