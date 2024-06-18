@@ -26,7 +26,7 @@ pub use map:: Map;
 // ===============================================================================================
 
 #[pyclass(frozen, module="calzone")]
-pub struct Geometry (SharedPtr<ffi::GeometryBorrow>);
+pub struct Geometry (pub(crate) SharedPtr<ffi::GeometryBorrow>);
 
 unsafe impl Send for ffi::GeometryBorrow {}
 unsafe impl Sync for ffi::GeometryBorrow {}
@@ -34,7 +34,7 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 #[pymethods]
 impl Geometry {
     #[new]
-    fn new(volume: DictLike) -> PyResult<Self> {
+    pub fn new(volume: DictLike) -> PyResult<Self> {
         // XXX from GDML (manage memory by diffing G4SolidStore etc.).
         let builder = GeometryBuilder::new(volume)?;
         let geometry = builder.build()?;

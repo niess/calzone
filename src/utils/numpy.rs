@@ -1,3 +1,5 @@
+// Calzone interface.
+use crate::cxx::ffi::Primary;
 // PyO3 interface.
 use pyo3::prelude::*;
 use pyo3::{ffi, pyobject_native_type_extract, pyobject_native_type_named, PyTypeInfo};
@@ -23,6 +25,7 @@ struct ArrayInterface {
     // Type objects.
     dtype_f32: PyObject,
     dtype_f64: PyObject,
+    dtype_primary: PyObject,
     dtype_u16: PyObject,
     type_ndarray: PyObject,
     // Functions.
@@ -108,6 +111,18 @@ pub fn initialise(py: Python) -> PyResult<()> {
         .call1(("f8",))?
         .into_py(py);
 
+    let dtype_primary: PyObject = {
+        let arg: [PyObject; 4] = [
+            ("pid", "i4").into_py(py),
+            ("energy", "f8").into_py(py),
+            ("position", "f8", 3).into_py(py),
+            ("direction", "f8", 3).into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
+
     let dtype_u16: PyObject = dtype
         .call1(("u2",))?
         .into_py(py);
@@ -134,6 +149,7 @@ pub fn initialise(py: Python) -> PyResult<()> {
         // Type objects.
         dtype_f32,
         dtype_f64,
+        dtype_primary,
         dtype_u16,
         type_ndarray: object(2),
         // Functions.
@@ -210,7 +226,7 @@ impl PyUntypedArray {
 
 // Private interface.
 impl PyUntypedArray {
-    fn data(&self, index: usize) -> PyResult<*mut c_char> {
+    pub fn data(&self, index: usize) -> PyResult<*mut c_char> {
         let size = self.size();
         if index >= size {
             Err(PyIndexError::new_err(format!(
@@ -577,6 +593,13 @@ impl Dtype for f64 {
     #[inline]
     fn dtype(py: Python) -> PyResult<PyObject> {
         Ok(api(py).dtype_f64.clone_ref(py))
+    }
+}
+
+impl Dtype for Primary {
+    #[inline]
+    fn dtype(py: Python) -> PyResult<PyObject> {
+        Ok(api(py).dtype_primary.clone_ref(py))
     }
 }
 

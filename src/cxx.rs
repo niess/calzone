@@ -1,4 +1,5 @@
 use crate::geometry::volume::Volume;
+use crate::simulation::RunAgent;
 use crate::utils::error::ctrlc_catched;
 
 
@@ -124,6 +125,57 @@ pub mod ffi {
 
     // ===========================================================================================
     //
+    // Physics interface.
+    //
+    // ===========================================================================================
+
+    #[repr(u32)]
+    pub enum EmPhysicsModel {
+        Dna,
+        Livermore,
+        None,
+        Option1,
+        Option2,
+        Option3,
+        Option4,
+        Penelope,
+        Standard,
+    }
+
+    #[repr(u32)]
+    pub enum HadPhysicsModel {
+        FTFP_BERT,
+        FTFP_BERT_HP,
+        QGSP_BERT,
+        QGSP_BERT_HP,
+        QGSP_BIC,
+        QGSP_BIC_HP,
+        None,
+    }
+
+    #[derive(Clone, Copy)]
+    struct Physics {
+        default_cut: f64,
+        em_model: EmPhysicsModel,
+        had_model: HadPhysicsModel,
+    }
+
+    // ===========================================================================================
+    //
+    // Source interface.
+    //
+    // ===========================================================================================
+
+    #[derive(Clone, Copy)]
+    struct Primary {
+        pid: i32,
+        energy: f64,
+        position: [f64; 3],
+        direction: [f64; 3],
+    }
+
+    // ===========================================================================================
+    //
     // Units interface.
     //
     // ===========================================================================================
@@ -200,5 +252,13 @@ pub mod ffi {
         // Materials interface.
         fn get_hash(self: &Mixture) -> u64;
         fn get_hash(self: &Molecule) -> u64;
+
+        // Simulation interface.
+        type RunAgent<'a>;
+
+        unsafe fn get_geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
+        unsafe fn get_physics<'b>(self: &'b RunAgent) -> &'b Physics;
+        fn get_open01(self: &mut RunAgent) -> f64;
+        unsafe fn next_primary<'b>(self: &'b mut RunAgent) -> &'b Primary;
     }
 }
