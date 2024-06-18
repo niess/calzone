@@ -115,21 +115,25 @@ impl<'a> RunAgent<'a> {
         Ok(agent)
     }
 
-    pub fn get_geometry<'b>(&'b self) -> &'b ffi::GeometryBorrow {
+    pub fn geometry<'b>(&'b self) -> &'b ffi::GeometryBorrow {
         &self.geometry
     }
 
-    pub fn get_open01(&mut self) -> f64 {
+    pub fn next_open01(&mut self) -> f64 {
         self.random.open01()
-    }
-
-    pub fn get_physics<'b>(&'b self) -> &'b ffi::Physics {
-        &self.physics
     }
 
     pub fn next_primary<'b>(&'b mut self) -> &'b ffi::Primary {
         let primary = self.primaries.data(self.index).unwrap();
         self.index += 1;
         unsafe { (primary as *const ffi::Primary).as_ref().unwrap() }
+    }
+
+    pub fn physics<'b>(&'b self) -> &'b ffi::Physics {
+        &self.physics
+    }
+
+    pub fn prng_name(&self) -> &'static str {
+        "Pcg64Mcg"
     }
 }

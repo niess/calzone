@@ -31,8 +31,18 @@ fn main() {
     let sources = [
         "src/geometry.cc",
         "src/materials.cc",
+        "src/simulation/physics.cc",
+        "src/simulation/random.cc",
+        "src/simulation/source.cc",
         "src/utils/error.cc",
         "src/utils/units.cc",
+    ];
+
+    let headers = [
+        "src/calzone.h",
+        "src/simulation/physics.h",
+        "src/simulation/random.h",
+        "src/simulation/source.h",
     ];
 
     cxx_build::bridge("src/cxx.rs")
@@ -48,9 +58,12 @@ fn main() {
         .compile("geant4");
 
     println!("cargo:rerun-if-changed=src/cxx.rs");
-    println!("cargo:rerun-if-changed=src/calzone.h");
 
     for path in sources {
+        println!("cargo:rerun-if-changed={}", path);
+    }
+
+    for path in headers {
         println!("cargo:rerun-if-changed={}", path);
     }
 

@@ -256,9 +256,10 @@ pub mod ffi {
         // Simulation interface.
         type RunAgent<'a>;
 
-        unsafe fn get_geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
-        unsafe fn get_physics<'b>(self: &'b RunAgent) -> &'b Physics;
-        fn get_open01(self: &mut RunAgent) -> f64;
+        unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
+        fn next_open01(self: &mut RunAgent) -> f64;
         unsafe fn next_primary<'b>(self: &'b mut RunAgent) -> &'b Primary;
+        unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
+        fn prng_name(self: &RunAgent) -> &'static str;
     }
 }
