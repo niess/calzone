@@ -30,7 +30,7 @@ fn main() {
 
     let sources = [
         "src/geometry.cc",
-        "src/materials.cc",
+        "src/geometry/materials.cc",
         "src/simulation/physics.cc",
         "src/simulation/random.cc",
         "src/simulation/source.cc",

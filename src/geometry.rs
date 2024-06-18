@@ -1,4 +1,3 @@
-use crate::materials::MaterialsDefinition;
 use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::{IndexError, ValueError};
@@ -14,9 +13,11 @@ use temp_dir::TempDir;
 
 mod goupil;
 mod map;
+pub mod materials;
 pub mod volume;
 
 pub use map:: Map;
+pub use materials::MaterialsDefinition;
 
 
 // ===============================================================================================

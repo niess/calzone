@@ -6,7 +6,6 @@ use pyo3::sync::GILOnceCell;
 
 mod cxx;
 mod geometry;
-mod materials;
 mod simulation;
 mod utils;
 
@@ -43,7 +42,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add_class::<simulation::Physics>()?;
 
     // Register function(s).
-    module.add_function(wrap_pyfunction!(materials::load, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::materials::load, module)?)?;
 
     Ok(())
 }

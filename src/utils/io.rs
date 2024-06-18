@@ -1,4 +1,4 @@
-use crate::materials::gate::load_gate_db;
+use crate::geometry::materials::gate::load_gate_db;
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyFileNotFoundError, PyNotImplementedError};
 use pyo3::types::{PyDict, PyString};

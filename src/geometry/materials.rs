@@ -5,7 +5,7 @@ use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use super::cxx::ffi;
+use super::ffi;
 
 pub mod gate;
 mod hash;
