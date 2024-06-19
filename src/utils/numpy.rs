@@ -1,5 +1,6 @@
 // Calzone interface.
 use crate::cxx::ffi::Primary;
+use crate::simulation::sampler::{LineDeposit, PointDeposit, TotalDeposit};
 // PyO3 interface.
 use pyo3::prelude::*;
 use pyo3::{ffi, pyobject_native_type_extract, pyobject_native_type_named, PyTypeInfo};
@@ -25,7 +26,10 @@ struct ArrayInterface {
     // Type objects.
     dtype_f32: PyObject,
     dtype_f64: PyObject,
+    dtype_line_deposit: PyObject,
+    dtype_point_deposit: PyObject,
     dtype_primary: PyObject,
+    dtype_total_deposit: PyObject,
     dtype_u16: PyObject,
     type_ndarray: PyObject,
     // Functions.
@@ -111,12 +115,45 @@ pub fn initialise(py: Python) -> PyResult<()> {
         .call1(("f8",))?
         .into_py(py);
 
+    let dtype_line_deposit: PyObject = {
+        let arg: [PyObject; 4] = [
+            ("event", "u8").into_py(py),
+            ("value", "f8").into_py(py),
+            ("start", "f8", 3).into_py(py),
+            ("end", "f8", 3).into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
+
+    let dtype_point_deposit: PyObject = {
+        let arg: [PyObject; 3] = [
+            ("event", "u8").into_py(py),
+            ("value", "f8").into_py(py),
+            ("position", "f8", 3).into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
+
     let dtype_primary: PyObject = {
         let arg: [PyObject; 4] = [
             ("pid", "i4").into_py(py),
             ("energy", "f8").into_py(py),
             ("position", "f8", 3).into_py(py),
             ("direction", "f8", 3).into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
+
+    let dtype_total_deposit: PyObject = {
+        let arg: [PyObject; 2] = [
+            ("event", "u8").into_py(py),
+            ("value", "f8").into_py(py),
         ];
         dtype
             .call1((arg, true))?
@@ -149,7 +186,10 @@ pub fn initialise(py: Python) -> PyResult<()> {
         // Type objects.
         dtype_f32,
         dtype_f64,
+        dtype_line_deposit,
+        dtype_point_deposit,
         dtype_primary,
+        dtype_total_deposit,
         dtype_u16,
         type_ndarray: object(2),
         // Functions.
@@ -596,10 +636,31 @@ impl Dtype for f64 {
     }
 }
 
+impl Dtype for LineDeposit {
+    #[inline]
+    fn dtype(py: Python) -> PyResult<PyObject> {
+        Ok(api(py).dtype_line_deposit.clone_ref(py))
+    }
+}
+
+impl Dtype for PointDeposit {
+    #[inline]
+    fn dtype(py: Python) -> PyResult<PyObject> {
+        Ok(api(py).dtype_point_deposit.clone_ref(py))
+    }
+}
+
 impl Dtype for Primary {
     #[inline]
     fn dtype(py: Python) -> PyResult<PyObject> {
         Ok(api(py).dtype_primary.clone_ref(py))
+    }
+}
+
+impl Dtype for TotalDeposit {
+    #[inline]
+    fn dtype(py: Python) -> PyResult<PyObject> {
+        Ok(api(py).dtype_total_deposit.clone_ref(py))
     }
 }
 

@@ -3,6 +3,7 @@
 #include <memory>
 // Geant4 interface.
 #include "G4Material.hh"
+#include "G4VPhysicalVolume.hh"
 // Calzone interface.
 struct GeometryBorrow;
 #include "calzone/src/cxx.rs.h"
@@ -27,7 +28,6 @@ void set_error(ErrorType, const char *);
 //
 // ============================================================================
 
-struct G4VPhysicalVolume;
 struct GeometryData;
 
 struct GeometryBorrow {
@@ -88,3 +88,13 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose);
 // ============================================================================
 
 void export_units(rust::Vec<UnitDefinition> & units);
+
+
+// ============================================================================
+//
+// Conversion utilities.
+//
+// ============================================================================
+
+rust::Str as_str(const G4String &);
+std::array<double, 3> to_vec(const G4ThreeVector &);

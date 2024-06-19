@@ -9,10 +9,12 @@ use pyo3::types::PyString;
 
 mod physics;
 mod random;
+pub mod sampler;
 pub mod source;
 
 pub use physics::Physics;
 pub use random::Random;
+use sampler::{SamplerMode, Deposits};
 pub use super::cxx::ffi;
 
 
@@ -30,6 +32,8 @@ pub struct Simulation {
     physics: Py<Physics>,
     #[pyo3(get, set)]
     random: Py<Random>,
+    #[pyo3(get, set)]
+    sampler: Option<SamplerMode>,
 }
 
 #[pymethods]
@@ -56,7 +60,8 @@ impl Simulation {
         let random = random
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
-        let simulation = Self { geometry, physics, random };
+        let sampler = Some(SamplerMode::Brief);
+        let simulation = Self { geometry, physics, random, sampler };
         Ok(simulation)
     }
 
@@ -87,7 +92,7 @@ impl Simulation {
         py: Python,
         primaries: &PyArray<ffi::Primary>,
         verbose: Option<bool>,
-    ) -> PyResult<()> {
+    ) -> PyResult<PyObject> {
         let verbose = verbose.unwrap_or(false);
 
         let mut agent = RunAgent::new(py, self, primaries)?;
@@ -98,7 +103,7 @@ impl Simulation {
         let mut random = self.random.borrow_mut(py);
         *random = agent.random.clone();
 
-        result
+        result.and_then(|_| agent.export(py))
     }
 }
 
@@ -166,7 +171,10 @@ pub struct RunAgent<'a> {
     physics: ffi::Physics,
     primaries: &'a PyArray<ffi::Primary>,
     random: Random,
+    // Iterator.
     index: usize,
+    // Samples.
+    deposits: Option<Deposits>,
 }
 
 impl<'a> RunAgent<'a> {
@@ -174,8 +182,23 @@ impl<'a> RunAgent<'a> {
         self.primaries.len().unwrap()
     }
 
+    fn export(self, py: Python) -> PyResult<PyObject> {
+        match self.deposits {
+            None => Ok(py.None()),
+            Some(deposits) => deposits.export(py),
+        }
+    }
+
     pub fn geometry<'b>(&'b self) -> &'b ffi::GeometryBorrow {
         self.geometry.as_ref().unwrap()
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn is_sampler(&self) -> bool {
+        self.deposits.is_some()
     }
 
     fn new(
@@ -190,7 +213,8 @@ impl<'a> RunAgent<'a> {
         let physics = simulation.physics.bind(py).borrow().0;
         let random = simulation.random.bind(py).borrow().clone();
         let index = 0;
-        let agent = RunAgent { geometry, physics, primaries, random, index };
+        let deposits = simulation.sampler.map(|mode| Deposits::new(mode));
+        let agent = RunAgent { geometry, physics, primaries, random, index, deposits };
         Ok(agent)
     }
 
@@ -211,4 +235,18 @@ impl<'a> RunAgent<'a> {
     pub fn prng_name(&self) -> &'static str {
         "Pcg64Mcg"
     }
+
+    pub fn push_deposit(
+        &mut self,
+        volume: *const ffi::G4VPhysicalVolume,
+        deposit: f64,
+        non_ionising: f64,
+        start: &ffi::G4ThreeVector,
+        end: &ffi::G4ThreeVector,
+    ) {
+        if let Some(deposits) = self.deposits.as_mut() {
+            deposits.push(volume, self.index, deposit, non_ionising, start, end)
+        }
+    }
+
 }

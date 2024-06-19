@@ -35,7 +35,9 @@ fn main() {
         "src/simulation/geometry.cc",
         "src/simulation/physics.cc",
         "src/simulation/random.cc",
+        "src/simulation/sampler.cc",
         "src/simulation/source.cc",
+        "src/utils/convert.cc",
         "src/utils/error.cc",
         "src/utils/units.cc",
     ];
@@ -45,6 +47,7 @@ fn main() {
         "src/simulation/geometry.h",
         "src/simulation/physics.h",
         "src/simulation/random.h",
+        "src/simulation/sampler.h",
         "src/simulation/source.h",
     ];
 

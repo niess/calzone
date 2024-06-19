@@ -176,6 +176,37 @@ pub mod ffi {
 
     // ===========================================================================================
     //
+    // Tracker interface. // XXX needed?
+    //
+    // ===========================================================================================
+
+    #[derive(Clone, Copy)]
+    struct Process {
+        b0: u64,
+        b1: u64,
+    }
+
+    #[derive(Clone, Copy)]
+    struct Track {
+        event: usize,
+        tid: i32,
+        parent: i32,
+        pid: i32,
+        creator: Process,
+    }
+
+    #[derive(Clone, Copy)]
+    struct Vertex {
+        event: usize,
+        tid: i32,
+        energy: f64,
+        position: [f64; 3],
+        direction: [f64; 3],
+        process: Process,
+    }
+
+    // ===========================================================================================
+    //
     // Units interface.
     //
     // ===========================================================================================
@@ -221,8 +252,18 @@ pub mod ffi {
         fn drop_simulation();
         fn run_simulation(agent: &mut RunAgent, verbose: bool) -> SharedPtr<Error>;
 
+        type G4VPhysicalVolume;
+        fn GetName(self: &G4VPhysicalVolume) -> &G4String;
+
         // Units interface.
         fn export_units(units: &mut Vec<UnitDefinition>);
+
+        // Conversion utilities.
+        type G4String;
+        fn as_str(value: &G4String) -> &str;
+
+        type G4ThreeVector;
+        fn to_vec(value: &G4ThreeVector) -> [f64; 3];
     }
 
     // ===========================================================================================
@@ -262,9 +303,19 @@ pub mod ffi {
 
         fn events(self: &RunAgent) -> usize;
         unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
+        fn index(self: &RunAgent) -> usize; // XXX needed?
+        fn is_sampler(self: &RunAgent) -> bool;
         fn next_open01(self: &mut RunAgent) -> f64;
         unsafe fn next_primary<'b>(self: &'b mut RunAgent) -> &'b Primary;
         unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
         fn prng_name(self: &RunAgent) -> &'static str;
+        unsafe fn push_deposit(
+            self: &mut RunAgent,
+            volume: *const G4VPhysicalVolume,
+            step_deposit: f64,
+            non_ionising: f64,
+            start: &G4ThreeVector,
+            end: &G4ThreeVector,
+        );
     }
 }
