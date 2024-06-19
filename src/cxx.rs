@@ -217,6 +217,10 @@ pub mod ffi {
         fn add_mixture(element: &Mixture) -> SharedPtr<Error>;
         fn add_molecule(element: &Molecule) -> SharedPtr<Error>;
 
+        // Simulation interface.
+        fn drop_simulation();
+        fn run_simulation(agent: &mut RunAgent, verbose: bool) -> SharedPtr<Error>;
+
         // Units interface.
         fn export_units(units: &mut Vec<UnitDefinition>);
     }
@@ -256,6 +260,7 @@ pub mod ffi {
         // Simulation interface.
         type RunAgent<'a>;
 
+        fn events(self: &RunAgent) -> usize;
         unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
         fn next_open01(self: &mut RunAgent) -> f64;
         unsafe fn next_primary<'b>(self: &'b mut RunAgent) -> &'b Primary;

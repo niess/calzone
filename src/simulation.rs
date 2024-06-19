@@ -9,6 +9,7 @@ use pyo3::types::PyString;
 
 mod physics;
 mod random;
+pub mod source;
 
 pub use physics::Physics;
 pub use random::Random;
@@ -63,15 +64,20 @@ impl Simulation {
     fn run(
         &self,
         py: Python,
-        primaries: &PyArray<ffi::Primary>
+        primaries: &PyArray<ffi::Primary>,
+        verbose: Option<bool>,
     ) -> PyResult<()> {
-        let agent = RunAgent::new(py, self, primaries)?;
+        let verbose = verbose.unwrap_or(false);
+
+        let mut agent = RunAgent::new(py, self, primaries)?;
+        let result = ffi::run_simulation(&mut agent, verbose)
+            .to_result();
 
         // Synchronize back random stream.
         let mut random = self.random.borrow_mut(py);
         *random = agent.random.clone();
 
-        Ok(())
+        result
     }
 }
 
@@ -83,6 +89,10 @@ enum GeometryArg<'py> {
     String(Bound<'py, PyString>),
 }
 
+#[pyfunction]
+pub fn drop_simulation() {
+    ffi::drop_simulation();
+}
 
 // ===============================================================================================
 //
@@ -99,6 +109,14 @@ pub struct RunAgent<'a> {
 }
 
 impl<'a> RunAgent<'a> {
+    pub fn events(&self) -> usize {
+        self.primaries.len().unwrap()
+    }
+
+    pub fn geometry<'b>(&'b self) -> &'b ffi::GeometryBorrow {
+        self.geometry.as_ref().unwrap()
+    }
+
     fn new(
         py: Python,
         simulation: &Simulation,
@@ -113,10 +131,6 @@ impl<'a> RunAgent<'a> {
         let index = 0;
         let agent = RunAgent { geometry, physics, primaries, random, index };
         Ok(agent)
-    }
-
-    pub fn geometry<'b>(&'b self) -> &'b ffi::GeometryBorrow {
-        &self.geometry
     }
 
     pub fn next_open01(&mut self) -> f64 {

@@ -75,8 +75,8 @@ void PhysicsImpl::DisableVerbosity() const
     UImanager->ApplyCommand("/process/had/verbose 0");
 }
 
-void PhysicsImpl::Configure(const RunAgent & runAgent) {
-    auto && definition = runAgent.physics();
+void PhysicsImpl::Update() {
+    auto && definition = RUN_AGENT->physics();
     bool modified = false;
     if (!this->decayPhysics) {
         this->decayPhysics.reset(new G4DecayPhysics());

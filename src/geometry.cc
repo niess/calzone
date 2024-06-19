@@ -32,11 +32,14 @@ struct GeometryData {
     GeometryData(const rust::Box<Volume> & volume);
     ~GeometryData();
 
+    GeometryData(const GeometryData &) = delete; // Forbid copy.
+
     GeometryData * clone();
     void drop();
 
     static GeometryData * get(const G4VPhysicalVolume *);
 
+    size_t id = 0;
     G4VPhysicalVolume * world = nullptr;
     std::map<std::string, const G4VPhysicalVolume *> elements;
     std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> mothers;
@@ -44,9 +47,12 @@ struct GeometryData {
 private:
     size_t rc = 0;
     std::list <const G4VSolid *> orphans;
+
+    static size_t LAST_ID;
     static std::map<const G4VPhysicalVolume *, GeometryData *> INSTANCES;
 };
 
+size_t GeometryData::LAST_ID = 0;
 std::map<const G4VPhysicalVolume *, GeometryData *> GeometryData::INSTANCES;
 
 static G4VSolid * build_envelope(
@@ -422,6 +428,7 @@ static void map_volumes(
 
 GeometryData::GeometryData(const rust::Box<Volume> & volume) {
     clear_error();
+    this->id = ++GeometryData::LAST_ID;
     this->world = nullptr;
 
     // Build solids.
@@ -758,6 +765,13 @@ std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {
     return get_error();
 }
 
+size_t GeometryBorrow::id() const {
+    return this->data->id;
+}
+
+G4VPhysicalVolume * GeometryBorrow::world() const {
+    return this->data->world;
+}
 
 // ============================================================================
 //

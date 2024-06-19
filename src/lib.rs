@@ -40,9 +40,17 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add_class::<geometry::GeometryBuilder>()?;
     module.add_class::<geometry::Map>()?;
     module.add_class::<simulation::Physics>()?;
+    module.add_class::<simulation::Random>()?;
+    module.add_class::<simulation::Simulation>()?;
 
     // Register function(s).
     module.add_function(wrap_pyfunction!(geometry::materials::load, module)?)?;
+    module.add_function(wrap_pyfunction!(simulation::source::primaries, module)?)?;
+
+    // Register Geant4 finalisation.
+    let dropper = wrap_pyfunction!(simulation::drop_simulation, module)?;
+    py.import_bound("atexit")?
+      .call_method1("register", (dropper,))?;
 
     Ok(())
 }

@@ -9,7 +9,7 @@
 
 
 void SourceImpl::GeneratePrimaries(G4Event * event) {
-    auto primary = this->agent->next_primary();
+    auto primary = RUN_AGENT->next_primary();
     auto definition = G4ParticleTable::GetParticleTable()->FindParticle(
         primary.pid
     );
@@ -37,10 +37,6 @@ void SourceImpl::GeneratePrimaries(G4Event * event) {
         primary.direction[2]
     ));
     gun.GeneratePrimaryVertex(event);
-}
-
-void SourceImpl::Configure(RunAgent & runAgent) {
-    this->agent = &runAgent;
 }
 
 SourceImpl * SourceImpl::Get() {

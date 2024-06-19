@@ -31,6 +31,8 @@ fn main() {
     let sources = [
         "src/geometry.cc",
         "src/geometry/materials.cc",
+        "src/simulation.cc",
+        "src/simulation/geometry.cc",
         "src/simulation/physics.cc",
         "src/simulation/random.cc",
         "src/simulation/source.cc",
@@ -40,6 +42,7 @@ fn main() {
 
     let headers = [
         "src/calzone.h",
+        "src/simulation/geometry.h",
         "src/simulation/physics.h",
         "src/simulation/random.h",
         "src/simulation/source.h",

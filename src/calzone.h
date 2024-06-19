@@ -27,11 +27,14 @@ void set_error(ErrorType, const char *);
 //
 // ============================================================================
 
+struct G4VPhysicalVolume;
 struct GeometryData;
 
 struct GeometryBorrow {
     GeometryBorrow(GeometryData *);
     ~GeometryBorrow();
+
+    GeometryBorrow(const GeometryBorrow &) = delete; // Forbid copy.
 
     // Geant4 interface.
     std::shared_ptr<Error> check(int resolution) const;
@@ -39,6 +42,8 @@ struct GeometryBorrow {
     std::array<double, 3> compute_origin(rust::Str, rust::Str) const;
     VolumeInfo describe_volume(rust::Str) const;
     std::shared_ptr<Error> dump(rust::Str) const;
+    size_t id() const;
+    G4VPhysicalVolume * world() const;
 
     // Goupil interface.
     void set_goupil() const;
@@ -62,6 +67,18 @@ std::shared_ptr<Error> add_molecule(const Molecule &);
 
 class G4Material;
 G4Material * get_material(const rust::String & name);
+
+
+// ============================================================================
+//
+// Simulation interface.
+//
+// ============================================================================
+
+extern RunAgent * RUN_AGENT;
+
+void drop_simulation();
+std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose);
 
 
 // ============================================================================

@@ -11,6 +11,7 @@
 
 
 struct PhysicsImpl: public G4VUserPhysicsList {
+    PhysicsImpl(const PhysicsImpl &) = delete; // Forbid copy.
 
     // Geant4 interface.
     void ConstructParticle();
@@ -18,11 +19,12 @@ struct PhysicsImpl: public G4VUserPhysicsList {
 
     // User interface.
     void DisableVerbosity() const;
-    void Configure(const RunAgent &);
+    void Update();
 
     static PhysicsImpl * Get();
 
 private:
+    PhysicsImpl() = default;
 
     // Geant4 interface.
     std::unique_ptr<G4DecayPhysics> decayPhysics = nullptr;

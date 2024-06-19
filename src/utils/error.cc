@@ -16,7 +16,12 @@ static std::shared_ptr<Error> POINTER {
 };
 
 bool any_error() {
-    return LAST_ERROR.tp != ErrorType::None;
+    if (ctrlc_catched()) {
+        LAST_ERROR.tp = ErrorType::KeyboardInterrupt;
+        return true;
+    } else {
+        return LAST_ERROR.tp != ErrorType::None;
+    }
 }
 
 void clear_error() {

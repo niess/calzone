@@ -5,7 +5,7 @@
 #include "calzone.h"
 
 struct RandomImpl: public CLHEP::HepRandomEngine {
-    RandomImpl();
+    RandomImpl(const RandomImpl &) = delete;
 
     // Geant4 interface.
     double flat();
@@ -22,10 +22,12 @@ struct RandomImpl: public CLHEP::HepRandomEngine {
     std::istream & get (std::istream & is);
 
     // User interface.
-    void Configure(RunAgent &);
+    void Switch();
 
     static RandomImpl * Get();
 
 private:
-    RunAgent * agent = nullptr;
+    RandomImpl() = default;
+
+    CLHEP::HepRandomEngine * altEngine = nullptr;
 };

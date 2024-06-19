@@ -7,20 +7,17 @@
 
 
 struct SourceImpl: G4VUserPrimaryGeneratorAction {
+    SourceImpl(const SourceImpl &) = delete; // Forbid copy.
 
     // Geant4 interface.
     void GeneratePrimaries(G4Event *);
 
     // User interface.
-    void Configure(RunAgent &);
-
     static SourceImpl * Get();
 
 private:
+    SourceImpl() = default;
 
     // Geant4 interface.
     G4ParticleGun gun = G4ParticleGun(1);
-
-    // User interface.
-    RunAgent * agent;
 };

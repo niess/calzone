@@ -1,20 +1,18 @@
 #include "random.h"
 
 
-RandomImpl::RandomImpl(): CLHEP::HepRandomEngine() {}
-
 double RandomImpl::flat() {
-    return this->agent->next_open01();
+    return RUN_AGENT->next_open01();
 }
 
 void RandomImpl::flatArray(const int n, double * v) {
     for (int i = 0; i < n; i++, v++) {
-        *v = this->agent->next_open01();
+        *v = RUN_AGENT->next_open01();
     }
 }
 
 std::string RandomImpl::name() const {
-    return std::string(this->agent->prng_name());
+    return std::string(RUN_AGENT->prng_name());
 }
 
 void RandomImpl::setSeed(long, int) {}
@@ -33,8 +31,16 @@ std::istream & RandomImpl::get (std::istream &) {
     exit(EXIT_FAILURE);
 }
 
-void RandomImpl::Configure(RunAgent & runAgent) {
-    this->agent = &runAgent;
+void RandomImpl::Switch() {
+    if (this->altEngine == nullptr) {
+        // Enable.
+        this->altEngine = G4Random::getTheEngine();
+        G4Random::setTheEngine(this);
+    } else {
+        // Disable.
+        G4Random::setTheEngine(this->altEngine);
+        this->altEngine = nullptr;
+    }
 }
 
 RandomImpl * RandomImpl::Get() {
