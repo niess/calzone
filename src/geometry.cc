@@ -9,6 +9,7 @@
 #include "G4NistManager.hh"
 #include "G4Orb.hh"
 #include "G4PVPlacement.hh"
+#include "G4SmartVoxelHeader.hh"
 #include "G4SubtractionSolid.hh"
 #include "G4TessellatedSolid.hh"
 #include "G4TriangularFacet.hh"
@@ -318,6 +319,8 @@ static void drop_them_all(G4LogicalVolume * logical) {
         drop_them_all(daughter);
     }
     // Delete this volume.
+    delete logical->GetVoxelHeader();
+    logical->SetVoxelHeader(nullptr);
     delete logical->GetSolid();
     delete logical;
 }
@@ -785,8 +788,29 @@ void GeometryBorrow::set_goupil() const {
     GOUPIL_GEOMETRY = this->data;
 }
 
+static void optimise(G4VPhysicalVolume * physical) {
+    const int MIN_VOXEL_VOLUMES_LEVEL_1 = 2; // from voxeldefs.hh.
+
+    auto && volume = physical->GetLogicalVolume();
+    size_t n = volume->GetNoDaughters();
+
+    auto && head = volume->GetVoxelHeader();
+    if (head == nullptr) {
+        if ((volume->IsToOptimise() && (n >= MIN_VOXEL_VOLUMES_LEVEL_1)) ||
+            ((n == 1) && (volume->GetDaughter(0)->IsReplicated()))) {
+            auto && head = new G4SmartVoxelHeader(volume);
+            volume->SetVoxelHeader(head);
+        }
+    }
+
+    for (size_t i = 0; i < n; i++) {
+        optimise(volume->GetDaughter(i));
+    }
+}
+
 const G4VPhysicalVolume * G4Goupil::NewGeometry() {
     auto geometry = GOUPIL_GEOMETRY->clone();
+    optimise(geometry->world);
     return geometry->world;
 }
 
