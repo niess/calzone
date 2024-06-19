@@ -24,9 +24,9 @@ pub use super::cxx::ffi;
 
 #[pyclass(module="calzone")]
 pub struct Simulation {
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     geometry: Option<Py<Geometry>>,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     physics: Py<Physics>,
     #[pyo3(get, set)]
     random: Py<Random>,
@@ -38,27 +38,48 @@ impl Simulation {
     fn new<'py>(
         py: Python<'py>,
         geometry: Option<GeometryArg>,
-        physics: Option<&Bound<'py, Physics>>,
+        physics: Option<PhysicsArg>,
         random: Option<&Bound<'py, Random>>,
     ) -> PyResult<Self> {
         let geometry = geometry
-            .map(|geometry| match geometry {
-                GeometryArg::Geometry(geometry) => Ok(geometry.unbind()),
-                GeometryArg::String(path) => {
-                    let path = DictLike::String(path);
-                    let geometry = Geometry::new(path)?;
-                    Py::new(py, geometry)
-                },
+            .map(|geometry| {
+                let geometry: PyResult<Py<Geometry>> = geometry.try_into();
+                geometry
             })
             .transpose()?;
         let physics = physics
-            .map(|physics| Ok(physics.clone().unbind()))
-            .unwrap_or_else(|| Py::new(py, Physics::new()))?;
+            .map(|physics| {
+                let physics: PyResult<Py<Physics>> = physics.try_into();
+                physics
+            })
+            .unwrap_or_else(|| Py::new(py, Physics::default()))?;
         let random = random
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
         let simulation = Self { geometry, physics, random };
         Ok(simulation)
+    }
+
+    #[setter]
+    fn set_geometry(&mut self, geometry: Option<GeometryArg>) -> PyResult<()> {
+        match geometry {
+            None => self.geometry = None,
+            Some(geometry) => {
+                let geometry: Py<Geometry> = geometry.try_into()?;
+                self.geometry = Some(geometry);
+            },
+        }
+        Ok(())
+    }
+
+    #[setter]
+    fn set_physics(&mut self, py: Python, physics: Option<PhysicsArg>) -> PyResult<()> {
+        let physics: Py<Physics> = match physics {
+            None => Py::new(py, Physics::none())?,
+            Some(physics) => physics.try_into()?,
+        };
+        self.physics = physics;
+        Ok(())
     }
 
     fn run(
@@ -87,6 +108,46 @@ enum GeometryArg<'py> {
     Geometry(Bound<'py, Geometry>),
     #[pyo3(transparent, annotation = "str")]
     String(Bound<'py, PyString>),
+}
+
+impl<'py> TryFrom<GeometryArg<'py>> for Py<Geometry> {
+    type Error = PyErr;
+
+    fn try_from(value: GeometryArg<'py>) -> Result<Py<Geometry>, Self::Error> {
+        match value {
+            GeometryArg::Geometry(geometry) => Ok(geometry.unbind()),
+            GeometryArg::String(path) => {
+                let py = path.py();
+                let path = DictLike::String(path);
+                let geometry = Geometry::new(path)?;
+                Py::new(py, geometry)
+            },
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+enum PhysicsArg<'py> {
+    #[pyo3(transparent, annotation = "Physics")]
+    Physics(Bound<'py, Physics>),
+    #[pyo3(transparent, annotation = "str")]
+    String(Bound<'py, PyString>),
+}
+
+impl<'py> TryFrom<PhysicsArg<'py>> for Py<Physics> {
+    type Error = PyErr;
+
+    fn try_from(value: PhysicsArg<'py>) -> Result<Py<Physics>, Self::Error> {
+        match value {
+            PhysicsArg::Physics(physics) => Ok(physics.unbind()),
+            PhysicsArg::String(model) => {
+                let py = model.py();
+                let model = model.to_cow()?;
+                let physics = Physics::new(Some(model.as_ref()), None, None)?;
+                Py::new(py, physics)
+            },
+        }
+    }
 }
 
 #[pyfunction]

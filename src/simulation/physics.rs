@@ -11,14 +11,41 @@ use super::ffi;
 //
 // ===============================================================================================
 
+#[derive(Default)]
 #[pyclass(module="calzone")]
 pub struct Physics (pub(crate) ffi::Physics);
+
+impl Physics {
+    const DEFAULT_EM_MODEL: ffi::EmPhysicsModel = ffi::EmPhysicsModel::Standard;
+    const DEFAULT_HAD_MODEL: ffi::HadPhysicsModel = ffi::HadPhysicsModel::None;
+
+    pub fn none() ->  Self {
+        let mut physics = ffi::Physics::default();
+        physics.em_model = ffi::EmPhysicsModel::None;
+        physics.had_model = ffi::HadPhysicsModel::None;
+        Self (physics)
+    }
+}
 
 #[pymethods]
 impl Physics {
     #[new]
-    pub fn new() -> Self {
-        Self (ffi::Physics::default())
+    pub fn new(
+        em_model: Option<&str>,
+        had_model: Option<&str>,
+        default_cut: Option<f64>
+    ) -> PyResult<Self> {
+        let mut physics = Self (ffi::Physics::default());
+        if let Some(em_model) = em_model {
+            physics.set_em_model(Some(em_model))?;
+        }
+        if let Some(had_model) = had_model {
+            physics.set_had_model(Some(had_model))?;
+        }
+        if let Some(default_cut) = default_cut {
+            physics.set_default_cut(default_cut)?;
+        }
+        Ok(physics)
     }
 
     #[getter]
@@ -179,8 +206,8 @@ impl From<HadPhysicsModel> for ffi::HadPhysicsModel {
 impl Default for ffi::Physics {
     fn default() -> Self {
         let default_cut = 0.1; // cm
-        let em_model = ffi::EmPhysicsModel::Standard;
-        let had_model = ffi::HadPhysicsModel::None;
+        let em_model = Physics::DEFAULT_EM_MODEL;
+        let had_model = Physics::DEFAULT_HAD_MODEL;
         Self { default_cut, em_model, had_model }
     }
 }
