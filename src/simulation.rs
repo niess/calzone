@@ -3,6 +3,7 @@ use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
+use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
@@ -11,10 +12,12 @@ mod physics;
 mod random;
 pub mod sampler;
 pub mod source;
+pub mod tracker;
 
 pub use physics::Physics;
 pub use random::Random;
 use sampler::{SamplerMode, Deposits};
+use tracker::Tracker;
 pub use super::cxx::ffi;
 
 
@@ -34,6 +37,8 @@ pub struct Simulation {
     random: Py<Random>,
     #[pyo3(get, set)]
     sampler: Option<SamplerMode>,
+    #[pyo3(get, set)]
+    tracker: bool,
 }
 
 #[pymethods]
@@ -45,6 +50,7 @@ impl Simulation {
         physics: Option<PhysicsArg>,
         random: Option<&Bound<'py, Random>>,
         sampler: Option<SamplerMode>,
+        tracker: Option<bool>,
     ) -> PyResult<Self> {
         let geometry = geometry
             .map(|geometry| {
@@ -62,7 +68,8 @@ impl Simulation {
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
         let sampler = sampler.or_else(|| Some(SamplerMode::Brief));
-        let simulation = Self { geometry, physics, random, sampler };
+        let tracker = tracker.unwrap_or(false);
+        let simulation = Self { geometry, physics, random, sampler, tracker };
         Ok(simulation)
     }
 
@@ -176,6 +183,8 @@ pub struct RunAgent<'a> {
     index: usize,
     // Samples.
     deposits: Option<Deposits>,
+    // tracks.
+    tracker: Option<Tracker>,
 }
 
 impl<'a> RunAgent<'a> {
@@ -184,10 +193,26 @@ impl<'a> RunAgent<'a> {
     }
 
     fn export(self, py: Python) -> PyResult<PyObject> {
-        match self.deposits {
-            None => Ok(py.None()),
-            Some(deposits) => deposits.export(py),
-        }
+        static RESULT2: NamedTuple<2> = NamedTuple::new("Result", ["tracks", "vertices"]);
+        static RESULT3: NamedTuple<3> = NamedTuple::new(
+            "Result", ["deposits", "tracks", "vertices"]
+        );
+
+        let result = match self.deposits {
+            None => match self.tracker {
+                None => py.None(),
+                Some(tracker) => RESULT2.instance(py, tracker.export(py)?)?.unbind(),
+            },
+            Some(deposits) => match self.tracker {
+                None => deposits.export(py)?,
+                Some(tracker) => {
+                    let deposits = deposits.export(py)?;
+                    let (tracks, vertices) = tracker.export(py)?;
+                    RESULT3.instance(py, (deposits, tracks, vertices))?.unbind()
+                }
+            },
+        };
+        Ok(result)
     }
 
     pub fn geometry<'b>(&'b self) -> &'b ffi::GeometryBorrow {
@@ -211,7 +236,8 @@ impl<'a> RunAgent<'a> {
         let random = simulation.random.bind(py).borrow().clone();
         let index = 0;
         let deposits = simulation.sampler.map(|mode| Deposits::new(mode));
-        let agent = RunAgent { geometry, physics, primaries, random, index, deposits };
+        let tracker = if simulation.tracker { Some(Tracker::new()) } else { None };
+        let agent = RunAgent { geometry, physics, primaries, random, index, deposits, tracker };
         Ok(agent)
     }
 
@@ -246,4 +272,17 @@ impl<'a> RunAgent<'a> {
         }
     }
 
+    pub fn push_track(&mut self, mut track: ffi::Track) {
+        if let Some(tracker) = self.tracker.as_mut() {
+            track.event = self.index;
+            tracker.push_track(track)
+        }
+    }
+
+    pub fn push_vertex(&mut self, mut vertex: ffi::Vertex) {
+        if let Some(tracker) = self.tracker.as_mut() {
+            vertex.event = self.index;
+            tracker.push_vertex(vertex)
+        }
+    }
 }

@@ -1,5 +1,5 @@
 // Calzone interface.
-use crate::cxx::ffi::Primary;
+use crate::cxx::ffi::{Primary, Track, Vertex};
 use crate::simulation::sampler::{LineDeposit, PointDeposit, TotalDeposit};
 // PyO3 interface.
 use pyo3::prelude::*;
@@ -30,7 +30,9 @@ struct ArrayInterface {
     dtype_point_deposit: PyObject,
     dtype_primary: PyObject,
     dtype_total_deposit: PyObject,
+    dtype_track: PyObject,
     dtype_u16: PyObject,
+    dtype_vertex: PyObject,
     type_ndarray: PyObject,
     // Functions.
     empty: *const PyArray_Empty,
@@ -160,9 +162,36 @@ pub fn initialise(py: Python) -> PyResult<()> {
             .into_py(py)
     };
 
+    let dtype_track: PyObject = {
+        let arg: [PyObject; 5] = [
+            ("event", "u8").into_py(py),
+            ("tid", "i4").into_py(py),
+            ("parent", "i4").into_py(py),
+            ("pid", "i4").into_py(py),
+            ("creator", "S16").into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
+
     let dtype_u16: PyObject = dtype
         .call1(("u2",))?
         .into_py(py);
+
+    let dtype_vertex: PyObject = {
+        let arg: [PyObject; 6] = [
+            ("event", "u8").into_py(py),
+            ("tid", "i4").into_py(py),
+            ("energy", "f8").into_py(py),
+            ("position", "f8", 3).into_py(py),
+            ("direction", "f8", 3).into_py(py),
+            ("process", "S16").into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
 
     // Parse C interface.
     // See e.g. numpy/_core/code_generators/numpy_api.py for API mapping.
@@ -190,7 +219,9 @@ pub fn initialise(py: Python) -> PyResult<()> {
         dtype_point_deposit,
         dtype_primary,
         dtype_total_deposit,
+        dtype_track,
         dtype_u16,
+        dtype_vertex,
         type_ndarray: object(2),
         // Functions.
         empty:               function(184) as *const PyArray_Empty,
@@ -664,6 +695,13 @@ impl Dtype for TotalDeposit {
     }
 }
 
+impl Dtype for Track {
+    #[inline]
+    fn dtype(py: Python) -> PyResult<PyObject> {
+        Ok(api(py).dtype_track.clone_ref(py))
+    }
+}
+
 impl Dtype for u16 {
     #[inline]
     fn dtype(py: Python) -> PyResult<PyObject> {
@@ -671,6 +709,12 @@ impl Dtype for u16 {
     }
 }
 
+impl Dtype for Vertex {
+    #[inline]
+    fn dtype(py: Python) -> PyResult<PyObject> {
+        Ok(api(py).dtype_vertex.clone_ref(py))
+    }
+}
 
 //================================================================================================
 // Control flags for Numpy arrays.

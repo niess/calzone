@@ -177,7 +177,7 @@ pub mod ffi {
 
     // ===========================================================================================
     //
-    // Tracker interface. // XXX needed?
+    // Tracker interface.
     //
     // ===========================================================================================
 
@@ -318,5 +318,7 @@ pub mod ffi {
             start: &G4ThreeVector,
             end: &G4ThreeVector,
         );
+        fn push_track(self: &mut RunAgent, mut track: Track);
+        fn push_vertex(self: &mut RunAgent, mut vertex: Vertex);
     }
 }
