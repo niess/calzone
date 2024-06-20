@@ -1,10 +1,14 @@
 use crate::utils::error::variant_error;
-use crate::utils::numpy::{PyArray, PyUntypedArray};
+use crate::utils::numpy::{Dtype, PyArray, PyArrayFlags, PyUntypedArray};
+use derive_more::{AsMut, AsRef, From};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
+use pyo3::pyclass::{boolean_struct::False, PyClass};
+use pyo3::sync::GILOnceCell;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 use super::ffi;
+use std::pin::Pin;
 
 
 // ===============================================================================================
@@ -107,6 +111,8 @@ impl DepositsCell {
     }
 
     fn export(self, py: Python) -> PyResult<PyObject> {
+        static TUPLE: GILOnceCell<PyObject> = GILOnceCell::new();
+
         let deposits = match self {
             Self::Brief(mut deposits) => {
                 let array = PyArray::<TotalDeposit>::empty(py, &[deposits.total.len()])?;
@@ -120,7 +126,16 @@ impl DepositsCell {
                 array.into_py(py)
             },
             Self::Detailed(deposits) => {
-                unimplemented!()
+                let line = Export::export::<LineDepositsExport>(py, deposits.line)?;
+                let point = Export::export::<PointDepositsExport>(py, deposits.point)?;
+                let tuple = TUPLE.get_or_try_init(py, || py.import_bound("collections")
+                    .and_then(|m| m.getattr("namedtuple"))
+                    .and_then(|m| m.call1(("Deposits", ["line", "point"])))
+                    .map(|m| m.unbind())
+                )?.bind(py);
+                tuple.set_item(0, line)?;
+                tuple.set_item(1, point)?;
+                tuple.clone().unbind()
             },
         };
         Ok(deposits)
@@ -186,4 +201,50 @@ pub struct PointDeposit {
 pub struct TotalDeposit {
     event: usize,
     value: f64,
+}
+
+#[derive(AsMut, AsRef, From)]
+#[pyclass(module="calzone")]
+struct LineDepositsExport (Export<LineDeposit>);
+
+#[derive(AsMut, AsRef, From)]
+#[pyclass(module="calzone")]
+struct PointDepositsExport (Export<PointDeposit>);
+
+
+// ===============================================================================================
+//
+// Generic export of Vec<T> data as a PyArray<T> (avoiding clone/copy).
+//
+// Note: The Vec<T> data are pinned to a PyClass which owns the memory wraped by the NumPy array.
+// However, since PyClass does not support generics, we first define a generic Export<T> struct,
+// Then, the PyClass derives AsMut<Export<T>> and AsRef<Export<T>> in order to be exportable.
+//
+// ===============================================================================================
+
+#[repr(transparent)]
+struct Export<T: Sized> (Pin<Box<[T]>>);
+
+impl<T> Export<T>
+where
+    T: Copy + Dtype + Sized,
+{
+    fn export<'py, W>(py: Python<'py>, values: Vec<T>) -> PyResult<PyObject>
+    where
+        W: AsMut<Self> + AsRef<Self> + From<Self> + Into<PyClassInitializer<W>> +
+           PyClass<Frozen = False>,
+    {
+        let ob: W = (Self (Box::pin([]))).into();
+        let ob: Bound<'py, W> = Bound::new(py, ob)?;
+        ob.borrow_mut().as_mut().0 = Box::into_pin(values.into_boxed_slice());
+        let binding = ob.borrow();
+        let array: &PyAny = PyArray::<T>::from_data(
+            py,
+            &binding.as_ref().0,
+            ob.as_any(),
+            PyArrayFlags::ReadWrite,
+            None
+        )?;
+        Ok(array.into())
+    }
 }

@@ -8,6 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 cxx = "1.0"
+derive_more = "0.99"
 enum-variants-strings = "0.3"
 getrandom = "0.2"
 indexmap = "2.2"

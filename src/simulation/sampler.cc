@@ -6,32 +6,7 @@
 
 SamplerImpl::SamplerImpl() :
     G4VSensitiveDetector("sampler") {
-    this->collectionName.insert("hits");
-
-    // Translation.
-    this->processes["annihil"] = "Annihilation";
-    this->processes["compt"] = "Compton";
-    this->processes["conv"] = "Conversion";
-    this->processes["CoulombScat"] = "Coulomb";
-    this->processes["eBrem"] = "Bremsstrahlung";
-    this->processes["eIoni"] = "Ionisation";
-    this->processes["electronNuclear"] = "Photonuclear";
-    this->processes["hadElastic"] = "Elastic";
-    this->processes["hBrems"] = "Bresstrahlung";
-    this->processes["hIoni"] = "Ionisation";
-    this->processes["hPairProd"] = "PairProduction";
-    this->processes["ionIoni"] = "Ionisation";
-    this->processes["muIoni"] = "Ionisation";
-    this->processes["muMinusCaptureAtRest"] = "Capture";
-    this->processes["muonNuclear"] = "Photonuclear";
-    this->processes["muPairProd"] = "PairProduction";
-    this->processes["msc"] = "Elastic";
-    this->processes["nCapture"] = "Capture";
-    this->processes["neutronInelastic"] = "Inelastic";
-    this->processes["phot"] = "Photoelectric";
-    this->processes["protonInelastic"] = "Inelastic";
-    this->processes["Rayl"] = "Rayleigh";
-    this->processes["Transportation"] = "Transport";
+    this->collectionName.insert("deposits");
 }
 
 G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {

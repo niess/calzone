@@ -11,6 +11,4 @@ struct SamplerImpl : public G4VSensitiveDetector {
 
 private:
     SamplerImpl();
-
-    std::map<std::string, std::string> processes;
 };
