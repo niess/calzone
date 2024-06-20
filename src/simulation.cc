@@ -3,6 +3,7 @@
 #include "simulation/geometry.h"
 #include "simulation/physics.h"
 #include "simulation/random.h"
+#include "simulation/sampler.h"
 #include "simulation/source.h"
 // Geant4 interface.
 #include "G4GDMLParser.hh"
@@ -58,6 +59,9 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
     // Enable the random engine.
     auto && randomImpl = RandomImpl::Get();
     randomImpl->Switch();
+
+    // Activate (or not) the sampler.
+    SamplerImpl::Get()->Activate(RUN_AGENT->is_sampler());
 
     // Process events in bunches (in order to check for Ctrl+C).
     constexpr int bunch_size = 100;

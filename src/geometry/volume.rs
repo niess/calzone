@@ -26,6 +26,7 @@ use super::map::Map;
 pub struct Volume {
     pub(super) name: String,
     pub(super) material: String,
+    pub(super) sensitive: bool,
     shape: Shape,
     pub(super) position: Option<f64x3>,
     pub(super) rotation: Option<f64x3x3>,
@@ -95,8 +96,9 @@ impl TryFromBound for Volume {
             .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
 
         // Extract base properties.
-        const EXTRACTOR: Extractor<4> = Extractor::new([
+        const EXTRACTOR: Extractor<5> = Extractor::new([
             Property::required_str("material"),
+            Property::new_bool("sensitive", false),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
             Property::optional_dict("overlaps"),
@@ -105,12 +107,13 @@ impl TryFromBound for Volume {
 
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, position, rotation, overlaps] = EXTRACTOR.extract(
+        let [material, sensitive, position, rotation, overlaps] = EXTRACTOR.extract(
             &tag, value, Some(&mut remainder)
         )?;
 
         let name = tag.name().to_string();
         let material: String = material.into();
+        let sensitive: bool = sensitive.into();
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
         let overlaps: Option<Bound<PyDict>> = overlaps.into();
@@ -247,7 +250,9 @@ impl TryFromBound for Volume {
             },
         };
 
-        let volume = Self { name, material, shape, position, rotation, volumes, overlaps };
+        let volume = Self {
+            name, material, sensitive, shape, position, rotation, volumes, overlaps
+        };
         Ok(volume)
     }
 }
@@ -486,6 +491,10 @@ impl Volume {
             Some(rotation) => rotation.as_ref(),
             None => unreachable!(),
         }
+    }
+
+    pub fn sensitive(&self) -> bool {
+        self.sensitive
     }
 
     pub fn shape(&self) -> ffi::ShapeType {

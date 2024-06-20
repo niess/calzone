@@ -2,11 +2,11 @@ use crate::utils::error::variant_error;
 use crate::utils::numpy::{Dtype, PyArray, PyArrayFlags, PyUntypedArray};
 use derive_more::{AsMut, AsRef, From};
 use enum_variants_strings::EnumVariantsStrings;
+use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::pyclass::{boolean_struct::False, PyClass};
 use pyo3::sync::GILOnceCell;
 use pyo3::types::PyDict;
-use std::collections::HashMap;
 use super::ffi;
 use std::pin::Pin;
 
@@ -41,18 +41,18 @@ impl IntoPy<PyObject> for SamplerMode {
 
 pub struct Deposits {
     mode: SamplerMode,
-    values: HashMap<*const ffi::G4VPhysicalVolume, DepositsCell>,
+    values: IndexMap<*const ffi::G4VPhysicalVolume, DepositsCell>,
 }
 
 impl Deposits {
     pub fn new(mode: SamplerMode) -> Self {
-        let values = HashMap::new();
+        let values = IndexMap::new();
         Self { mode, values }
     }
 
     pub fn export(mut self, py: Python) -> PyResult<PyObject> {
         let data = PyDict::new_bound(py);
-        for (volume, deposits) in self.values.drain() {
+        for (volume, deposits) in self.values.drain(..) {
             let volume: &ffi::G4VPhysicalVolume = unsafe { &*volume };
             let volume = ffi::as_str(volume.GetName());
             let deposits = deposits.export(py)?;
@@ -93,7 +93,7 @@ enum DepositsCell {
 
 #[derive(Default)]
 struct BriefDeposits {
-    total: HashMap<usize, f64>,
+    total: IndexMap<usize, f64>,
 }
 
 #[derive(Default)]
@@ -111,16 +111,14 @@ impl DepositsCell {
     }
 
     fn export(self, py: Python) -> PyResult<PyObject> {
-        static TUPLE: GILOnceCell<PyObject> = GILOnceCell::new();
+        static NAMED_TUPLE: GILOnceCell<PyObject> = GILOnceCell::new();
 
         let deposits = match self {
             Self::Brief(mut deposits) => {
                 let array = PyArray::<TotalDeposit>::empty(py, &[deposits.total.len()])?;
-                let a = unsafe { array.slice_mut()? };
-                for (i, (event, value)) in deposits.total.drain().enumerate() {
-                    let mut ai = a[i];
-                    ai.event = event;
-                    ai.value = value;
+                for (i, (event, value)) in deposits.total.drain(..).enumerate() {
+                    let deposit = TotalDeposit { event, value };
+                    array.set(i, deposit)?;
                 }
                 let array: &PyUntypedArray = array.into();
                 array.into_py(py)
@@ -128,14 +126,13 @@ impl DepositsCell {
             Self::Detailed(deposits) => {
                 let line = Export::export::<LineDepositsExport>(py, deposits.line)?;
                 let point = Export::export::<PointDepositsExport>(py, deposits.point)?;
-                let tuple = TUPLE.get_or_try_init(py, || py.import_bound("collections")
+                let tuple = NAMED_TUPLE.get_or_try_init(py, || py.import_bound("collections")
                     .and_then(|m| m.getattr("namedtuple"))
                     .and_then(|m| m.call1(("Deposits", ["line", "point"])))
                     .map(|m| m.unbind())
                 )?.bind(py);
-                tuple.set_item(0, line)?;
-                tuple.set_item(1, point)?;
-                tuple.clone().unbind()
+                let deposits = tuple.call1((line, point))?;
+                deposits.unbind()
             },
         };
         Ok(deposits)

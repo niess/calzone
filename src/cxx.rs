@@ -68,6 +68,7 @@ pub mod ffi {
     struct VolumeInfo { // From Geant4.
         material: String,
         solid: String,
+        sensitive: bool,
         mother: String,
         daughters: Vec<String>,
     }
@@ -289,6 +290,7 @@ pub mod ffi {
         fn overlaps(self: &Volume) -> &[[String; 2]];
         fn position(self: &Volume) -> [f64; 3];
         fn rotation(self: &Volume) -> &[[f64; 3]];
+        fn sensitive(self: &Volume) -> bool;
         fn shape(self: &Volume) -> ShapeType;
         fn sphere_shape(self: &Volume) -> &SphereShape;
         fn tessellated_shape(self: &Volume) -> &TessellatedShape;
@@ -303,7 +305,6 @@ pub mod ffi {
 
         fn events(self: &RunAgent) -> usize;
         unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
-        fn index(self: &RunAgent) -> usize; // XXX needed?
         fn is_sampler(self: &RunAgent) -> bool;
         fn next_open01(self: &mut RunAgent) -> f64;
         unsafe fn next_primary<'b>(self: &'b mut RunAgent) -> &'b Primary;

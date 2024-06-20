@@ -1,4 +1,5 @@
 #include "calzone.h"
+#include "simulation/sampler.h"
 // standard library.
 #include <list>
 // fmt library.
@@ -374,7 +375,10 @@ static G4LogicalVolume * build_volumes(
         return nullptr;
     }
 
-    // XXX Set any sensitive detector.
+    // Set any sensitive detector.
+    if (volume.sensitive()) {
+        logical->SetSensitiveDetector(SamplerImpl::Get());
+    }
 
     // Build sub-volumes.
     for (auto && v: volume.volumes()) {
@@ -741,6 +745,7 @@ VolumeInfo GeometryBorrow::describe_volume(rust::Str name_) const {
         auto logical = volume->GetLogicalVolume();
         info.material = rust::String(logical->GetMaterial()->GetName());
         info.solid = rust::String(logical->GetSolid()->GetName());
+        info.sensitive = logical->GetSensitiveDetector() != nullptr;
         auto mother = this->data->mothers[volume];
         if (mother == nullptr) {
             info.mother = rust::String("");

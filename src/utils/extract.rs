@@ -200,6 +200,7 @@ pub struct Property {
 
 #[allow(dead_code)] // XXX needed?
 enum PropertyDefault {
+    Bool(bool),
     F64(f64),
     F64x3(f64x3),
     F64x3x3(f64x3x3),
@@ -211,6 +212,7 @@ enum PropertyDefault {
 
 enum PropertyType {
     Any,
+    Bool,
     Dict,
     F64,
     F64x3,
@@ -221,6 +223,7 @@ enum PropertyType {
 
 pub enum PropertyValue<'py> {
     Any(Bound<'py, PyAny>),
+    Bool(bool),
     Dict(Bound<'py, PyDict>),
     F64(f64),
     F64x3(f64x3),
@@ -306,6 +309,12 @@ impl Property {
     }
 
     // Defaulted constructors.
+    pub const fn new_bool(name: &'static str, default: bool) -> Self {
+        let tp = PropertyType::Bool;
+        let default = PropertyDefault::Bool(default);
+        Self::new(name, tp, default)
+    }
+
     pub const fn new_f64(name: &'static str, default: f64) -> Self {
         let tp = PropertyType::F64;
         let default = PropertyDefault::F64(default);
@@ -431,6 +440,11 @@ impl Property {
                     .or_else(bad_property)?;
                 PropertyValue::Any(value)
             },
+            PropertyType::Bool => {
+                let value: bool = extract(value)
+                    .or_else(bad_property)?;
+                PropertyValue::Bool(value)
+            },
             PropertyType::Dict => {
                 let value: Bound<PyDict> = extract(value)
                     .or_else(bad_property)?;
@@ -487,6 +501,7 @@ impl<'py> PropertyValue<'py> {
 impl<'py> From<&PropertyDefault> for PropertyValue<'py> {
     fn from(value: &PropertyDefault) -> Self {
         match value {
+            PropertyDefault::Bool(value) => Self::Bool(*value),
             PropertyDefault::F64(value) => Self::F64(*value),
             PropertyDefault::F64x3(value) => Self::F64x3(*value),
             PropertyDefault::F64x3x3(value) => Self::F64x3x3(*value),
@@ -511,6 +526,25 @@ impl<'py> From<PropertyValue<'py>> for Option<Bound<'py, PyAny>> {
     fn from(value: PropertyValue<'py>) -> Option<Bound<'py, PyAny>> {
         match value {
             PropertyValue::Any(value) => Some(value),
+            PropertyValue::None => None,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for bool {
+    fn from(value: PropertyValue<'py>) -> bool {
+        match value {
+            PropertyValue::Bool(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<bool> {
+    fn from(value: PropertyValue<'py>) -> Option<bool> {
+        match value {
+            PropertyValue::Bool(value) => Some(value),
             PropertyValue::None => None,
             _ => unreachable!(),
         }
@@ -709,6 +743,10 @@ where
     fn type_name() -> &'static str {
         T::type_name()
     }
+}
+
+impl TypeName for bool {
+    fn type_name() -> &'static str { "a 'bool'" }
 }
 
 impl TypeName for f64 {

@@ -44,6 +44,7 @@ impl Simulation {
         geometry: Option<GeometryArg>,
         physics: Option<PhysicsArg>,
         random: Option<&Bound<'py, Random>>,
+        sampler: Option<SamplerMode>,
     ) -> PyResult<Self> {
         let geometry = geometry
             .map(|geometry| {
@@ -60,7 +61,7 @@ impl Simulation {
         let random = random
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
-        let sampler = Some(SamplerMode::Brief);
+        let sampler = sampler.or_else(|| Some(SamplerMode::Brief));
         let simulation = Self { geometry, physics, random, sampler };
         Ok(simulation)
     }
@@ -191,10 +192,6 @@ impl<'a> RunAgent<'a> {
 
     pub fn geometry<'b>(&'b self) -> &'b ffi::GeometryBorrow {
         self.geometry.as_ref().unwrap()
-    }
-
-    pub fn index(&self) -> usize {
-        self.index
     }
 
     pub fn is_sampler(&self) -> bool {

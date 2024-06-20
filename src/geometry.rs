@@ -43,7 +43,7 @@ impl Geometry {
     }
 
     fn __getitem__(&self, volume: &str) -> PyResult<Volume> {
-        let ffi::VolumeInfo { material, solid, mother, daughters } =
+        let ffi::VolumeInfo { material, solid, sensitive, mother, daughters } =
             self.0.describe_volume(volume);
         if let Some(msg) = ffi::get_error().value() {
             let err = Error::new(IndexError).what("volume").why(msg);
@@ -59,6 +59,7 @@ impl Geometry {
             name: volume.to_string(),
             material,
             solid,
+            sensitive,
             mother,
             daughters,
         };
@@ -314,6 +315,8 @@ pub struct Volume {
     material: String,
     #[pyo3(get)]
     solid: String,
+    #[pyo3(get)]
+    sensitive: bool,
     #[pyo3(get)]
     mother: Option<String>,
     daughters: Vec<String>,
