@@ -182,18 +182,12 @@ pub mod ffi {
     // ===========================================================================================
 
     #[derive(Clone, Copy)]
-    struct Process {
-        b0: u64,
-        b1: u64,
-    }
-
-    #[derive(Clone, Copy)]
     struct Track {
         event: usize,
         tid: i32,
         parent: i32,
         pid: i32,
-        creator: Process,
+        creator: [u8; 16],
     }
 
     #[derive(Clone, Copy)]
@@ -203,7 +197,7 @@ pub mod ffi {
         energy: f64,
         position: [f64; 3],
         direction: [f64; 3],
-        process: Process,
+        process: [u8; 16],
     }
 
     // ===========================================================================================
@@ -306,6 +300,7 @@ pub mod ffi {
         fn events(self: &RunAgent) -> usize;
         unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
         fn is_sampler(self: &RunAgent) -> bool;
+        fn is_tracker(self: &RunAgent) -> bool;
         fn next_open01(self: &mut RunAgent) -> f64;
         unsafe fn next_primary<'b>(self: &'b mut RunAgent) -> &'b Primary;
         unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;

@@ -5,6 +5,7 @@
 #include "simulation/random.h"
 #include "simulation/sampler.h"
 #include "simulation/source.h"
+#include "simulation/tracker.h"
 // Geant4 interface.
 #include "G4GDMLParser.hh"
 #include "G4RunManager.hh"
@@ -49,6 +50,14 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
                                              // physics.
         manager->SetUserAction(sourceImpl);
         manager->Initialize();
+    }
+
+    if (RUN_AGENT->is_tracker()) {
+        manager->SetUserAction(TrackingImpl::Get());
+        manager->SetUserAction(SteppingImpl::Get());
+    } else {
+        manager->SetUserAction(TrackingImpl::None());
+        manager->SetUserAction(SteppingImpl::None());
     }
 
     if (verbose) {

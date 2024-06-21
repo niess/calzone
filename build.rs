@@ -37,6 +37,7 @@ fn main() {
         "src/simulation/random.cc",
         "src/simulation/sampler.cc",
         "src/simulation/source.cc",
+        "src/simulation/tracker.cc",
         "src/utils/convert.cc",
         "src/utils/error.cc",
         "src/utils/units.cc",
@@ -49,6 +50,7 @@ fn main() {
         "src/simulation/random.h",
         "src/simulation/sampler.h",
         "src/simulation/source.h",
+        "src/simulation/tracker.h",
     ];
 
     cxx_build::bridge("src/cxx.rs")

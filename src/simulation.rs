@@ -223,6 +223,10 @@ impl<'a> RunAgent<'a> {
         self.deposits.is_some()
     }
 
+    pub fn is_tracker(&self) -> bool {
+        self.tracker.is_some()
+    }
+
     fn new(
         py: Python,
         simulation: &Simulation,
