@@ -475,8 +475,7 @@ impl Map {
 impl Map {
     fn from_png<'py>(py: Python, path: &str) -> PyResult<Self> {
         // Open png file and parse metadata.
-        let image = py.import_bound("PIL")
-            .and_then(|m| m.getattr("Image"))
+        let image = py.import_bound("PIL.Image")
             .and_then(|m| m.getattr("open"))
             .and_then(|f| f.call1((path,)))?;
 
@@ -608,8 +607,7 @@ impl Map {
             zmin,
             zmax,
         );
-        let pil = py.import_bound("PIL")?;
-        let info = pil
+        let info = py.import_bound("PIL")
             .getattr("PngImagePlugin")
             .and_then(|m| m.getattr("PngInfo"))
             .and_then(|c| c.call0())?;
@@ -618,8 +616,7 @@ impl Map {
         // Save as png file.
         let kwargs = PyDict::new_bound(py);
         kwargs.set_item("pnginfo", info)?;
-        let image = pil
-            .getattr("Image")
+        let image = py.import_bound("PIL.Image")
             .and_then(|m| m.getattr("fromarray"))
             .and_then(|f| f.call1((array,)))?;
         image.call_method("save", (path,), Some(&kwargs))?;
