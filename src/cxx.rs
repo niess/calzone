@@ -1,4 +1,5 @@
 use crate::geometry::volume::Volume;
+use crate::geometry::tessellation::{SortedTessels, sort_tessels};
 use crate::simulation::RunAgent;
 use crate::utils::error::ctrlc_catched;
 
@@ -41,6 +42,13 @@ pub mod ffi {
         radius: f64,
         length: f64,
         thickness: f64,
+    }
+
+    #[repr(u32)]
+    enum EInside {
+      kOutside,
+      kSurface,
+      kInside,
     }
 
     struct EnvelopeShape {
@@ -227,6 +235,8 @@ pub mod ffi {
         fn get_error() -> SharedPtr<Error>;
 
         // Geometry interface.
+        type EInside;
+
         type GeometryBorrow;
         fn create_geometry(volume: &Box<Volume>) -> SharedPtr<GeometryBorrow>;
 
@@ -259,6 +269,9 @@ pub mod ffi {
 
         type G4ThreeVector;
         fn to_vec(value: &G4ThreeVector) -> [f64; 3];
+        fn x(self: &G4ThreeVector) -> f64;
+        fn y(self: &G4ThreeVector) -> f64;
+        fn z(self: &G4ThreeVector) -> f64;
     }
 
     // ===========================================================================================
@@ -289,6 +302,27 @@ pub mod ffi {
         fn sphere_shape(self: &Volume) -> &SphereShape;
         fn tessellated_shape(self: &Volume) -> &TessellatedShape;
         fn volumes(self: &Volume) -> &[Volume];
+
+        type SortedTessels;
+        fn sort_tessels(shape: &TessellatedShape) -> Box<SortedTessels>;
+
+        fn area(self: &SortedTessels) -> f64;
+        fn distance_to_in(
+            self: &SortedTessels,
+            point: &G4ThreeVector,
+            direction: &G4ThreeVector
+        ) -> f64;
+        fn distance_to_out(
+            self: &SortedTessels,
+            point: &G4ThreeVector,
+            direction: &G4ThreeVector,
+            index: &mut i64,
+        ) -> f64;
+        fn envelope(self: &SortedTessels) -> [[f64; 3]; 2];
+        fn inside(self: &SortedTessels, point: &G4ThreeVector, delta: f64) -> EInside;
+        fn normal(self: &SortedTessels, index: usize) -> [f64; 3];
+        fn surface_normal(self: &SortedTessels, point: &G4ThreeVector) -> [f64; 3];
+        fn surface_point(self: &SortedTessels, index: f64, u: f64, v: f64) -> [f64; 3];
 
         // Materials interface.
         fn get_hash(self: &Mixture) -> u64;

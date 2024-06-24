@@ -4,15 +4,21 @@
 #include "source.h"
 // Geant4 interafce.
 #include "G4Event.hh"
+#include "G4Geantino.hh"
 #include "G4ParticleTable.hh"
 #include "G4RunManager.hh"
 
 
 void SourceImpl::GeneratePrimaries(G4Event * event) {
     auto primary = RUN_AGENT->next_primary();
-    auto definition = G4ParticleTable::GetParticleTable()->FindParticle(
-        primary.pid
-    );
+    G4ParticleDefinition * definition;
+    if (primary.pid != 0) {
+        definition = G4ParticleTable::GetParticleTable()->FindParticle(
+            primary.pid
+        );
+    } else {
+        definition = G4Geantino::Definition();
+    }
     if (definition == nullptr) {
         event->SetEventAborted();
         auto manager = G4RunManager::GetRunManager();

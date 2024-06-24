@@ -15,6 +15,7 @@ mod goupil;
 mod map;
 pub mod materials;
 pub mod volume;
+pub mod tessellation;
 
 pub use map:: Map;
 pub use materials::MaterialsDefinition;

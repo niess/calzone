@@ -1,4 +1,5 @@
 #include "calzone.h"
+#include "geometry/tessellation.h"
 #include "simulation/sampler.h"
 // standard library.
 #include <list>
@@ -174,10 +175,11 @@ static G4VSolid * build_envelope(
     }
 }
 
-static G4TessellatedSolid * build_tessellation(
+static G4VSolid * build_tessellation(
     const std::string & pathname,
     const Volume & volume
 ) {
+    /*
     auto solid = new G4TessellatedSolid(pathname);
     if (solid == nullptr) {
         set_error(ErrorType::MemoryError, "");
@@ -210,8 +212,11 @@ static G4TessellatedSolid * build_tessellation(
         }
     }
     solid->SetSolidClosed(true);
-
     return solid;
+    */
+
+    auto && shape = volume.tessellated_shape();
+    return new TessellatedSolid(pathname, shape);
 }
 
 static G4VSolid * build_solids(

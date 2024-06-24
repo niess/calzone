@@ -118,9 +118,21 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
             { u.x(), u.y(), u.z() },
             0x0
         };
+        /*
         auto process = p->GetProcessDefinedStep();
         if (process != nullptr) {
             auto && name = TRANSLATOR.translate(process->GetProcessName());
+            auto dst = (char *)(&vertex.process);
+            std::strncpy(
+                dst,
+                name.c_str(),
+                sizeof(vertex.process) - 1
+            );
+        }
+        */
+        auto volume = p->GetPhysicalVolume();
+        if (volume != nullptr) {
+            auto && name = volume->GetName();
             auto dst = (char *)(&vertex.process);
             std::strncpy(
                 dst,

@@ -607,7 +607,7 @@ impl Map {
             zmin,
             zmax,
         );
-        let info = py.import_bound("PIL")
+        let info = py.import_bound("PIL")?
             .getattr("PngImagePlugin")
             .and_then(|m| m.getattr("PngInfo"))
             .and_then(|c| c.call0())?;
