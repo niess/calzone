@@ -247,7 +247,7 @@ impl SortedTessels {
         }
 
         // Otherwise, let us check if the point actually lies outside of the bounding box.
-        if !self.envelope.contains(&point) {
+        if !self.envelope.approx_contains_eps(&point, delta) {
             return ffi::EInside::kOutside;
         }
 
@@ -313,7 +313,7 @@ impl SortedTessels {
         self.facets[index].normal.into()
     }
 
-    pub fn surface_normal(&self, point: &ffi::G4ThreeVector) -> [f64; 3] {
+    pub fn surface_normal(&self, point: &ffi::G4ThreeVector, delta: f64) -> [f64; 3] {
         struct Match {
             normal: [f64; 3],
             distance: f64,
@@ -324,7 +324,8 @@ impl SortedTessels {
                 &mut self,
                 tessels: &SortedTessels,
                 node_index: usize,
-                point: &Point3<f64>
+                point: &Point3<f64>,
+                delta: f64,
             ) {
                 match &tessels.tree.nodes[node_index] {
                     BvhNode::Leaf{shape_index, ..} => {
@@ -337,11 +338,11 @@ impl SortedTessels {
                     },
                     BvhNode::Node{child_l_index, child_l_aabb,
                                   child_r_index, child_r_aabb, ..} => {
-                        if child_l_aabb.contains(&point) {
-                            self.inspect(tessels, *child_l_index, point)
+                        if child_l_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(tessels, *child_l_index, point, delta)
                         }
-                        if child_r_aabb.contains(&point) {
-                            self.inspect(tessels, *child_r_index, point)
+                        if child_r_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(tessels, *child_r_index, point, delta)
                         }
                     },
                 }
@@ -350,7 +351,7 @@ impl SortedTessels {
 
         let point = Point3::new(point.x(), point.y(), point.z());
         let mut closest = Match { normal: [0.0; 3], distance: f64::INFINITY };
-        closest.inspect(self, 0, &point);
+        closest.inspect(self, 0, &point, delta);
         closest.normal
     }
 

@@ -211,6 +211,7 @@ pub mod ffi {
         energy: f64,
         position: [f64; 3],
         direction: [f64; 3],
+        volume: [u8; 16],
         process: [u8; 16],
     }
 
@@ -330,7 +331,7 @@ pub mod ffi {
         fn envelope(self: &SortedTessels) -> [[f64; 3]; 2];
         fn inside(self: &SortedTessels, point: &G4ThreeVector, delta: f64) -> EInside;
         fn normal(self: &SortedTessels, index: usize) -> [f64; 3];
-        fn surface_normal(self: &SortedTessels, point: &G4ThreeVector) -> [f64; 3];
+        fn surface_normal(self: &SortedTessels, point: &G4ThreeVector, delta: f64) -> [f64; 3];
         fn surface_point(self: &SortedTessels, index: f64, u: f64, v: f64) -> [f64; 3];
 
         // Materials interface.

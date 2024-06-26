@@ -141,7 +141,8 @@ EInside TessellatedSolid::Inside(const G4ThreeVector & position) const {
 G4ThreeVector TessellatedSolid::SurfaceNormal(
     const G4ThreeVector & position
 ) const {
-    auto && normal = this->tessels->surface_normal(position);
+    const double delta = 0.5 * kCarTolerance;
+    auto && normal = this->tessels->surface_normal(position, delta);
     return G4ThreeVector(normal[0], normal[1], normal[2]);
 }
 

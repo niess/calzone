@@ -116,23 +116,24 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
             p->GetKineticEnergy() / CLHEP::MeV,
             { r.x(), r.y(), r.z() },
             { u.x(), u.y(), u.z() },
-            0x0
+            { 0x0 },
+            { 0x0 }
         };
-        /*
-        auto process = p->GetProcessDefinedStep();
-        if (process != nullptr) {
-            auto && name = TRANSLATOR.translate(process->GetProcessName());
-            auto dst = (char *)(&vertex.process);
+        auto volume = p->GetPhysicalVolume();
+        if (volume != nullptr) {
+            std::string name;
+            std::istringstream stream(volume->GetName());
+            while (getline(stream, name, '.')) {}
+            auto dst = (char *)(&vertex.volume);
             std::strncpy(
                 dst,
                 name.c_str(),
-                sizeof(vertex.process) - 1
+                sizeof(vertex.volume) - 1
             );
         }
-        */
-        auto volume = p->GetPhysicalVolume();
-        if (volume != nullptr) {
-            auto && name = volume->GetName();
+        auto process = p->GetProcessDefinedStep();
+        if (process != nullptr) {
+            auto && name = TRANSLATOR.translate(process->GetProcessName());
             auto dst = (char *)(&vertex.process);
             std::strncpy(
                 dst,
