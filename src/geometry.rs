@@ -207,6 +207,7 @@ impl GeometryBuilder {
         material: Option<String>,
         position: Option<f64x3>,
         rotation: Option<f64x3x3>,
+        sensitive: Option<bool>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
         let mut builder = slf.borrow_mut();
         let volume = builder.find_mut(volume)?;
@@ -226,6 +227,9 @@ impl GeometryBuilder {
         }
         if let Some(rotation) = rotation {
             volume.rotation = Some(rotation);
+        }
+        if let Some(sensitive) = sensitive {
+            volume.sensitive = sensitive;
         }
         Ok(slf)
     }

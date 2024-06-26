@@ -127,17 +127,21 @@ impl Map {
             Some("stl") | Some("STL") => {
                 let mut origin: Option<f64x3> = None;
                 let mut min_depth: Option<f64> = None;
+                let mut regular: Option<bool> = None;
                 if let Some(kwargs) = kwargs {
-                    const EXTRACTOR: Extractor<2> = Extractor::new([
+                    const EXTRACTOR: Extractor<3> = Extractor::new([
                         Property::optional_vec("origin"),
                         Property::optional_f64("min_depth"),
+                        Property::optional_bool("regular"),
                     ]);
                     let tag = Tag::new("dump", "", None);
-                    let [center, depth] = EXTRACTOR.extract_any(&tag, kwargs, None)?;
+                    let [center, depth, reg] = EXTRACTOR.extract_any(&tag, kwargs, None)?;
                     origin = center.into();
                     min_depth = depth.into();
+                    regular = reg.into();
                 }
-                let facets = self.tessellate(py, origin, min_depth)?;
+                let regular = regular.unwrap_or(false);
+                let facets = self.tessellate(py, regular, origin, min_depth)?;
                 dump_stl(&facets, &path)
             },
             Some(other) => {
@@ -185,6 +189,7 @@ impl Map {
     pub fn tessellate(
         &self,
         py: Python,
+        regular: bool,
         origin: Option<f64x3>,
         min_depth: Option<f64>,
     ) -> PyResult<Vec<f32>> {
@@ -242,7 +247,7 @@ impl Map {
             z[i * nx + j]
         };
 
-        let size = 36 * (nx * ny - 1);
+        let size = if regular { 36 * (nx * ny - 1) } else { 18 * ((nx + 1) * (ny + 1) - 3) };
         let mut facets = Vec::<f32>::with_capacity(size);
 
         struct Vertex (f32, f32, f32);
@@ -372,25 +377,38 @@ impl Map {
         }
 
         // Tessellate the bottom face.
-        //
-        // Note that we need to reproduce the top grid, despite the bottom surface being flat,
-        // otherwise Geant4 does not recognise the mesh as being closed.
-        let mut y0 = get_y(0);
-        for i in 0..(ny - 1) {
-            let y1 = get_y(i + 1);
-            let mut x0 = get_x(0);
-            for j in 0..(nx - 1) {
-                let x1 = get_x(j + 1);
-                push(
-                    right,
-                    vertex(x0, y0, zbot),
-                    vertex(x1, y0, zbot),
-                    vertex(x1, y1, zbot),
-                    vertex(x0, y1, zbot),
-                );
-                x0 = x1;
+        if regular {
+            // We reproduce the top grid, despite the bottom surface being flat, otherwise Geant4
+            // does not recognise the mesh as being closed.
+            let mut y0 = get_y(0);
+            for i in 0..(ny - 1) {
+                let y1 = get_y(i + 1);
+                let mut x0 = get_x(0);
+                for j in 0..(nx - 1) {
+                    let x1 = get_x(j + 1);
+                    push(
+                        right,
+                        vertex(x0, y0, zbot),
+                        vertex(x1, y0, zbot),
+                        vertex(x1, y1, zbot),
+                        vertex(x0, y1, zbot),
+                    );
+                    x0 = x1;
+                }
+                y0 = y1;
             }
-            y0 = y1;
+        } else {
+            let x0 = get_x(0);
+            let x1 = get_x(nx - 1);
+            let y0 = get_y(0);
+            let y1 = get_y(ny - 1);
+            push(
+                right,
+                vertex(x0, y0, zbot),
+                vertex(x1, y0, zbot),
+                vertex(x1, y1, zbot),
+                vertex(x0, y1, zbot),
+            );
         }
 
         Ok(facets)

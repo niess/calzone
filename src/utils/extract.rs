@@ -352,6 +352,12 @@ impl Property {
         Self::new(name, tp, default)
     }
 
+    pub const fn optional_bool(name: &'static str) -> Self {
+        let tp = PropertyType::Bool;
+        let default = PropertyDefault::Optional;
+        Self::new(name, tp, default)
+    }
+
     pub const fn optional_dict(name: &'static str) -> Self {
         let tp = PropertyType::Dict;
         let default = PropertyDefault::Optional;

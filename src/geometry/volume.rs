@@ -357,18 +357,20 @@ impl TryFromBound for ffi::TessellatedShape {
         let mut scale: f64 = 1.0;
         let mut origin: Option<f64x3> = None;
         let mut min_depth: Option<f64> = None;
+        let mut regular: Option<bool> = None;
         let path: PyResult<String> = value.extract();
         let path: String = match path {
             Err(_) => {
-                const EXTRACTOR: Extractor<4> = Extractor::new([
+                const EXTRACTOR: Extractor<5> = Extractor::new([
                     Property::required_str("path"),
                     Property::optional_str("units"),
                     Property::optional_vec("origin"),
                     Property::optional_f64("min_depth"),
+                    Property::optional_bool("regular"),
                 ]);
 
                 let tag = tag.cast("tessellation");
-                let [path, units, center, depth] = EXTRACTOR.extract_any(&tag, value, None)?;
+                let [path, units, center, depth, reg] = EXTRACTOR.extract_any(&tag, value, None)?;
                 if let PropertyValue::String(units) = units {
                     scale = convert(value.py(), units.as_str(), "cm")
                         .map_err(|e|
@@ -377,6 +379,7 @@ impl TryFromBound for ffi::TessellatedShape {
                 }
                 origin = center.into();
                 min_depth = depth.into();
+                regular = reg.into();
                 path.into()
             },
             Ok(path) => path,
@@ -408,6 +411,12 @@ impl TryFromBound for ffi::TessellatedShape {
                         .why("invalid option for STL format".to_string())
                         .to_err(ValueError);
                         return Err(err);
+                } else if regular.is_some() {
+                    let err = tag.bad()
+                        .what("regular")
+                        .why("invalid option for STL format".to_string())
+                        .to_err(ValueError);
+                        return Err(err);
                 } else {
                     load_stl(&path)
                 }
@@ -415,7 +424,8 @@ impl TryFromBound for ffi::TessellatedShape {
             Some("png") | Some("tif") => {
                 let py = value.py();
                 let map = Map::from_file(py, &path)?;
-                let facets = map.tessellate(py, origin, min_depth)?;
+                let regular = regular.unwrap_or(false);
+                let facets = map.tessellate(py, regular, origin, min_depth)?;
                 Ok(facets)
             },
             _ => return Err(PyNotImplementedError::new_err("")),
