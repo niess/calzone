@@ -73,6 +73,12 @@ pub mod ffi {
         facets: Vec<f32>,
     }
 
+    #[repr(i32)]
+    enum TSTAlgorithm {
+        Bvh,
+        Geant4,
+    }
+
     struct VolumeInfo { // From Geant4.
         material: String,
         solid: String,
@@ -238,7 +244,10 @@ pub mod ffi {
         type EInside;
 
         type GeometryBorrow;
-        fn create_geometry(volume: &Box<Volume>) -> SharedPtr<GeometryBorrow>;
+        fn create_geometry(
+            volume: &Box<Volume>,
+            algorithm: &TSTAlgorithm,
+        ) -> SharedPtr<GeometryBorrow>;
 
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
         fn compute_box(self: &GeometryBorrow, volume: &str, frame: &str) -> [f64; 6];

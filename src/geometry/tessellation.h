@@ -6,6 +6,7 @@
 
 struct TessellatedSolid: public G4VSolid {
     TessellatedSolid(const G4String &, const TessellatedShape & shape);
+    TessellatedSolid(const TessellatedSolid &) = delete;
 
     void BoundingLimits(G4ThreeVector &, G4ThreeVector &) const;
     G4bool CalculateExtent(

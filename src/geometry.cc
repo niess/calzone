@@ -32,7 +32,7 @@
 // ============================================================================
 
 struct GeometryData {
-    GeometryData(const rust::Box<Volume> & volume);
+    GeometryData(const rust::Box<Volume> &, const TSTAlgorithm &);
     ~GeometryData();
 
     GeometryData(const GeometryData &) = delete; // Forbid copy.
@@ -175,11 +175,10 @@ static G4VSolid * build_envelope(
     }
 }
 
-static G4VSolid * build_tessellation(
+static G4TessellatedSolid * build_geant4_tessellation(
     const std::string & pathname,
     const Volume & volume
 ) {
-    /*
     auto solid = new G4TessellatedSolid(pathname);
     if (solid == nullptr) {
         set_error(ErrorType::MemoryError, "");
@@ -213,14 +212,28 @@ static G4VSolid * build_tessellation(
     }
     solid->SetSolidClosed(true);
     return solid;
-    */
+}
 
-    auto && shape = volume.tessellated_shape();
-    return new TessellatedSolid(pathname, shape);
+static G4VSolid * build_tessellation(
+    const TSTAlgorithm & algorithm,
+    const std::string & pathname,
+    const Volume & volume
+) {
+    switch (algorithm) {
+        case TSTAlgorithm::Bvh: {
+            auto && shape = volume.tessellated_shape();
+            return new TessellatedSolid(pathname, shape);
+        }
+        case TSTAlgorithm::Geant4:
+            return build_geant4_tessellation(pathname, volume);
+        default:
+            return nullptr; // unreachable.
+    }
 }
 
 static G4VSolid * build_solids(
     const Volume & volume,
+    const TSTAlgorithm & algorithm,
     const std::string & path,
     std::map<std::string, G4VSolid *> & solids,
     std::list<const G4VSolid *> & orphans
@@ -236,7 +249,7 @@ static G4VSolid * build_solids(
     // Build sub-solids.
     std::list<const G4VSolid *> daughters;
     for (auto && v: volume.volumes()) {
-        auto s = build_solids(v, pathname, solids, orphans);
+        auto s = build_solids(v, algorithm, pathname, solids, orphans);
         if (s == nullptr) {
             return nullptr;
         } else {
@@ -297,7 +310,7 @@ static G4VSolid * build_solids(
             }
             break;
         case ShapeType::Tessellation:
-            solid = build_tessellation(pathname, volume);
+            solid = build_tessellation(algorithm, pathname, volume);
             break;
     }
     if (solid == nullptr) {
@@ -438,7 +451,10 @@ static void map_volumes(
     }
 }
 
-GeometryData::GeometryData(const rust::Box<Volume> & volume) {
+GeometryData::GeometryData(
+    const rust::Box<Volume> & volume,
+    const TSTAlgorithm & algorithm
+) {
     clear_error();
     this->id = ++GeometryData::LAST_ID;
     this->world = nullptr;
@@ -446,7 +462,9 @@ GeometryData::GeometryData(const rust::Box<Volume> & volume) {
     // Build solids.
     std::map<std::string, G4VSolid *> solids;
     const std::string path = "";
-    auto top_solid = build_solids(*volume, path, solids, this->orphans);
+    auto top_solid = build_solids(
+        *volume, algorithm, path, solids, this->orphans
+    );
     if (top_solid == nullptr) {
         for (auto item: solids) {
             delete item.second;
@@ -562,9 +580,10 @@ GeometryBorrow::~GeometryBorrow() {
 }
 
 std::shared_ptr<GeometryBorrow> create_geometry(
-    const rust::Box<Volume> & volume
+    const rust::Box<Volume> & volume,
+    const TSTAlgorithm & algorithm
 ) {
-    auto data = new GeometryData(volume);
+    auto data = new GeometryData(volume, algorithm);
     if (any_error()) {
         delete data;
         return nullptr;

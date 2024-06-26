@@ -132,8 +132,8 @@ impl TriangularFacet {
 
     fn new(v0: Point3<f64>, v1: Point3<f64>, v2: Point3<f64>) -> Self {
         let u = v1 - v0;
-        let v = v0 - v1;
-        let mut normal = u.cross(&v); // XXX outgoing normal?
+        let v = v2 - v0;
+        let mut normal = u.cross(&v);
         let norm = normal.norm();
         normal /= norm;
         let area = 0.5 * norm;
@@ -206,7 +206,6 @@ impl SortedTessels {
 
     pub fn inside(&self, point: &ffi::G4ThreeVector, delta: f64) -> ffi::EInside {
         // First, let us check if the point lies on the surface (according to Geant4).
-        // XXX Traverse the tree only once?
         struct Match {
             distance: f64,
         }
@@ -216,7 +215,8 @@ impl SortedTessels {
                 &mut self,
                 tessels: &SortedTessels,
                 node_index: usize,
-                point: &Point3<f64>
+                point: &Point3<f64>,
+                delta: f64,
             ) {
                 match &tessels.tree.nodes[node_index] {
                     BvhNode::Leaf{shape_index, ..} => {
@@ -228,11 +228,11 @@ impl SortedTessels {
                     },
                     BvhNode::Node{child_l_index, child_l_aabb,
                                   child_r_index, child_r_aabb, ..} => {
-                        if child_l_aabb.contains(&point) {
-                            self.inspect(tessels, *child_l_index, point)
+                        if child_l_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(tessels, *child_l_index, point, delta)
                         }
-                        if child_r_aabb.contains(&point) {
-                            self.inspect(tessels, *child_r_index, point)
+                        if child_r_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(tessels, *child_r_index, point, delta)
                         }
                     },
                 }
@@ -241,7 +241,7 @@ impl SortedTessels {
 
         let point = Point3::new(point.x(), point.y(), point.z());
         let mut closest = Match { distance: f64::INFINITY };
-        closest.inspect(self, 0, &point);
+        closest.inspect(self, 0, &point, delta);
         if closest.distance <= delta {
             return ffi::EInside::kSurface;
         }

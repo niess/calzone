@@ -1,10 +1,11 @@
 use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
-use crate::utils::error::Error;
+use crate::utils::error::{Error, variant_explain};
 use crate::utils::error::ErrorKind::{IndexError, ValueError};
 use crate::utils::float::{f64x3, f64x3x3};
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
 use cxx::SharedPtr;
+use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -108,25 +109,66 @@ impl Geometry {
 // ===============================================================================================
 
 #[pyclass]
-pub struct GeometryBuilder (GeometryDefinition);
+pub struct GeometryBuilder {
+    definition: GeometryDefinition,
+    #[pyo3(get, set)]
+    algorithm: Algorithm,
+}
+
+#[derive(Clone, Copy, Default, EnumVariantsStrings)]
+#[enum_variants_strings_transform(transform="lower_case")]
+enum Algorithm {
+    #[default]
+    Bvh,
+    Geant4,
+}
+
+impl From<Algorithm> for ffi::TSTAlgorithm {
+    fn from(value: Algorithm) -> Self {
+        match value {
+            Algorithm::Bvh => ffi::TSTAlgorithm::Bvh,
+            Algorithm::Geant4 => ffi::TSTAlgorithm::Geant4,
+        }
+    }
+}
+
+impl<'py> FromPyObject<'py> for Algorithm {
+    fn extract_bound(algorithm: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let algorithm: String = algorithm.extract()?;
+        let algorithm = Algorithm::from_str(&algorithm)
+            .map_err(|options| {
+                let why = variant_explain(&algorithm, options);
+                Error::new(ValueError).what("algorithm").why(&why).to_err()
+            })?;
+        Ok(algorithm)
+    }
+}
+
+impl IntoPy<PyObject> for Algorithm {
+    fn into_py(self, py: Python) -> PyObject {
+        self.to_str().into_py(py)
+    }
+}
 
 #[pymethods]
 impl GeometryBuilder {
     #[new]
     fn new(definition: DictLike) -> PyResult<Self> {
         let definition = GeometryDefinition::new(definition)?;
-        let builder = Self (definition);
+        let algorithm = Algorithm::default();
+        let builder = Self { definition, algorithm };
         Ok(builder)
     }
 
     fn build(&self) -> PyResult<Geometry> {
         // build materials.
-        if let Some(materials) = self.0.materials.as_ref() {
+        if let Some(materials) = self.definition.materials.as_ref() {
             materials.build()?;
         }
 
         // Build volumes.
-        let geometry = ffi::create_geometry(&self.0.volume);
+        let algorithm: ffi::TSTAlgorithm = self.algorithm.into();
+        let geometry = ffi::create_geometry(&self.definition.volume, &algorithm);
         if geometry.is_null() {
             ffi::get_error().to_result()?;
             unreachable!()
@@ -149,7 +191,7 @@ impl GeometryBuilder {
             }
         }
         let builder = slf.borrow();
-        let why = if builder.0.volume.name() == volume {
+        let why = if builder.definition.volume.name() == volume {
             format!("cannot delete top volume '{}'", volume)
         } else {
             format!("unknown '{}' volume", volume)
@@ -204,7 +246,7 @@ impl GeometryBuilder {
         }
         let mut builder = slf.borrow_mut();
         let mother = match mother {
-            None => &mut builder.0.volume,
+            None => &mut builder.definition.volume,
             Some(mother) => builder.find_mut(mother)?,
         };
         match mother.volumes.iter_mut().find(|v| v.name() == volume.name()) {
@@ -212,8 +254,8 @@ impl GeometryBuilder {
             Some(v) => *v = *volume,
         }
         if let Some(materials) = materials {
-            match &mut builder.0.materials {
-                None => builder.0.materials = Some(materials),
+            match &mut builder.definition.materials {
+                None => builder.definition.materials = Some(materials),
                 Some(m) => m.extend(materials),
             }
         }
@@ -227,7 +269,7 @@ impl GeometryBuilder {
         let volume = match names.next() {
             None => None,
             Some(name) => {
-                let volume = self.0.volume.as_mut();
+                let volume = self.definition.volume.as_mut();
                 if name != volume.name() {
                     None
                 } else {
