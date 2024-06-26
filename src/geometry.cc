@@ -58,32 +58,32 @@ private:
 size_t GeometryData::LAST_ID = 0;
 std::map<const G4VPhysicalVolume *, GeometryData *> GeometryData::INSTANCES;
 
+static G4AffineTransform local_transform(const Volume & v) {
+    auto && p = v.position();
+    auto translation = G4ThreeVector(
+        p[0] * CLHEP::cm,
+        p[1] * CLHEP::cm,
+        p[2] * CLHEP::cm
+    );
+    if (v.is_rotated()) {
+        G4RotationMatrix rotation;
+        auto && m = v.rotation();
+        auto rowX = G4ThreeVector(m[0][0], m[0][1], m[0][2]);
+        auto rowY = G4ThreeVector(m[1][0], m[1][1], m[1][2]);
+        auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
+        rotation.setRows(rowX, rowY, rowZ);
+        return std::move(G4AffineTransform(rotation, translation));
+    } else {
+        return std::move(G4AffineTransform(translation));
+    }
+}
+
 static G4VSolid * build_envelope(
     const std::string & pathname,
     const Volume & volume,
     std::list<const G4VSolid *> & daughters,
     std::list<const G4VSolid *> & orphans
 ) {
-    auto get_transform = [&](const Volume & v) -> G4AffineTransform {
-        auto && p = v.position();
-        auto translation = G4ThreeVector(
-            p[0] * CLHEP::cm,
-            p[1] * CLHEP::cm,
-            p[2] * CLHEP::cm
-        );
-        if (v.is_rotated()) {
-            G4RotationMatrix rotation;
-            auto && m = v.rotation();
-            auto rowX = G4ThreeVector(m[0][0], m[0][1], m[0][2]);
-            auto rowY = G4ThreeVector(m[1][0], m[1][1], m[1][2]);
-            auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
-            rotation.setRows(rowX, rowY, rowZ);
-            return G4AffineTransform(rotation, translation);
-        } else {
-            return G4AffineTransform(translation);
-        }
-    };
-
     // Compute limits along X, Y and Z axis.
     auto envelope = volume.envelope_shape();
     std::array<double, 3> min = { DBL_MAX, DBL_MAX, DBL_MAX };
@@ -93,7 +93,7 @@ static G4VSolid * build_envelope(
         std::array<double, 3> mx;
         const G4VSolid * s = daughters.front();
         daughters.pop_front();
-        auto t = get_transform(v);
+        auto t = local_transform(v);
         if (t.IsTranslated() || t.IsRotated()) {
             auto l = G4VoxelLimits();
             s->CalculateExtent(kXAxis, l, t, mi[0], mx[0]);
@@ -248,27 +248,80 @@ static G4VSolid * build_solids(
 
     // Build sub-solids.
     std::list<const G4VSolid *> daughters;
+    std::map<rust::String, G4AffineTransform> transforms;
+    std::list<std::array<rust::String, 2>> subtractions;
     for (auto && v: volume.volumes()) {
         auto s = build_solids(v, algorithm, pathname, solids, orphans);
         if (s == nullptr) {
             return nullptr;
         } else {
             daughters.push_back(s);
+            auto && t = local_transform(v);
+            transforms[v.name()] = std::move(t);
+            rust::String subtract = std::move(v.subtract());
+            if (!subtract.empty()) {
+                std::array<rust::String, 2> item = {
+                    v.name(),
+                    std::move(subtract)
+                };
+                subtractions.push_back(std::move(item));
+            }
         }
     }
 
-    // Patch overlaps.
-    for (auto overlap: volume.overlaps()) {
+    // Apply subtractions and overlaps.
+    auto subtract = [&](const std::array<rust::String, 2> & item) {
         const std::string path0 = fmt::format("{}.{}",
-            pathname, std::string(overlap[0]));
+            pathname, std::string(item[0]));
         const std::string path1 = fmt::format("{}.{}",
-            pathname, std::string(overlap[1]));
+            pathname, std::string(item[1]));
         auto solid0 = solids[path0];
-        auto boolean = new G4SubtractionSolid(
-            std::string(overlap[0]), solid0, solids[path1]
-        );
+        auto && t0 = transforms[item[0]];
+        auto && t1 = transforms[item[1]];
+        G4SubtractionSolid * boolean;
+        if (t1.IsTranslated() || t1.IsRotated()) {
+            if (t0.IsTranslated() || t0.IsRotated()) {
+                boolean = new G4SubtractionSolid(
+                    std::string(item[0]),
+                    solid0,
+                    solids[path1],
+                    t0 * t1.Inverse() // XXX Check this.
+                );
+            } else {
+                boolean = new G4SubtractionSolid(
+                    std::string(item[0]),
+                    solid0,
+                    solids[path1],
+                    t1.Inverse()
+                );
+            }
+        } else {
+            if (t0.IsTranslated() || t0.IsRotated()) {
+                auto t = t0 * t1.Inverse();
+                boolean = new G4SubtractionSolid(
+                    std::string(item[0]),
+                    solid0,
+                    solids[path1],
+                    t0
+                );
+            } else {
+                boolean = new G4SubtractionSolid(
+                    std::string(item[0]),
+                    solid0,
+                    solids[path1]
+                );
+            }
+        }
         orphans.push_back(solid0);
         solids[path0] = boolean;
+    };
+
+    for (auto item: subtractions) {
+        subtract(item);
+    }
+
+    for (auto overlap: volume.overlaps()) {
+        subtract(overlap);
     }
 
     // Build current solid.
@@ -600,7 +653,7 @@ std::shared_ptr<GeometryBorrow> create_geometry(
 // ============================================================================
 
 static void check_overlaps(G4VPhysicalVolume * volume, int resolution) {
-    volume->CheckOverlaps(resolution, 0.0, false);
+    volume->CheckOverlaps(resolution, DBL_EPSILON, false);
     if (any_error()) return;
 
     auto && logical = volume->GetLogicalVolume();

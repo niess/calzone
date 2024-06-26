@@ -166,6 +166,9 @@ impl GeometryBuilder {
             materials.build()?;
         }
 
+        // Validate volumes.
+        self.definition.volume.validate()?;
+
         // Build volumes.
         let algorithm: ffi::TSTAlgorithm = self.algorithm.into();
         let geometry = ffi::create_geometry(&self.definition.volume, &algorithm);
@@ -208,6 +211,7 @@ impl GeometryBuilder {
         position: Option<f64x3>,
         rotation: Option<f64x3x3>,
         sensitive: Option<bool>,
+        subtract: Option<String>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
         let mut builder = slf.borrow_mut();
         let volume = builder.find_mut(volume)?;
@@ -230,6 +234,9 @@ impl GeometryBuilder {
         }
         if let Some(sensitive) = sensitive {
             volume.sensitive = sensitive;
+        }
+        if let Some(subtract) = subtract {
+            volume.subtract = Some(subtract);
         }
         Ok(slf)
     }

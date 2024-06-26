@@ -1,4 +1,4 @@
-use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
+use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::error::variant_error;
 use crate::utils::extract::{extract, Extractor, Property, PropertyValue, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
@@ -32,6 +32,7 @@ pub struct Volume {
     pub(super) rotation: Option<f64x3x3>,
     pub(super) volumes: Vec<Volume>,
     overlaps: Vec<[String; 2]>,
+    pub(super) subtract: Option<String>,
 }
 
 pub enum Shape {
@@ -81,6 +82,30 @@ impl Volume {
         }
         Ok(())
     }
+
+    pub(super) fn validate(&self) -> PyResult<()> {
+        fn inspect(tag: &Tag, volume: &Volume) -> PyResult<()> {
+            let daughters: Vec<_> = volume.volumes.iter().map(|v| v.name()).collect();
+            for v in volume.volumes.iter() {
+                let vtag = tag.extend(v.name.as_ref(), None, None);
+                if let Some(subtract) = v.subtract.as_ref() {
+                    if !daughters.contains(&subtract) {
+                        let why = format!("unknown volume '{}.{}'", tag.path(), subtract);
+                        return Err(vtag.bad().what("subtract").why(why).to_err(ValueError))
+                    }
+                }
+                inspect(&vtag, v)?;
+            }
+            Ok(())
+        }
+
+        let tag = Tag::new("volume", self.name.as_ref(), None);
+        if let Some(subtract) = self.subtract.as_ref() {
+            let why = format!("unknown volume '{}'", subtract);
+            return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
+        }
+        inspect(&tag, self)
+    }
 }
 
 // ===============================================================================================
@@ -96,18 +121,18 @@ impl TryFromBound for Volume {
             .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
 
         // Extract base properties.
-        const EXTRACTOR: Extractor<5> = Extractor::new([
+        const EXTRACTOR: Extractor<6> = Extractor::new([
             Property::required_str("material"),
             Property::new_bool("sensitive", false),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
             Property::optional_dict("overlaps"),
-
+            Property::optional_str("subtract"),
         ]);
 
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, sensitive, position, rotation, overlaps] = EXTRACTOR.extract(
+        let [material, sensitive, position, rotation, overlaps, subtract] = EXTRACTOR.extract(
             &tag, value, Some(&mut remainder)
         )?;
 
@@ -117,6 +142,7 @@ impl TryFromBound for Volume {
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
         let overlaps: Option<Bound<PyDict>> = overlaps.into();
+        let subtract: Option<String> = subtract.into();
 
         // Split shape(s) and volumes from remainder.
         let (volumes, shapes) = {
@@ -195,18 +221,7 @@ impl TryFromBound for Volume {
                             )).to_err(ValueError);
                             Err(err)
                         }
-                        Some(v) => {
-                            // Check that the volume is not displaced.
-                            if v.position.is_some() || v.rotation.is_some() {
-                                let err = tag.bad().what("overlap").why(format!(
-                                    "displaced '{}' volume",
-                                    name,
-                                )).to_err(NotImplementedError);
-                                Err(err)
-                            } else {
-                                Ok(())
-                            }
-                        },
+                        Some(_) => Ok(()),
                     }
                 };
 
@@ -251,7 +266,7 @@ impl TryFromBound for Volume {
         };
 
         let volume = Self {
-            name, material, sensitive, shape, position, rotation, volumes, overlaps
+            name, material, sensitive, shape, position, rotation, volumes, overlaps, subtract
         };
         Ok(volume)
     }
@@ -516,6 +531,13 @@ impl Volume {
             Shape::Sphere(shape) => &shape,
             _ => unreachable!(),
         }
+    }
+
+    pub fn subtract(&self) -> String {
+        self.subtract
+            .as_ref()
+            .map(|s| s.clone())
+            .unwrap_or_else(|| "".to_string())
     }
 
     pub fn tessellated_shape(&self) -> &ffi::TessellatedShape {
