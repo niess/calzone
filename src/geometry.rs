@@ -69,7 +69,7 @@ impl Geometry {
         Ok(volume)
     }
 
-    /// Check for overlapping volumes.
+    /// Check the geometry by looking for overlapping volumes.
     fn check(&self, resolution: Option<i32>) -> PyResult<()> {
         let resolution = resolution.unwrap_or(1000);
         self.0
@@ -112,11 +112,11 @@ impl Geometry {
 //
 // ===============================================================================================
 
-/// A Monte Carlo geometry constructor.
+/// A Monte Carlo geometry builder.
 #[pyclass(module="calzone")]
 pub struct GeometryBuilder {
     definition: GeometryDefinition,
-    /// Tessellations traversal algorithm.
+    /// Traversal algorithm for tessellated shapes.
     #[pyo3(get, set)]
     algorithm: Algorithm,
 }
@@ -187,12 +187,12 @@ impl GeometryBuilder {
         Ok(geometry)
     }
 
-    /// Delete a geometry `Volume`.
+    /// Remove a volume from the geometry definition.
     fn delete<'py>(
         slf: Bound<'py, GeometryBuilder>,
-        volume: &str,
+        pathname: &str,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
-        if let Some((mother, name)) = volume.rsplit_once('.') {
+        if let Some((mother, name)) = pathname.rsplit_once('.') {
             let mut builder = slf.borrow_mut();
             let mother = builder.find_mut(mother)?;
             let n = mother.volumes.len();
@@ -202,19 +202,19 @@ impl GeometryBuilder {
             }
         }
         let builder = slf.borrow();
-        let why = if builder.definition.volume.name() == volume {
-            format!("cannot delete top volume '{}'", volume)
+        let why = if builder.definition.volume.name() == pathname {
+            format!("cannot delete top volume '{}'", pathname)
         } else {
-            format!("unknown '{}' volume", volume)
+            format!("unknown '{}' volume", pathname)
         };
         let err = Error::new(ValueError).what("geometry operation").why(&why);
         Err(err.into())
     }
 
-    /// Modify a geometry `Volume`.
+    /// Modify the definition of a geometry volume.
     fn modify<'py>(
         slf: Bound<'py, GeometryBuilder>,
-        volume: &str,
+        pathname: &str,
         name: Option<String>,
         material: Option<String>,
         position: Option<f64x3>,
@@ -223,7 +223,7 @@ impl GeometryBuilder {
         subtract: Option<String>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
         let mut builder = slf.borrow_mut();
-        let volume = builder.find_mut(volume)?;
+        let volume = builder.find_mut(pathname)?;
         if let Some(name) = name {
             volume::Volume::check(&name)
                 .map_err(|why| {
@@ -250,15 +250,15 @@ impl GeometryBuilder {
         Ok(slf)
     }
 
-    /// (Re)place a geometry `Volume`.
+    /// (Re)place a definition of a geometry volume.
     fn place<'py>(
         slf: Bound<'py, GeometryBuilder>,
-        volume: DictLike,
+        definition: DictLike,
         mother: Option<&str>,
         position: Option<f64x3>,
         rotation: Option<f64x3x3>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
-        let GeometryDefinition { mut volume, materials } = GeometryDefinition::new(volume)?;
+        let GeometryDefinition { mut volume, materials } = GeometryDefinition::new(definition)?;
         if let Some(position) = position {
             volume.position = Some(position);
         }
@@ -370,17 +370,23 @@ impl GeometryDefinition {
 //
 // ===============================================================================================
 
+/// A volume of a Monte Carlo geometry.
 #[pyclass(frozen, module="calzone")]
 pub struct Volume {
     geometry: SharedPtr<ffi::GeometryBorrow>,
+    /// The volume absolute pathname.
     #[pyo3(get)]
     name: String,
+    /// The volume constitutive material.
     #[pyo3(get)]
     material: String,
+    /// The volume shape (according to Geant4).
     #[pyo3(get)]
     solid: String,
+    /// Flag indicating whether or not energy deposits are sampled.
     #[pyo3(get)]
     sensitive: bool,
+    /// The mother of this volume, if any (i.e. directly containing this volume).
     #[pyo3(get)]
     mother: Option<String>,
     daughters: Vec<String>,
@@ -388,13 +394,15 @@ pub struct Volume {
 
 #[pymethods]
 impl Volume {
+    /// Daughter volume(s), if any (i.e. included insides).
     #[getter]
     fn get_daughters<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
         PyTuple::new_bound(py, &self.daughters)
     }
 
-    #[pyo3(name = "r#box")]
-    fn compute_box(
+    /// Return the volume's Axis-Aligned Bounding-Box (AABB).
+    #[pyo3(name = "aabb")]
+    fn compute_aabb(
         &self,
         py: Python,
         frame: Option<&str>
@@ -417,6 +425,7 @@ impl Volume {
         Ok(result.as_any().into_py(py))
     }
 
+    /// Return the coordinates of the volume origin.
     #[pyo3(name = "origin")]
     fn compute_origin(&self, frame: Option<&str>) -> PyResult<f64x3> {
         let frame = frame.unwrap_or("");

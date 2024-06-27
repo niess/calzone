@@ -43,6 +43,10 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add_class::<simulation::Physics>()?;
     module.add_class::<simulation::Random>()?;
     module.add_class::<simulation::Simulation>()?;
+    module.add_class::<geometry::Volume>()?;
+
+    // Register exception(s).
+    module.add("Geant4Exception", py.get_type_bound::<utils::error::Geant4Exception>())?;
 
     // Register function(s).
     module.add_function(wrap_pyfunction!(geometry::materials::load, module)?)?;

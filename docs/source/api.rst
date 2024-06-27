@@ -1,0 +1,458 @@
+Python interface
+================
+
+
+.. autoclass:: calzone.Geant4Exception
+   :members:
+
+   This class represents an exception issued by the Geant4 kernel. Note however
+   that Geant4 does not raise C++ exceptions, but instead relies on
+   `G4VExceptionHandler`_. Therefore, Geant4 exceptions might be reported long
+   *after* the scope that actually issued the error.
+
+.. autoclass:: calzone.Geometry
+
+   This class wraps an immutable `G4VPhysicalVolume`_ instance, acting as root
+   (world) volume for the Geant4 Monte Carlo simulation.
+
+   .. method:: __new__(definition)
+
+      Create a new geometry instance from a *definition*. The :doc:`geometry
+      definition <geometry>` can be provided directly as a Python :python:`dict`
+      object, or loaded from a *definition* file (in JSON, or TOML format). For
+      instance, the following creates a Monte Carlo geometry from a
+      :python:`dict`-definition encoded in a TOML file.
+
+      >>> geometry = calzone.Geometry("geometry.toml")
+
+      .. seealso::
+
+         The :py:class:`GeometryBuilder` class (described hereafter) allows for
+         customisation of the geometry before actually building it.
+
+   .. method:: __getitem__(self, pathname)
+
+      Return an interface to a Monte Carlo :py:class:`Volume` given its absolute
+      *pathname* inside the geometry. For instance,
+
+      >>> volume = geometry["Environment.Detector"]
+
+   .. automethod:: check
+
+      An integer *resolution* can be provided, specifying the number of Monte
+      Carlo trials when looking for overlaps. The default resolution is of
+      :python:`1000` trials per couple of volumes.
+
+      On failure, i.e. as soon as an overlap is found, a
+      :py:class:`Geant4Exception` is raised. Thus, only the first found overlap
+      is reported, in case that the geometry comprises multiple overlaps.
+
+   .. automethod:: dump
+
+      If *path* is :python:`None`, then the geometry is dumped to
+      :python:`"geometry.gdml"`. Note that contrary to Geant4, this method
+      erases any existing GDML file with the same name.
+
+   .. method:: export()
+
+      Export the Geant4 geometry as a `goupil.ExternalGeometry
+      <ExternalGeometry_>`_.
+
+----
+
+.. autoclass:: calzone.GeometryBuilder
+
+   This class manages a :doc:`geometry definition <geometry>`. It provides high
+   level operators for customising the Monte Carlo geometry before actually
+   building it.
+
+   .. method:: __new__(definition)
+
+      Create a new geometry *builder* from an initial *definition*, provided
+      directly as a Python :python:`dict` object, or loaded from a *definition*
+      file (in JSON, or TOML format). For instance,
+
+      >>> builder = calzone.GeometryBuilder("geometry.toml")
+
+   .. automethod:: build
+
+      Upon successful completion, a :py:class:`Geometry` instance is returned,
+      for instance as
+
+      >>> geometry = builder.build()
+
+      Note that the returned geometry is immutable. That is, subsequent
+      *builder* operations do not modify any previously built geometry.
+
+   .. automethod:: delete
+
+      The volume to remove is identified by its absolute *pathname*. For
+      instance, the following deletes the :python:`"Detector"` volume nested
+      inside the root :python:`"Environment"` one.
+
+      >>> builder.delete("Environment.Detector")
+
+   .. automethod:: modify
+
+      The volume to modify is identified by its absolute *pathname*. The other
+      arguments specify replacement values, if not :python:`None`. See the
+      :doc:`geometry description <geometry>` section for the meaning of each
+      argument. For instance, the following enables the sampling of energy
+      deposits in the root :python:`"Environment"` volume.
+
+      >>> builder.modify("Environment", sensitive=True)
+
+   .. automethod:: place
+
+      The volume *definition* can be provided directly as a Python dict object,
+      or loaded from a definition file (in JSON, or TOML format). The *mother*
+      argument specifies the location of the volume within the geometry
+      hierarchy. Note that if a volume with the same name already exists at the
+      given location, then it is replaced with the new *definition*. See the
+      :doc:`geometry description <geometry>` section for the meaning of the
+      other arguments.
+
+   .. autoattribute:: algorithm
+
+      Must be one of :python:`"bvh"` (default) or :python:`"geant4"`. Note that
+      Geant4 native algorithm is inefficient for large meshes. Therefore, it
+      should be avoided when a tessellated topography is used.
+
+----
+
+.. autofunction:: calzone.load
+
+   The material(s) *definition* can be provided directly as a Python
+   :python:`dict` object, or loaded from a *definition* file (in Gate DB, JSON
+   or TOML format). For instance, the following loads materials from a Gate DB
+   file.
+
+   >>> calzone.load("materials.db")
+
+   .. important::
+
+      Materials are uniquely identified by their name. However, once loaded to
+      Geant4, a material cannot be unloaded, nor modified. If a different
+      definition is provided for an existing (already loaded) material, then a
+      :external:py:class:`ValueError` is raised.
+
+----
+
+.. autoclass:: calzone.Map
+
+   This class manages a regular grid of topography elevation values, e.g. from a
+   Digital Elevation Model (DEM). Data are exposed as a mutable
+   :external:py:class:`numpy.ndarray`, and can be exported as a 2D image (in PNG
+   format), or as a 3D model (in STL format).
+
+   .. method:: __new__(data)
+
+      Create a new map instance from a grid of elevation values.
+
+      The *data* can be provided as a `GeoTiff`_ object, or loaded from an image
+      file (in TIFF, or PNG format). For instance, the following loads
+      topography data from a GeoTIFF file,
+
+      >>> topography = calzone.Map("topography.tif")
+
+   .. automethod:: dump
+
+      The export format is specified by the file extension. It must be one of
+      :python:`".png"` or :python:`".stl"`. When exporting as STL, optional
+      *kwargs* can be provided in order to customise the 3D model (see section
+      :ref:`geometry:Topography volume`). For instance, the following exports
+      the map as a PNG image (including topography metadata).
+
+      >>> topography.dump("topography.png")
+
+   .. automethod:: from_array
+
+      The *z* argument must be a dim-2 :external:py:class:`numpy.ndarray` (of
+      shape [:py:attr:`ny`, :py:attr:`nx`]) containing the topography elevation
+      values (in C order, see the :py:attr:`z` attribute below). The *xlim* and
+      *ylim* arguments are length-2 sequences specifying the map limits along
+      the x and y-axis (i.e. :py:attr:`x0`, :py:attr:`x1`, :py:attr:`y0` and
+      :py:attr:`y1` attributes below). For instance,
+
+      >>> topography = calzone.Map.from_array(z, [x0, x1], [y0, y1])
+
+      Optionally, the map :py:attr:`CRS <crs>` can also be indicated.
+
+   .. note::
+
+      The coordinates of map nodes :python:`(0,0)`, or :python:`(ny,nx)`, are
+      :python:`(x0,y0)`, or :python:`(x1,y1)`, respectively. Since image formats
+      are conventionally rendered with node :python:`(0,0)` located at upper
+      left corner, it is frequent to have :python:`y0 > y1`.
+
+   .. autoattribute:: crs
+
+      This property is purely informative (and optional), since :py:class:`Map`
+      objects do not allow for frame transforms.
+
+   .. autoattribute:: nx
+   .. autoattribute:: ny
+   .. autoattribute:: x0
+   .. autoattribute:: x1
+   .. autoattribute:: y0
+   .. autoattribute:: y1
+
+   .. autoattribute:: z
+
+      Elevation values are indexed in C-order. That is, :python:`z[i,j]`
+      corresponds to the elevation at grid node :python:`j` along x-axis
+      (columns), and :python:`i` along y-axis (rows).
+
+----
+
+.. autoclass:: calzone.Physics
+
+   .. method:: __new__(default_cut=None, em_model=None, had_model=None)
+
+      Create a new set of Geant4 physics settings.
+
+      See the :py:attr:`default_cut`, :py:attr:`em_model` and
+      :py:attr:`had_model` attributes below for the meaning of the optional
+      arguments. If an argument is left :python:`None`, then its default value
+      is used. For instance, the following creates settings with standard
+      electromagnetric physics (the default), and no hadronic physics.
+
+      >>> physics = calzone.Physics()
+
+   .. autoattribute:: default_cut
+
+   .. autoattribute:: em_model
+
+      Must be one of :python:`"dna"`, :python:`"livermore"`,
+      :python:`"option1"`, :python:`"option2"`, :python:`"option3"`,
+      :python:`"option4"`, :python:`"penelope"` or :python:`"standard"`
+      (default). See the `Geant4 documentation <EMConstructors_>`_ for the
+      meaning of these options.
+
+      Setting :py:attr:`em_model` to :python:`None` disables the simulation of
+      electromagnetic interactions.
+
+      .. note::
+
+         When :py:attr:`em_model` is not :python:`None`, then
+         `G4EmExtraPhysics`_ is automatically enabled, in addition to the
+         selected model of electromagnetic interactions.
+
+
+   .. autoattribute:: had_model
+
+      Must be one of :python:`"FTFP_BERT"`, :python:`"FTFP_BERT_HP"`,
+      :python:`"QGSP_BERT"`, :python:`"QGSP_BERT_HP"`, :python:`"QGSP_BIC"` or
+      :python:`"QGSP_BIC_HP"`. See the `Geant4 documentation
+      <HadConstructors_>`_ for the meaning of these options.
+
+      Setting :py:attr:`had_model` to :python:`None`, which is the default,
+      disables the simulation of hadronic interactions.
+
+----
+
+.. autofunction:: calzone.primaries
+
+   This function returns a `structured numpy array <StructuredArray_>`_ with the
+   given *shape*. Primary particles are initialised with default properties, if
+   not overriden by specifying *kwargs*. For instance, the following creates an
+   array of 100 primary particles (photons, by default) with a kinetic energy of
+   0.5 MeV, starting from the origin (by default), and going downwards.
+
+   >>> primaries = calzone.primaries(100, energy=0.5, direction=(0, 0, -1))
+
+   The data structure (:external:py:class:`numpy.dtype`) of a primary particle
+   is the following (the corresponding physical units are also indicated).
+
+   .. list-table:: Primaries array structure.
+      :width: 50%
+      :widths: auto
+      :header-rows: 1
+
+      * - Field
+        - Format
+        - Units
+      * - :python:`"pid"`
+        - :python:`"i4"`
+        - 
+      * - :python:`"energy"`
+        - :python:`"f8"`
+        - MeV
+      * - :python:`"position"`
+        - :python:`"(f8, 3)"`
+        - cm
+      * - :python:`"direction"`
+        - :python:`"(f8, 3)"`
+        - 
+
+----
+
+.. autoclass:: calzone.Random
+
+   This class exposes a stream of pseudo-random numbers as a cyclic sequence of
+   :external:py:class:`float`. The stream is determined by the :py:attr:`seed`
+   attribute, while the :py:attr:`index` attribute indicates its current state.
+
+   .. note::
+
+      A `Permuted Congruential Generator <WikipediaPCG_>`_ (PCG) is used (namely
+      `Mcg128Xsl64`_), which has excellent performances for Monte Carlo
+      applications.
+
+   .. method:: __new__(seed=None)
+
+      Create a new pseudo-random stream.
+
+      If *seed* is :python:`None`, then a random value is picked using the
+      system entropy. Otherwise, the specified :py:attr:`seed` value is used.
+      For instance,
+
+      >>> prng = calzone.Random(123456789)
+
+   .. automethod:: uniform01
+
+      If *shape* is :python:`None`, then a single number is returned. Otherwise,
+      a :external:py:class:`numpy.ndarray` is returned, with the given *shape*.
+      For instance, the following returns the next 100 pseudo-random
+      numbers from the stream.
+
+      >>> rns = prng.uniform01(100)
+
+   .. autoattribute:: index
+
+      This property can be modified, resulting in consuming or rewinding the
+      pseudo-random stream. For instance, the following resets the stream.
+
+      >>> prng.index = 0
+
+   .. autoattribute:: seed
+
+      The property fully determines (and identifies) the pseudo-random stream.
+      Note that modifying the seed also resets the stream to index :python:`0`.
+
+----
+
+.. autoclass:: calzone.Simulation
+
+   This class provides an interface for running a Geant4 simulation. The
+   simulation is configured through a set of attributes described hereafter, or
+   using the class constructor, below.
+
+   .. method:: __new__(geometry=None, physics=None, random=None, sampling=None, tracking=None)
+
+      Create a new interface to a Geant4 simulation.
+
+      The optional arguments set the corresponding attributes, as described
+      below.
+
+   .. automethod:: run
+
+      Run a Geant4 Monte Carlo simulation with the provided set of *primaries*.
+      Note that a :py:attr:`geometry` must have been set first. The returned
+      object depends on the simulation :py:attr:`sampling` and
+      :py:attr:`tracking` flags. For example, if both are enabled, then a
+      :external:py:class:`NamedTuple <typing.NamedTuple>` is returned,
+      containing the sampled energy deposits, as well as the recorded tracks and
+      vertices (as :external:py:class:`numpy.ndarray`, each).
+
+      The *verbose* flag (:python:`False` by default) controls Geant4 tracking
+      prints, e.g. for cross-checking results.
+
+   .. autoattribute:: geometry
+
+      This property is a :py:class:`Geometry` instance. However, by default, no
+      geometry is attached to the simulation.
+
+   .. autoattribute:: physics
+
+      This property is a :py:class:`Physics` instance. By default, only
+      (:python:`"standard"`) electromagnetic interactions are enabled.
+
+   .. autoattribute:: random
+
+      This property is a :py:class:`Random` instance. By default, the
+      pseudo-random stream is seeded using the system entropy.
+
+   .. autoattribute:: sampling
+
+      Must be one of :python:`"brief"` (default) or :python:`"detailed"`. If set
+      to :python:`None`, then energy deposits sampling is disabled for all
+      volumes.
+
+      In :python:`"brief"` mode, only the total energy deposits per sensitive
+      volume is recorded. On the contrary, in :python:`"detailed"` mode the full
+      detail of energy deposition is reported.
+
+   .. autoattribute:: tracking
+
+      Must be a :python:`bool`, or :python:`None`. By default, Monte Carlo
+      tracks recording is disabled.
+
+----
+
+.. autoclass:: calzone.Volume
+
+   This class provides an interface for inspecting a `G4VPhysicalVolume`_ of an
+   instanciated Monte Carlo geometry. Note that the geometry is static, i.e. it
+   cannot be modified once it has been built.
+
+   Since :py:class:`Volume` objects are related to a :py:class:`Geometry`, they
+   cannot be instaciated directly. Instead, they are indexed from a geometry,
+   e.g. as
+
+   >>> volume = geometry["Environment.Detector"]
+
+   .. automethod:: aabb
+
+      The *frame* argument specifies the reference volume (by its absolute
+      *pathname*) of the axis-aligned bounding-box. If *frame* is
+      :python:`None`, then the bounding box is computed in the root frame of the
+      simulation. For instance, the following computes the volume 
+      AABB in its own frame (thus, the AABB of the underlying `G4VSolid`_,
+      actually).
+
+      >>> aabb = volume.aabb(volume.name)
+
+   .. automethod:: origin
+
+      As previously (see the :py:meth:`aabb` method), the *frame* argument
+      specifies the reference volume. Note that depending on the underlying
+      `G4VSolid`_, the origin might or might not be at the volume centre.
+
+   .. autoattribute:: daughters
+
+      Daughter's absolute pathnames are given, as a :external:py:class:`tuple`
+      of :external:py:class:`str` objects. Note that only direct descendants are
+      reported (e.g., not grand-daughters).
+
+   .. autoattribute:: material
+
+      This is the name of the underlying `G4Material`_, as registered to Geant4.
+
+   .. autoattribute:: mother
+   .. autoattribute:: name
+   .. autoattribute:: sensitive
+
+   .. autoattribute:: solid
+
+      This is the Geant4 type (as a :external:py:class:`str`) of the underlying
+      `G4VSolid`_.
+
+.. ============================================================================
+.. 
+.. URL links.
+.. 
+.. ============================================================================
+
+.. _EMConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/electromagnetic/index.html
+.. _HadConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/reference_PL/index.html
+.. _ExternalGeometry: https://goupil.readthedocs.io/en/latest/py/external_geometry.html
+.. _G4EmExtraPhysics: https://geant4.kek.jp/Reference/11.2.0/classG4EmExtraPhysics.html
+.. _G4Material: https://geant4.kek.jp/Reference/11.2.0/classG4Material.html
+.. _G4VExceptionHandler: https://geant4.kek.jp/Reference/11.2.0/classG4VExceptionHandler.html
+.. _G4VPhysicalVolume: https://geant4.kek.jp/Reference/11.2.0/classG4VPhysicalVolume.html
+.. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
+.. _Geotiff: https://github.com/KipCrossing/geotiff
+.. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
+.. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
+.. _WikipediaPCG: https://en.wikipedia.org/wiki/Permuted_congruential_generator

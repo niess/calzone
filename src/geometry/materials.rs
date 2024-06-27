@@ -12,8 +12,8 @@ mod hash;
 
 /// Load Geant4 material(s).
 #[pyfunction]
-pub fn load(arg: DictLike) -> PyResult<()> {
-    let (materials, file) = arg.resolve(None)?;
+pub fn load(definition: DictLike) -> PyResult<()> {
+    let (materials, file) = definition.resolve(None)?;
     let tag = Tag::new("", "materials", file.as_deref());
     let materials = MaterialsDefinition::try_from_dict(&tag, &materials)?;
     materials.build()?;

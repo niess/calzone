@@ -16,32 +16,32 @@ use std::path::Path;
 //
 // ===============================================================================================
 
-/// A structured topography map over a x-y grid.
+/// A structured topography map spanning a x-y grid.
 #[pyclass(module = "calzone")]
 pub struct Map {
     /// Coordinates Reference System (CRS).
     #[pyo3(get)]
     crs: Option<usize>,
-    /// Number of nodes along the x-axis.
+    /// Number of nodes along the x-axis (i.e. columns).
     #[pyo3(get)]
     nx: usize,
-    /// X-coordinate of map nodes `[:,0]`.
+    /// Left x-coordinate (index-wise).
     #[pyo3(get)]
     x0: f64,
-    /// X-coordinate of map nodes `[:,nx-1]`.
+    /// Right x-coordinate (index-wise).
     #[pyo3(get)]
     x1: f64,
-    /// Number of nodes along the x-axis.
+    /// Number of nodes along the y-axis (i.e. rows).
     #[pyo3(get)]
     ny: usize,
     #[pyo3(get)]
-    /// Y-coordinate of map nodes `[0,:]`.
+    /// Lower y-coordinate (index-wise).
     y0: f64,
     #[pyo3(get)]
-    /// Y-coordinate of map nodes `[ny-1,:]`.
+    /// Upper y-coordinate (index-wise).
     y1: f64,
     #[pyo3(get)]
-    /// Topography elevations at map nodes.
+    /// Topography elevation values at map nodes.
     z: PyObject,
 }
 
@@ -74,7 +74,7 @@ impl Map {
         }
     }
 
-    /// Create a new topography map from a 2d-numpy ndarray.
+    /// Create a new topography map from a 2D-numpy ndarray.
     #[staticmethod]
     fn from_array(
         z: &Bound<PyUntypedArray>,
@@ -117,7 +117,7 @@ impl Map {
         Ok(map)
     }
 
-    /// dump the map to a file.
+    /// Dump the map to a file.
     #[pyo3(signature = (filename, **kwargs,))]
     fn dump<'py>(
         &self,
@@ -178,7 +178,7 @@ pub enum MapLike<'py> {
 }
 
 impl Map {
-    const DEFAULT_MIN_DEPTH: f64 = 10.0; // in map units.
+    const DEFAULT_MIN_DEPTH: f64 = 100.0; // in map units.
 
     pub fn from_file(py: Python, path: &Path) -> PyResult<Self> {
         let filename = path.to_str().unwrap();

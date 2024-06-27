@@ -16,6 +16,22 @@ use std::path::{Path, PathBuf};
 //
 // ===============================================================================================
 
+pub fn load_json<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => {
+                let path = format!("No such file or directory '{}'", path.display());
+                PyFileNotFoundError::new_err(path)
+            },
+            _ => err.into(),
+        })?;
+    let json = py.import_bound("json")?;
+    let loads = json.getattr("loads")?;
+    let content = loads.call1((content,))?;
+    let dict: Bound<PyDict> = content.extract()?;
+    Ok(dict)
+}
+
 pub fn load_toml<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
     let content = std::fs::read_to_string(path)
         .map_err(|err| match err.kind() {
@@ -73,6 +89,7 @@ impl<'py> DictLike<'py> {
                 };
                 let dict = match path.extension().and_then(OsStr::to_str) {
                     Some("db") => load_gate_db(py, &path),
+                    Some("json") => load_json(py, &path),
                     Some("toml") => load_toml(py, &path),
                     _ => Err(PyNotImplementedError::new_err("")),
                 }?;

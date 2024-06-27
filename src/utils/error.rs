@@ -159,7 +159,7 @@ impl<'a> From<Error<'a>> for PyErr {
 //
 // ===============================================================================================
 
-create_exception!(calzone, Geant4Exception, PyException);
+create_exception!(calzone, Geant4Exception, PyException, "A Geant4 exception.");
 
 impl ffi::Error {
     const KEYBOARD_INTERUPT: &'static str = "Ctrl+C catched";

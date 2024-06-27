@@ -27,13 +27,13 @@ pub use super::cxx::ffi;
 //
 // ===============================================================================================
 
-/// A Geant4 simulation interface.
+/// Interface to a Geant4 simulation.
 #[pyclass(module="calzone")]
 pub struct Simulation {
-    /// Monte Carlo `Geometry`.
+    /// The Monte Carlo `Geometry`.
     #[pyo3(get)]
     geometry: Option<Py<Geometry>>,
-    /// Monte Carlo `Physics`.
+    /// Monte Carlo `Physics` settings.
     #[pyo3(get)]
     physics: Py<Physics>,
     /// Monte Carlo pseudo-random stream.
@@ -42,7 +42,7 @@ pub struct Simulation {
     /// Sampling mode for sensitive volumes.
     #[pyo3(get, set)]
     sampling: Option<SamplerMode>,
-    /// Flag to (de)activate Monte Carlo tracks generation.
+    /// Flag to (de)activate the recording of Monte Carlo tracks.
     #[pyo3(get, set)]
     tracking: bool,
 }
