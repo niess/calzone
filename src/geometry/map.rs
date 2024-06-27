@@ -16,23 +16,32 @@ use std::path::Path;
 //
 // ===============================================================================================
 
+/// A structured topography map over a x-y grid.
 #[pyclass(module = "calzone")]
 pub struct Map {
+    /// Coordinates Reference System (CRS).
     #[pyo3(get)]
     crs: Option<usize>,
+    /// Number of nodes along the x-axis.
     #[pyo3(get)]
     nx: usize,
+    /// X-coordinate of map nodes `[:,0]`.
     #[pyo3(get)]
     x0: f64,
+    /// X-coordinate of map nodes `[:,nx-1]`.
     #[pyo3(get)]
     x1: f64,
+    /// Number of nodes along the x-axis.
     #[pyo3(get)]
     ny: usize,
     #[pyo3(get)]
+    /// Y-coordinate of map nodes `[0,:]`.
     y0: f64,
     #[pyo3(get)]
+    /// Y-coordinate of map nodes `[ny-1,:]`.
     y1: f64,
     #[pyo3(get)]
+    /// Topography elevations at map nodes.
     z: PyObject,
 }
 
@@ -65,6 +74,7 @@ impl Map {
         }
     }
 
+    /// Create a new topography map from a 2d-numpy ndarray.
     #[staticmethod]
     fn from_array(
         z: &Bound<PyUntypedArray>,
@@ -107,6 +117,7 @@ impl Map {
         Ok(map)
     }
 
+    /// dump the map to a file.
     #[pyo3(signature = (filename, **kwargs,))]
     fn dump<'py>(
         &self,

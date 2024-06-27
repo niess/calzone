@@ -13,6 +13,7 @@ mod utils;
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
 
+/// CALorimeter ZONE (CalZone)
 #[pymodule]
 fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
 

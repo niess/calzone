@@ -27,18 +27,24 @@ pub use super::cxx::ffi;
 //
 // ===============================================================================================
 
+/// A Geant4 simulation interface.
 #[pyclass(module="calzone")]
 pub struct Simulation {
+    /// Monte Carlo `Geometry`.
     #[pyo3(get)]
     geometry: Option<Py<Geometry>>,
+    /// Monte Carlo `Physics`.
     #[pyo3(get)]
     physics: Py<Physics>,
+    /// Monte Carlo pseudo-random stream.
     #[pyo3(get, set)]
     random: Py<Random>,
+    /// Sampling mode for sensitive volumes.
     #[pyo3(get, set)]
-    sampler: Option<SamplerMode>,
+    sampling: Option<SamplerMode>,
+    /// Flag to (de)activate Monte Carlo tracks generation.
     #[pyo3(get, set)]
-    tracker: bool,
+    tracking: bool,
 }
 
 #[pymethods]
@@ -49,8 +55,8 @@ impl Simulation {
         geometry: Option<GeometryArg>,
         physics: Option<PhysicsArg>,
         random: Option<&Bound<'py, Random>>,
-        sampler: Option<SamplerMode>,
-        tracker: Option<bool>,
+        sampling: Option<SamplerMode>,
+        tracking: Option<bool>,
     ) -> PyResult<Self> {
         let geometry = geometry
             .map(|geometry| {
@@ -67,9 +73,9 @@ impl Simulation {
         let random = random
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
-        let sampler = sampler.or_else(|| Some(SamplerMode::Brief));
-        let tracker = tracker.unwrap_or(false);
-        let simulation = Self { geometry, physics, random, sampler, tracker };
+        let sampling = sampling.or_else(|| Some(SamplerMode::Brief));
+        let tracking = tracking.unwrap_or(false);
+        let simulation = Self { geometry, physics, random, sampling, tracking };
         Ok(simulation)
     }
 
@@ -95,6 +101,7 @@ impl Simulation {
         Ok(())
     }
 
+    /// Run a Geant4 Monte Carlo simulation.
     fn run(
         &self,
         py: Python,
@@ -239,8 +246,8 @@ impl<'a> RunAgent<'a> {
         let physics = simulation.physics.bind(py).borrow().0;
         let random = simulation.random.bind(py).borrow().clone();
         let index = 0;
-        let deposits = simulation.sampler.map(|mode| Deposits::new(mode));
-        let tracker = if simulation.tracker { Some(Tracker::new()) } else { None };
+        let deposits = simulation.sampling.map(|mode| Deposits::new(mode));
+        let tracker = if simulation.tracking { Some(Tracker::new()) } else { None };
         let agent = RunAgent { geometry, physics, primaries, random, index, deposits, tracker };
         Ok(agent)
     }

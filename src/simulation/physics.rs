@@ -11,6 +11,7 @@ use super::ffi;
 //
 // ===============================================================================================
 
+/// Geant4 physics settings.
 #[derive(Default)]
 #[pyclass(module="calzone")]
 pub struct Physics (pub(crate) ffi::Physics);
@@ -48,6 +49,7 @@ impl Physics {
         Ok(physics)
     }
 
+    /// Physics default cut, in cm.
     #[getter]
     fn get_default_cut(&self) -> f64 {
         self.0.default_cut
@@ -65,6 +67,7 @@ impl Physics {
         }
     }
 
+    /// Electromagnetic physics list.
     #[getter]
     fn get_em_model(&self) -> Option<&'static str> {
         let model: Option<EmPhysicsModel> = self.0.em_model.into();
@@ -88,6 +91,7 @@ impl Physics {
         }
     }
 
+    /// Hadronic physics list.
     #[getter]
     fn get_had_model(&self) -> Option<&'static str> {
         let model: Option<HadPhysicsModel> = self.0.had_model.into();

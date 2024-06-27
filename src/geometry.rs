@@ -28,6 +28,7 @@ pub use materials::MaterialsDefinition;
 //
 // ===============================================================================================
 
+/// A static Monte Carlo geometry.
 #[pyclass(frozen, module="calzone")]
 pub struct Geometry (pub(crate) SharedPtr<ffi::GeometryBorrow>);
 
@@ -68,6 +69,7 @@ impl Geometry {
         Ok(volume)
     }
 
+    /// Check for overlapping volumes.
     fn check(&self, resolution: Option<i32>) -> PyResult<()> {
         let resolution = resolution.unwrap_or(1000);
         self.0
@@ -76,6 +78,7 @@ impl Geometry {
         Ok(())
     }
 
+    /// Dump the geometry to a GDML file.
     fn dump(&self, path: Option<&str>) -> PyResult<()> {
         let tmp = TempDir::new()?;
         let path = path.unwrap_or("geometry.gdml");
@@ -90,6 +93,7 @@ impl Geometry {
         Ok(())
     }
 
+    /// Export the geometry as a `goupil.ExternalGeometry` object.
     fn export<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let goupil = py.import_bound("goupil")?;
         let external_geometry = goupil.getattr("ExternalGeometry")?;
@@ -108,9 +112,11 @@ impl Geometry {
 //
 // ===============================================================================================
 
-#[pyclass]
+/// A Monte Carlo geometry constructor.
+#[pyclass(module="calzone")]
 pub struct GeometryBuilder {
     definition: GeometryDefinition,
+    /// Tessellations traversal algorithm.
     #[pyo3(get, set)]
     algorithm: Algorithm,
 }
@@ -160,6 +166,7 @@ impl GeometryBuilder {
         Ok(builder)
     }
 
+    /// Build the Monte Carlo `Geometry`.
     fn build(&self) -> PyResult<Geometry> {
         // build materials.
         if let Some(materials) = self.definition.materials.as_ref() {
@@ -180,6 +187,7 @@ impl GeometryBuilder {
         Ok(geometry)
     }
 
+    /// Delete a geometry `Volume`.
     fn delete<'py>(
         slf: Bound<'py, GeometryBuilder>,
         volume: &str,
@@ -203,6 +211,7 @@ impl GeometryBuilder {
         Err(err.into())
     }
 
+    /// Modify a geometry `Volume`.
     fn modify<'py>(
         slf: Bound<'py, GeometryBuilder>,
         volume: &str,
@@ -241,6 +250,7 @@ impl GeometryBuilder {
         Ok(slf)
     }
 
+    /// (Re)place a geometry `Volume`.
     fn place<'py>(
         slf: Bound<'py, GeometryBuilder>,
         volume: DictLike,

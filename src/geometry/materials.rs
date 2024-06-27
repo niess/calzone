@@ -10,7 +10,7 @@ use super::ffi;
 pub mod gate;
 mod hash;
 
-
+/// Load Geant4 material(s).
 #[pyfunction]
 pub fn load(arg: DictLike) -> PyResult<()> {
     let (materials, file) = arg.resolve(None)?;

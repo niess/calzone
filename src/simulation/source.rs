@@ -10,6 +10,7 @@ use super::ffi;
 //
 // ===============================================================================================
 
+/// Create a `numpy.ndarray` of primary Monte Carlo particles.
 #[pyfunction]
 #[pyo3(signature=(shape=None, **kwargs))]
 pub fn primaries(

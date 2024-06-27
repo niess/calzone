@@ -8,12 +8,15 @@ use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
 
 
+/// A Pseudo-Random Numbers Generator (PRNG).
 #[derive(Clone)]
 #[pyclass(module = "calzone")]
 pub struct Random {
     rng: Pcg64Mcg,
+    /// Prng stream index.
     #[pyo3(get)]
     index: u128,
+    /// Prng initial seed.
     #[pyo3(get)]
     seed: u128,
 }
@@ -46,6 +49,7 @@ impl Random {
         self.initialise(seed)
     }
 
+    /// Generate pseudo-random number(s) uniformly distributed over (0,1).
     fn uniform01(
         &mut self,
         py: Python,
