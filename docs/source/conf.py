@@ -24,6 +24,9 @@ templates_path = ["_templates"]
 exclude_patterns = []
 
 rst_prolog = """
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
 .. role:: python(code)
     :language: python
     :class: highlight

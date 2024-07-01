@@ -137,22 +137,22 @@ impl Map {
             },
             Some("stl") | Some("STL") => {
                 let mut origin: Option<f64x3> = None;
-                let mut min_depth: Option<f64> = None;
+                let mut extra_depth: Option<f64> = None;
                 let mut regular: Option<bool> = None;
                 if let Some(kwargs) = kwargs {
                     const EXTRACTOR: Extractor<3> = Extractor::new([
                         Property::optional_vec("origin"),
-                        Property::optional_f64("min_depth"),
+                        Property::optional_f64("extra_depth"),
                         Property::optional_bool("regular"),
                     ]);
                     let tag = Tag::new("dump", "", None);
                     let [center, depth, reg] = EXTRACTOR.extract_any(&tag, kwargs, None)?;
                     origin = center.into();
-                    min_depth = depth.into();
+                    extra_depth = depth.into();
                     regular = reg.into();
                 }
                 let regular = regular.unwrap_or(false);
-                let facets = self.tessellate(py, regular, origin, min_depth)?;
+                let facets = self.tessellate(py, regular, origin, extra_depth)?;
                 dump_stl(&facets, &path)
             },
             Some(other) => {
@@ -202,7 +202,7 @@ impl Map {
         py: Python,
         regular: bool,
         origin: Option<f64x3>,
-        min_depth: Option<f64>,
+        extra_depth: Option<f64>,
     ) -> PyResult<Vec<f32>> {
         // Unpack or set the origin.
         let (xc, yc, zc) = origin
@@ -223,8 +223,8 @@ impl Map {
             for zi in z {
                 zmin = zmin.min(*zi);
             }
-            let min_depth = min_depth.unwrap_or(Self::DEFAULT_MIN_DEPTH);
-            zmin - (min_depth as f32)
+            let extra_depth = extra_depth.unwrap_or(Self::DEFAULT_MIN_DEPTH);
+            zmin - (extra_depth as f32)
         };
 
         // Helpers for manipulating data.

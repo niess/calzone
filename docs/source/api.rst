@@ -159,9 +159,9 @@ Python interface
 
       The export format is specified by the file extension. It must be one of
       :python:`".png"` or :python:`".stl"`. When exporting as STL, optional
-      *kwargs* can be provided in order to customise the 3D model (see section
-      :ref:`geometry:Topography volume`). For instance, the following exports
-      the map as a PNG image (including topography metadata).
+      *kwargs* can be provided in order to customise the 3D shape (see
+      :numref:`tab-topography-items`). For instance, the following exports the
+      map as a PNG image (including topography metadata).
 
       >>> topography.dump("topography.png")
 

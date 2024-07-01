@@ -4,15 +4,15 @@ CalZone
 
 ----
 
-CalZone is a `Geant4`_ Python wrapper for simulating the energy depositions by
-high energy particles in a calorimeter. The interface strives to be simple,
-relying on :external:py:mod:`numpy`. That is, :py:func:`Primary
-<calzone.primaries>` particles are :py:meth:`injected <calzone.Simulation.run>`
-into the simulation :py:class:`volume <calzone.Geometry>` as a
-:external:py:class:`numpy.ndarray`, and a :external:py:class:`numpy.ndarray` of
-energy deposits is returned. The Monte Carlo :doc:`geometry <geometry>` is
-encoded as a :external:py:class:`dict` structure, which can be defined through
-configuration files, e.g. using `JSON`_ or `TOML`_ formats.
+CalZone is a `Geant4`_ Python wrapper for simulating the energy deposition by
+high-energy particles in a calorimeter. The interface has been designed with
+simplicity in mind. :py:func:`Primary <calzone.primaries>` particles are
+:py:meth:`injected <calzone.Simulation.run>` into the simulation
+:py:class:`volume <calzone.Geometry>` as a :external:py:class:`numpy.ndarray`,
+and a :external:py:class:`numpy.ndarray` of energy deposits is returned. The
+Monte Carlo :doc:`geometry <geometry>` is encoded in a Python
+:external:py:class:`dict`, which can be loaded from configuration files,
+e.g. using `JSON`_ or `TOML`_ formats.
 
 Documentation
 -------------
