@@ -1,7 +1,7 @@
-use crate::utils::extract::{Extractor, Strings, Property, Tag, TryFromBound};
+use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::{Error, variant_explain};
 use crate::utils::error::ErrorKind::{IndexError, ValueError};
-use crate::utils::float::{f64x3, f64x3x3};
+use crate::utils::float::f64x3;
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
 use cxx::SharedPtr;
@@ -217,11 +217,11 @@ impl GeometryBuilder {
         pathname: &str,
         name: Option<String>,
         material: Option<String>,
+        overlaps: Option<DictLike<'py>>,
         position: Option<f64x3>,
-        rotation: Option<f64x3x3>,
+        rotation: Option<Rotation>,
         sensitive: Option<bool>,
         subtract: Option<Strings>,
-        // XXX Overlaps as well?
         // XXX Relocate (mother as well)?
         // XXX Modify shape as well?
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
@@ -238,11 +238,19 @@ impl GeometryBuilder {
         if let Some(material) = material {
             volume.material = material;
         }
+        if let Some(overlaps) = overlaps {
+            let tag = Tag::empty();
+            volume.overlaps = volume::Volume::flatten_overlaps(
+                &tag,
+                &overlaps,
+                volume.volumes.as_slice()
+            )?;
+        }
         if let Some(position) = position {
             volume.position = Some(position);
         }
         if let Some(rotation) = rotation {
-            volume.rotation = Some(rotation);
+            volume.rotation = Some(rotation.into_mat());
         }
         if let Some(sensitive) = sensitive {
             volume.sensitive = sensitive;
@@ -259,14 +267,14 @@ impl GeometryBuilder {
         definition: DictLike,
         mother: Option<&str>,
         position: Option<f64x3>,
-        rotation: Option<f64x3x3>,
+        rotation: Option<Rotation>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
         let GeometryDefinition { mut volume, materials } = GeometryDefinition::new(definition)?;
         if let Some(position) = position {
             volume.position = Some(position);
         }
         if let Some(rotation) = rotation {
-            volume.rotation = Some(rotation);
+            volume.rotation = Some(rotation.into_mat());
         }
         let mut builder = slf.borrow_mut();
         let mother = match mother {

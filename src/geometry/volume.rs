@@ -36,7 +36,7 @@ pub struct Volume {
     pub(super) position: Option<f64x3>,
     pub(super) rotation: Option<f64x3x3>,
     pub(super) volumes: Vec<Volume>,
-    overlaps: Vec<[String; 2]>,
+    pub(super) overlaps: Vec<[String; 2]>,
     pub(super) subtract: Vec<String>,
 }
 
@@ -86,6 +86,68 @@ impl Volume {
             },
         }
         Ok(())
+    }
+
+    pub(super) fn flatten_overlaps<'py>(
+        tag: &Tag,
+        overlaps: &DictLike<'py>,
+        volumes: &[Self],
+    ) -> PyResult<Vec<[String; 2]>> {
+        // Extract and flatten overlaps.
+        let mut o = Vec::<[String; 2]>::new();
+
+        let find = |name: &String| -> PyResult<()> {
+            // Check that the overlaping volume is defined.
+            match volumes.iter().find(|v| &v.name == name) {
+                None => {
+                    let err = tag.bad().what("overlap").why(format!(
+                        "undefined '{}' volume",
+                        name,
+                    )).to_err(ValueError);
+                    Err(err)
+                }
+                Some(_) => Ok(()),
+            }
+        };
+
+        let mut push = |left: String, right: String| -> PyResult<()> {
+            // Order and push an overlap pair.
+            find(&left)?;
+            find(&right)?;
+            match left.cmp(&right) {
+                Greater => o.push([right, left]),
+                _ => o.push([left, right]),
+            }
+            Ok(())
+        };
+
+        let (overlaps, tag) = tag.resolve(&overlaps)?;
+        for (left, right) in overlaps.iter() {
+            let left: String = extract(&left)
+                .or_else(|| tag.bad().what("left overlap").into())?;
+            let result: PyResult<Vec<String>> = right.extract();
+            match result {
+                Err(_) => {
+                    let right: String = extract(&right)
+                        .expect("a (sequence of) 'str'")
+                        .or_else(|| tag.bad().what("right overlap").into())?;
+                    push(left, right)?;
+                },
+                Ok(rights) => {
+                    for right in rights {
+                        push(left.clone(), right)?;
+                    }
+                },
+            }
+        }
+
+        // Sort overlaps.
+        o.sort_by(|a, b| match a[0].cmp(&b[0]) {
+            Equal => a[1].cmp(&b[1]),
+            other => other,
+        });
+        o.dedup(); // remove duplicates.
+        Ok(o)
     }
 
     pub(super) fn validate(&self) -> PyResult<()> {
@@ -254,63 +316,7 @@ impl TryFromBound for Volume {
         // Extract overlaps.
         let overlaps = match overlaps {
             None => Vec::<[String; 2]>::new(),
-            Some(overlaps) => {
-                // Extract and flatten overlaps.
-                let mut o = Vec::<[String; 2]>::new();
-
-                let find = |name: &String| -> PyResult<()> {
-                    // Check that the overlaping volume is defined.
-                    match volumes.iter().find(|v| &v.name == name) {
-                        None => {
-                            let err = tag.bad().what("overlap").why(format!(
-                                "undefined '{}' volume",
-                                name,
-                            )).to_err(ValueError);
-                            Err(err)
-                        }
-                        Some(_) => Ok(()),
-                    }
-                };
-
-                let mut push = |left: String, right: String| -> PyResult<()> {
-                    // Order and push an overlap pair.
-                    find(&left)?;
-                    find(&right)?;
-                    match left.cmp(&right) {
-                        Greater => o.push([right, left]),
-                        _ => o.push([left, right]),
-                    }
-                    Ok(())
-                };
-
-                let (overlaps, tag) = tag.resolve(&overlaps)?;
-                for (left, right) in overlaps.iter() {
-                    let left: String = extract(&left)
-                        .or_else(|| tag.bad().what("left overlap").into())?;
-                    let result: PyResult<Vec<String>> = right.extract();
-                    match result {
-                        Err(_) => {
-                            let right: String = extract(&right)
-                                .expect("a (sequence of) 'str'")
-                                .or_else(|| tag.bad().what("right overlap").into())?;
-                            push(left, right)?;
-                        },
-                        Ok(rights) => {
-                            for right in rights {
-                                push(left.clone(), right)?;
-                            }
-                        },
-                    }
-                }
-
-                // Sort overlaps.
-                o.sort_by(|a, b| match a[0].cmp(&b[0]) {
-                    Equal => a[1].cmp(&b[1]),
-                    other => other,
-                });
-                o.dedup(); // remove duplicates.
-                o
-            },
+            Some(overlaps) => Self::flatten_overlaps(&tag, &overlaps, volumes.as_slice())?,
         };
 
         let volume = Self {

@@ -86,6 +86,10 @@ impl<'a> Tag<'a> {
         Self { typename, name: self.name, path, file: self.file.clone() }
     }
 
+    pub fn empty() -> Self {
+        Self::new("", "", None)
+    }
+
     /// Returns a new `Tag` with a path extended by `value`, and optionally a different type or
     /// file.
     pub fn extend<'b: 'a>(
