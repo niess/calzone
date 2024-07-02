@@ -135,21 +135,27 @@ see :ref:`geometry:Shape definition`.
 Overlaps
 ~~~~~~~~
 
-The :python:`"subtract"` and :python:`"overlaps"` volume properties manage
-overlaps between sister volumes in two distinct ways. The :python:`"subtract"`
-property explicitly specifies a sister volume (by its name) whose shape must be
-subtracted from the volume one. This is typically used to extract portions of
-the :python:`"Ground"` volume to accommodate the :python:`"Detector"` volume.
+The :python:`"subtract"` and :python:`"overlaps"` volume properties address the
+issue of overlaps between sister volumes in two distinct ways. The
+:python:`"subtract"` property explicitly specifies a sister volume (by its name)
+whose shape is to be subtracted from the current volume. This can be employed,
+for instance, to subtract a portion of a :python:`"Ground"` volume to
+accommodate a partially buried :python:`"Detector"` volume.
 
-The :python:`"overlaps"` property specifies pairs of daughter volumes, (see
-:numref:`tab-overlaps-items`), for instance as,
+.. note::
+
+   Only unsubtracted volumes can be subtracted from. Consequently, the
+   *subtract* property does not permit the formation of subtraction chains.
+
+The :python:`"overlaps"` property indicates pairs of overlapping daughter
+volumes, (see :numref:`tab-overlaps-items`), for instance as,
 
 >>> { "overlaps": { "Bottom": [ "Left", "Right" ], "Top": "Left" }}
 
-These volumes are split using an iterative subtraction procedure. It should be
-noted that this procedure does not guarantee which volume is subtracted or not.
-It is intended to be used only for patching small (erroneous) overlaps (e.g. due
-to numeric approximations).
+These volumes are separated using an iterative subtraction procedure. It should
+be noted that this procedure does not guarantee which volume is subtracted or
+not. It is therefore recommended that this method be used only for the purpose
+of patching small (erroneous) overlaps (e.g. due to numeric approximations).
 
 .. _tab-overlaps-items:
 

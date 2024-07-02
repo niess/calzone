@@ -1,4 +1,4 @@
-use crate::utils::error::ErrorKind::ValueError;
+use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
 use crate::utils::error::variant_error;
 use crate::utils::extract::{extract, Extractor, FloatOrVec, Property, PropertyValue, Tag,
                             TryFromBound};
@@ -85,13 +85,54 @@ impl Volume {
 
     pub(super) fn validate(&self) -> PyResult<()> {
         fn inspect(tag: &Tag, volume: &Volume) -> PyResult<()> {
-            let daughters: Vec<_> = volume.volumes.iter().map(|v| v.name()).collect();
+            let daughters: Vec<_> = volume.volumes.iter()
+                .map(|v| (v.name(), v.subtract.is_some()))
+                .collect();
             for v in volume.volumes.iter() {
                 let vtag = tag.extend(v.name.as_ref(), None, None);
                 if let Some(subtract) = v.subtract.as_ref() {
-                    if !daughters.contains(&subtract) {
-                        let why = format!("unknown volume '{}.{}'", tag.path(), subtract);
+                    if subtract == v.name() {
+                        let why = format!("cannot subtract self ('{}.{}')", tag.path(), subtract);
                         return Err(vtag.bad().what("subtract").why(why).to_err(ValueError))
+                    }
+
+                    match daughters.iter().find(|v| v.0 == subtract) {
+                        None => {
+                            let why = format!("unknown volume '{}.{}'", tag.path(), subtract);
+                            return Err(vtag.bad().what("subtract").why(why).to_err(ValueError))
+                        },
+                        Some((_, subtracted)) => if *subtracted {
+                            let why = format!(
+                                "cannot subtract a subtracted volume ('{}.{}')",
+                                tag.path(),
+                                subtract
+                            );
+                            return Err(vtag.bad().what("subtract").why(why)
+                                .to_err(NotImplementedError))
+                        } else {
+                            // Check overlaps.
+                            let mut is_vol = false;
+                            let mut is_sub = false;
+                            for [left, right] in volume.overlaps.iter() {
+                                if left == volume.name() || right == volume.name() {
+                                    is_vol = true;
+                                }
+                                if left == subtract || right == subtract {
+                                    is_sub = true;
+                                }
+                                if is_vol && is_sub {
+                                    let why = format!(
+                                        "cannot subtract overlaping volumes ('{}.{}', '{}'.'{}')",
+                                        tag.path(),
+                                        volume.name(),
+                                        tag.path(),
+                                        subtract,
+                                    );
+                                    return Err(vtag.bad().what("subtract").why(why)
+                                        .to_err(NotImplementedError))
+                                }
+                            }
+                        },
                     }
                 }
                 inspect(&vtag, v)?;
