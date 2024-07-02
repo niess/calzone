@@ -1,6 +1,7 @@
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::error::variant_error;
-use crate::utils::extract::{extract, Extractor, Property, PropertyValue, Tag, TryFromBound};
+use crate::utils::extract::{extract, Extractor, FloatOrVec, Property, PropertyValue, Tag,
+                            TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
 use crate::utils::io::{DictLike, load_stl};
 use crate::utils::units::convert;
@@ -275,7 +276,7 @@ impl TryFromBound for Volume {
 
 impl TryFromBound for ffi::BoxShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let size: PyResult<f64x3> = value.extract();
+        let size: PyResult<FloatOrVec> = value.extract();
         let size: f64x3 = match size {
             Err(_) => {
                 const EXTRACTOR: Extractor<1> = Extractor::new([
@@ -286,7 +287,7 @@ impl TryFromBound for ffi::BoxShape {
                 let [size] = EXTRACTOR.extract_any(&tag, value, None)?;
                 size.into()
             },
-            Ok(size) => size,
+            Ok(size) => size.into_vec(),
         };
         let shape = Self { size: size.into() };
         Ok(shape)

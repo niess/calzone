@@ -481,9 +481,9 @@ impl Property {
                 PropertyValue::F64(value)
             },
             PropertyType::F64x3 => {
-                let value: f64x3 = extract(value)
+                let value: FloatOrVec = extract(value)
                     .or_else(bad_property)?;
-                PropertyValue::F64x3(value)
+                PropertyValue::F64x3(value.into_vec())
             },
             PropertyType::F64x3x3 => {
                 let value: f64x3x3 = extract(value)
@@ -502,6 +502,21 @@ impl Property {
             },
         };
         Ok(value)
+    }
+}
+
+#[derive(FromPyObject)]
+pub enum FloatOrVec {
+    Float(f64),
+    Vec(f64x3),
+}
+
+impl FloatOrVec {
+    pub fn into_vec(self) -> f64x3 {
+        match self {
+            Self::Float(f) => f64x3::splat(f),
+            Self::Vec(v) => v,
+        }
     }
 }
 
@@ -778,8 +793,8 @@ impl TypeName for f64 {
     fn type_name() -> &'static str { "a 'float'" }
 }
 
-impl TypeName for f64x3 {
-    fn type_name() -> &'static str { "a 'vector'" }
+impl TypeName for FloatOrVec {
+    fn type_name() -> &'static str { "a 'float' or a 'vector'" }
 }
 
 impl TypeName for f64x3x3 {
