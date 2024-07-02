@@ -4,7 +4,6 @@ use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use super::ffi;
 
 pub mod gate;
@@ -13,9 +12,8 @@ mod hash;
 /// Load Geant4 material(s).
 #[pyfunction]
 pub fn load(definition: DictLike) -> PyResult<()> {
-    let (materials, file) = definition.resolve(None)?;
-    let tag = Tag::new("", "materials", file.as_deref());
-    let materials = MaterialsDefinition::try_from_dict(&tag, &materials)?;
+    let tag = Tag::new("", "materials", None);
+    let materials = MaterialsDefinition::try_from_dict(&tag, &definition)?;
     materials.build()?;
     Ok(())
 }
@@ -76,15 +74,6 @@ impl TryFromBound for MaterialsDefinition {
             .map_err(|err|
                 tag.bad().why(format!("{}", err.value_bound(py))).to_err(ValueError)
             )?;
-        let (materials, file) = materials.resolve(tag.file())
-            .map_err(|err|
-                tag.bad().why(format!("{}", err.value_bound(py))).to_err(ValueError)
-            )?;
-        let tag = if file.is_some() {
-            Tag::new("materials", "", file.as_deref())
-        } else {
-            tag
-        };
 
         const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::optional_dict("elements"),
@@ -93,7 +82,7 @@ impl TryFromBound for MaterialsDefinition {
         ]);
         let [elements, molecules, mixtures] = EXTRACTOR.extract(&tag, &materials, None)?;
 
-        let elements: Option<Bound<PyDict>> = elements.into();
+        let elements: Option<DictLike> = elements.into();
         let elements = match elements {
             None => Vec::new(),
             Some(elements) => {
@@ -102,7 +91,7 @@ impl TryFromBound for MaterialsDefinition {
             },
         };
 
-        let molecules: Option<Bound<PyDict>> = molecules.into();
+        let molecules: Option<DictLike> = molecules.into();
         let molecules = match molecules {
             None => Vec::new(),
             Some(molecules) => {
@@ -111,7 +100,7 @@ impl TryFromBound for MaterialsDefinition {
             },
         };
 
-        let mixtures: Option<Bound<PyDict>> = mixtures.into();
+        let mixtures: Option<DictLike> = mixtures.into();
         let mixtures = match mixtures {
             None => Vec::new(),
             Some(mixtures) => {
@@ -134,7 +123,7 @@ impl TryFromBound for MaterialsDefinition {
 
 impl TryFromBound for ffi::Element {
     #[allow(non_snake_case)]
-    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
         const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("Z"),
             Property::required_f64("A"),
@@ -156,7 +145,7 @@ impl TryFromBound for ffi::Element {
 }
 
 impl TryFromBound for ffi::Molecule {
-    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
         const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("density"),
             Property::required_dict("composition"),
@@ -173,7 +162,7 @@ impl TryFromBound for ffi::Molecule {
 }
 
 impl TryFromBound for ffi::Mixture {
-    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
         const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("density"),
             Property::required_dict("composition"),
@@ -194,8 +183,8 @@ impl TryFromBound for ffi::Mixture {
 fn try_into_properties<'py>(
     extractor: &Extractor<3>,
     tag: &Tag,
-    value: &Bound<'py, PyDict>
-) -> PyResult<(ffi::MaterialProperties, Bound<'py, PyDict>)> {
+    value: &DictLike<'py>
+) -> PyResult<(ffi::MaterialProperties, DictLike<'py>)> {
     let [density, composition, state] = extractor.extract(tag, value, None)?;
 
     let state: ffi::G4State = if state.is_none() {
@@ -215,7 +204,7 @@ fn try_into_properties<'py>(
         state,
     };
 
-    let composition: Bound<PyDict> = composition.into();
+    let composition: DictLike = composition.into();
     Ok((properties, composition))
 }
 

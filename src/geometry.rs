@@ -328,17 +328,17 @@ struct GeometryDefinition {
 
 impl GeometryDefinition {
     pub fn new(definition: DictLike) -> PyResult<Self> {
-        let (definition, file) = definition.resolve(None)?;
-
         const EXTRACTOR: Extractor<1> = Extractor::new([
             Property::optional_any("materials"),
         ]);
 
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let tag = Tag::new("geometry", "", file.as_deref());
+        let tag = Tag::new("geometry", "", None);
         let [materials] = EXTRACTOR.extract(
             &tag, &definition, Some(&mut remainder)
         )?;
+
+        let (_, file) = definition.resolve(None)?;
 
         if remainder.len() != 1 {
             let why = format!("expected 1 top volume, found {}", remainder.len());

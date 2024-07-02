@@ -2,12 +2,11 @@ use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::error::variant_error;
 use crate::utils::extract::{extract, Extractor, Property, PropertyValue, Tag, TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
-use crate::utils::io::load_stl;
+use crate::utils::io::{DictLike, load_stl};
 use crate::utils::units::convert;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use pyo3::exceptions::{PyNotImplementedError};
 use std::borrow::Cow;
 use std::cmp::Ordering::{Equal, Greater};
@@ -77,7 +76,7 @@ impl Volume {
                 return Err("empty string");
             },
             Some(c) => if !c.is_uppercase() {
-                return Err("should be capitalized");
+                return Err("should be capitalised");
             },
         }
         Ok(())
@@ -115,7 +114,7 @@ impl Volume {
 // ===============================================================================================
 
 impl TryFromBound for Volume {
-    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
         // Check volume name.
         Self::check(tag.name())
             .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
@@ -141,7 +140,7 @@ impl TryFromBound for Volume {
         let sensitive: bool = sensitive.into();
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
-        let overlaps: Option<Bound<PyDict>> = overlaps.into();
+        let overlaps: Option<DictLike> = overlaps.into();
         let subtract: Option<String> = subtract.into();
 
         // Split shape(s) and volumes from remainder.
@@ -159,11 +158,12 @@ impl TryFromBound for Volume {
         };
 
         // Extract shape properties.
+        let (_, tag) = tag.resolve(value)?;
         let get_shape_type = |shape: &str| -> PyResult<ShapeType> {
             ShapeType::from_str(shape)
-                .map_err(|options| {
-                    let message: String = tag.bad().into();
-                    variant_error(message.as_str(), shape, options)
+                .map_err(|_| {
+                    let why = format!("unknown property or shape '{}'", shape);
+                    tag.bad().why(why).to_err(ValueError)
                 })
         };
 
@@ -236,6 +236,7 @@ impl TryFromBound for Volume {
                     Ok(())
                 };
 
+                let (overlaps, tag) = tag.resolve(&overlaps)?;
                 for (left, right) in overlaps.iter() {
                     let left: String = extract(&left)
                         .or_else(|| tag.bad().what("left overlap").into())?;
@@ -293,7 +294,7 @@ impl TryFromBound for ffi::BoxShape {
 }
 
 impl TryFromBound for ffi::CylinderShape {
-    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self> {
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
         const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("length"),
             Property::required_f64("radius"),
@@ -301,7 +302,7 @@ impl TryFromBound for ffi::CylinderShape {
         ]);
 
         let tag = tag.cast("Cylinder");
-        let [length, radius, thickness] = EXTRACTOR.extract_any(&tag, value, None)?;
+        let [length, radius, thickness] = EXTRACTOR.extract(&tag, value, None)?;
         let shape = Self {
             length: length.into(),
             radius: radius.into(),

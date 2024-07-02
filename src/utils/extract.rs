@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::path::Path;
 use super::error::{Error, ErrorKind};
 use super::float::{f64x3, f64x3x3};
+use super::io::DictLike;
 
 
 // ===============================================================================================
@@ -22,16 +23,17 @@ pub trait TryFromBound {
     where
         Self: Sized
     {
-        let value: Bound<PyDict> = extract(value)
+        let value: DictLike = extract(value)
             .or_else(|| tag.bad().what("properties").into())?;
         Self::try_from_dict(tag, &value)
     }
 
-    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self>
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self>
     where
         Self: Sized
     {
-        Self::try_from_any(tag, value.as_any())
+        let (value, tag) = tag.resolve(value)?;
+        Self::try_from_any(&tag, value.as_any())
     }
 }
 
@@ -39,10 +41,11 @@ impl<T> TryFromBound for Vec<T>
 where
     T: TryFromBound + Sized,
 {
-    fn try_from_dict<'py>(tag: &Tag, value: &Bound<'py, PyDict>) -> PyResult<Self>
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self>
     where
         Self: Sized
     {
+        let (value, tag) = tag.resolve(value)?;
         let mut items = Vec::<T>::with_capacity(value.len());
         for (k, v) in value.iter() {
             let name: String = extract(&k)
@@ -56,11 +59,12 @@ where
 }
 
 /// A contextual `Tag` enclosing the type, the name and the path of the object being extracted.
+#[derive(Clone)]
 pub struct Tag<'a> {
     typename: &'a str,
     name: &'a str,
     path: Cow<'a, str>,
-    file: Option<&'a Path>,
+    file: Option<Cow<'a, Path>>,
 }
 
 impl<'a> Tag<'a> {
@@ -69,44 +73,41 @@ impl<'a> Tag<'a> {
     }
 
     pub fn bad_type(&self) -> String {
-        format!("{}bad {}", self.file_prefix(), self.typename)
+        let prefix = match &self.file {
+            None => Cow::Borrowed(""),
+            Some(file) => Cow::Owned(format!("{}: ", file.display())),
+        };
+        format!("{}bad {}", prefix, self.typename)
     }
 
     pub fn cast<'b: 'a>(&'b self, typename: &'a str) -> Tag<'b> {
         let path = Cow::Borrowed(self.path.as_ref());
-        Self { typename, name: self.name, path, file: self.file }
+        Self { typename, name: self.name, path, file: self.file.clone() }
     }
 
     /// Returns a new `Tag` with a path extended by `value`, and optionally a different type or
     /// file.
-    pub fn extend(
-        &self,
+    pub fn extend<'b: 'a>(
+        &'b self,
         value: &'a str,
         typename: Option<&'a str>,
         file: Option<&'a Path>
     ) -> Self {
         let typename = typename.unwrap_or(self.typename);
-        let file = file.or(self.file);
+        let file = file.or(self.file.as_deref());
         if self.name.is_empty() {
             Self::new(typename, value, file)
         } else {
             let path = format!("{}.{}", self.path(), value);
             let path = Cow::Owned(path);
-            Self { typename: typename, name: value, path, file }
+            let file = file.as_ref().map(|file| Cow::Borrowed(*file));
+            Self { typename, name: value, path, file }
         }
     }
 
     /// Returns the file of this `Tag`.
-    pub fn file(&self) -> Option<&'a Path> {
-        self.file
-    }
-
-    /// Returns the file prefix of this `Tag` (for errors printout).
-    pub fn file_prefix<'b>(&'b self) -> Cow<'b, str> {
-        match self.file {
-            None => Cow::Borrowed(""),
-            Some(file) => Cow::Owned(format!("{}: ", file.display())),
-        }
+    pub fn file<'b: 'a>(&'b self) -> Option<&'a Path> {
+        self.file.as_deref()
     }
 
     /// Returns the qualified name of this `Tag`.
@@ -126,12 +127,28 @@ impl<'a> Tag<'a> {
     /// Returns a new `Tag` initialised with `name`.
     pub fn new(typename: &'a str, name: &'a str, file: Option<&'a Path>) -> Self {
         let path = Cow::Borrowed(name);
+        let file = file.as_ref().map(|file| Cow::Borrowed(*file));
         Self { typename, name, path, file }
     }
 
     /// Returns the path of this `Tag`.
     pub fn path<'b>(&'b self) -> &'b str {
         &self.path
+    }
+
+    pub fn resolve<'b: 'a + 'c, 'c, 'py>(&'b self, dict: &'c DictLike<'py>) -> PyResult<(Cow<'c, Bound<'py, PyDict>>, Self)> {
+        let py = dict.py();
+        let (dict, file) = dict.resolve(self.file())
+            .map_err(|err|
+                self.bad().why(format!("{}", err.value_bound(py))).to_err(ErrorKind::ValueError)
+            )?;
+        let tag = if file.is_some() {
+            let file = Some(Cow::Owned(file.unwrap()));
+            Self { typename: self.typename, name: self.name, path: self.path.clone(), file }
+        } else {
+            self.clone()
+        };
+        Ok((dict, tag))
     }
 }
 
@@ -147,10 +164,10 @@ impl<'a, 'b> TaggedBad<'a, 'b> {
     }
 
     pub fn to_err(&self, kind: ErrorKind) -> PyErr {
-        let prefix = self.tag.file_prefix();
         let tag = self.tag.qualified_name();
+        let prefix = self.tag.file.as_ref().map(|file| file.to_string_lossy());
         Error::new(kind)
-            .r#where(prefix.as_ref())
+            .maybe_where(prefix.as_deref())
             .who(tag.as_str())
             .maybe_what(self.what)
             .maybe_why(self.why.as_deref())
@@ -170,10 +187,10 @@ impl<'a, 'b> TaggedBad<'a, 'b> {
 
 impl<'a, 'b> From<TaggedBad<'a, 'b>> for String {
     fn from(value: TaggedBad<'a, 'b>) -> Self {
-        let prefix = value.tag.file_prefix();
         let tag = value.tag.qualified_name();
+        let prefix = value.tag.file.as_ref().map(|file| file.to_string_lossy());
         Error::default()
-            .r#where(prefix.as_ref())
+            .maybe_where(prefix.as_deref())
             .who(tag.as_str())
             .maybe_what(value.what)
             .maybe_why(value.why.as_deref())
@@ -224,7 +241,7 @@ enum PropertyType {
 pub enum PropertyValue<'py> {
     Any(Bound<'py, PyAny>),
     Bool(bool),
-    Dict(Bound<'py, PyDict>),
+    Dict(DictLike<'py>),
     F64(f64),
     F64x3(f64x3),
     F64x3x3(f64x3x3),
@@ -237,9 +254,11 @@ impl<const N: usize> Extractor<N> {
     pub fn extract<'a, 'py>(
         &self,
         tag: &Tag,
-        dict: &'a Bound<'py, PyDict>,
+        dict: &'a DictLike<'py>,
         mut remainder: Option<&mut IndexMap<String, Bound<'py, PyAny>>>,
     ) -> PyResult<[PropertyValue<'py>; N]> {
+        // Resolve dict object.
+        let (dict, tag) = tag.resolve(dict)?;
 
         // Extract properties from (key, value).
         let mut values: [PropertyValue; N] = std::array::from_fn(|_| PropertyValue::None);
@@ -248,7 +267,7 @@ impl<const N: usize> Extractor<N> {
                 .or_else(|| tag.bad().what("key").into())?;
             for (index, property) in self.properties.iter().enumerate() {
                 if k == property.name {
-                    values[index] = property.extract(tag, &v)?;
+                    values[index] = property.extract(&tag, &v)?;
                     continue 'items;
                 }
             }
@@ -291,7 +310,7 @@ impl<const N: usize> Extractor<N> {
         any: &'a Bound<'py, PyAny>,
         remainder: Option<&mut IndexMap<String, Bound<'py, PyAny>>>,
     ) -> PyResult<[PropertyValue<'py>; N]> {
-        let dict: Bound<PyDict> = extract(any)
+        let dict: DictLike = extract(any)
             .or_else(|| tag.bad().what("properties").into())?;
         self.extract(tag, &dict, remainder)
     }
@@ -452,7 +471,7 @@ impl Property {
                 PropertyValue::Bool(value)
             },
             PropertyType::Dict => {
-                let value: Bound<PyDict> = extract(value)
+                let value: DictLike = extract(value)
                     .or_else(bad_property)?;
                 PropertyValue::Dict(value)
             },
@@ -557,8 +576,8 @@ impl<'py> From<PropertyValue<'py>> for Option<bool> {
     }
 }
 
-impl<'py> From<PropertyValue<'py>> for Bound<'py, PyDict> {
-    fn from(value: PropertyValue<'py>) -> Bound<'py, PyDict> {
+impl<'py> From<PropertyValue<'py>> for DictLike<'py> {
+    fn from(value: PropertyValue<'py>) -> DictLike<'py> {
         match value {
             PropertyValue::Dict(value) => value,
             _ => unreachable!(),
@@ -566,8 +585,8 @@ impl<'py> From<PropertyValue<'py>> for Bound<'py, PyDict> {
     }
 }
 
-impl<'py> From<PropertyValue<'py>> for Option<Bound<'py, PyDict>> {
-    fn from(value: PropertyValue<'py>) -> Option<Bound<'py, PyDict>> {
+impl<'py> From<PropertyValue<'py>> for Option<DictLike<'py>> {
+    fn from(value: PropertyValue<'py>) -> Option<DictLike<'py>> {
         match value {
             PropertyValue::Dict(value) => Some(value),
             PropertyValue::None => None,
@@ -771,8 +790,8 @@ impl TypeName for PyAny {
     fn type_name() -> &'static str { "an 'object'" }
 }
 
-impl TypeName for PyDict {
-    fn type_name() -> &'static str { "a 'dict'" }
+impl<'py> TypeName for DictLike<'py> {
+    fn type_name() -> &'static str { "a 'dict' or a 'str'" }
 }
 
 impl TypeName for String {

@@ -46,6 +46,11 @@ impl<'a> Error<'a> {
         self
     }
 
+    pub fn maybe_where(mut self, r#where: Option<&'a str>) -> Self {
+        self.r#where = r#where;
+        self
+    }
+
     pub fn maybe_why(mut self, why: Option<&'a str>) -> Self {
         self.why = why;
         self

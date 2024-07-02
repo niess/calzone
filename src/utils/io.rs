@@ -98,6 +98,13 @@ impl<'py> DictLike<'py> {
         };
         Ok(result)
     }
+
+    pub fn py(&self) -> Python<'py> {
+        match self {
+            Self::Dict(dict) => dict.py(),
+            Self::String(path) => path.py(),
+        }
+    }
 }
 
 
