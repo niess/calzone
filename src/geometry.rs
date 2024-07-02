@@ -203,7 +203,7 @@ impl GeometryBuilder {
         }
         let builder = slf.borrow();
         let why = if builder.definition.volume.name() == pathname {
-            format!("cannot delete top volume '{}'", pathname)
+            format!("cannot delete root volume '{}'", pathname)
         } else {
             format!("unknown '{}' volume", pathname)
         };
@@ -215,26 +215,16 @@ impl GeometryBuilder {
     fn modify<'py>(
         slf: Bound<'py, GeometryBuilder>,
         pathname: &str,
-        name: Option<String>,
         material: Option<String>,
         overlaps: Option<DictLike<'py>>,
         position: Option<f64x3>,
         rotation: Option<Rotation>,
         sensitive: Option<bool>,
         subtract: Option<Strings>,
-        // XXX Relocate (mother as well)?
         // XXX Modify shape as well?
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
         let mut builder = slf.borrow_mut();
         let volume = builder.find_mut(pathname)?;
-        if let Some(name) = name {
-            volume::Volume::check(&name)
-                .map_err(|why| {
-                    let what = format!("name '{}'", name);
-                    Error::new(ValueError).what(&what).why(why).to_err()
-                })?;
-            volume.name = name;
-        }
         if let Some(material) = material {
             volume.material = material;
         }
@@ -258,6 +248,81 @@ impl GeometryBuilder {
         if let Some(subtract) = subtract {
             volume.subtract = subtract.into_vec();
         }
+        Ok(slf)
+    }
+
+    /// Relocate a volume within the geometry definition.
+    fn r#move<'py>(
+        slf: Bound<'py, GeometryBuilder>,
+        source: &str,
+        destination: &str,
+    ) -> PyResult<Bound<'py, GeometryBuilder>> {
+        let (src_mother, src_name) = source.rsplit_once('.')
+            .ok_or_else(|| {
+                let why = format!("cannot relocate root volume '{}'", source);
+                let err: PyErr = Error::new(ValueError)
+                    .what("geometry operation").why(&why).into();
+                err
+            })?;
+        let (dst_mother, dst_name) = destination.rsplit_once('.')
+            .ok_or_else(|| {
+                let why = format!("cannot relocate as root volume '{}'", source);
+                let err: PyErr = Error::new(ValueError)
+                    .what("geometry operation").why(&why).into();
+                err
+            })?;
+        if dst_name != src_name {
+            volume::Volume::check(&dst_name)
+                .map_err(|why| {
+                    let what = format!("name '{}'", dst_name);
+                    Error::new(ValueError).what(&what).why(why).to_err()
+                })?;
+        }
+        let mut builder = slf.borrow_mut();
+        if dst_mother == src_mother {
+            let volume = builder.find_mut(source)?;
+            if volume.name != dst_name {
+                volume.name = dst_name.to_string();
+            }
+            return Ok(slf);
+        }
+        if !builder.contains(dst_mother) {
+            let why = format!("unknown '{}' volume", dst_mother);
+            let err: PyErr = Error::new(ValueError)
+                .what("geometry operation").why(&why).into();
+            return Err(err);
+        }
+        let mut volume = {
+            let src_mother = builder.find_mut(src_mother)?;
+            let mut volume = None;
+            for i in 0..src_mother.volumes.len() {
+                let v = &src_mother.volumes[i];
+                if v.name == src_name {
+                    volume = Some(src_mother.volumes.remove(i));
+                    break;
+                }
+            }
+            let volume = volume
+                .ok_or_else(|| {
+                    let why = format!("unknown '{}' volume", source);
+                    let err: PyErr = Error::new(ValueError)
+                        .what("geometry operation").why(&why).into();
+                    err
+                })?;
+            volume
+        };
+
+        let dst_mother = builder.find_mut(dst_mother)?;
+        for v in dst_mother.volumes.iter_mut() {
+            if v.name == dst_name {
+                *v = volume;
+                return Ok(slf)
+            }
+        }
+        if volume.name != dst_name {
+            volume.name = dst_name.to_string();
+        }
+        dst_mother.volumes.push(volume);
         Ok(slf)
     }
 
@@ -296,6 +361,29 @@ impl GeometryBuilder {
 }
 
 impl GeometryBuilder {
+    fn contains(&self, path: &str) -> bool {
+        let mut names = path.split(".");
+        let volume = match names.next() {
+            None => None,
+            Some(name) => {
+                let volume = self.definition.volume.as_ref();
+                if name != volume.name() {
+                    None
+                } else {
+                    let mut volume = Some(volume);
+                    for name in names {
+                        volume = volume.unwrap().volumes.iter().find(|v| v.name() == name);
+                        if volume.is_none() {
+                            break
+                        }
+                    }
+                    volume
+                }
+            },
+        };
+        volume.is_some()
+    }
+
     fn find_mut<'a>(&'a mut self, path: &str) -> PyResult<&'a mut volume::Volume> {
         let mut names = path.split(".");
         let volume = match names.next() {
@@ -327,7 +415,7 @@ impl GeometryBuilder {
 //
 // Geometry definition.
 //
-// This is a thin wrapper collecting the top volume description and some optional material
+// This is a thin wrapper collecting the root volume description and some optional material
 // definitions.
 //
 // ===============================================================================================
@@ -352,7 +440,7 @@ impl GeometryDefinition {
         let (_, file) = definition.resolve(None)?;
 
         if remainder.len() != 1 {
-            let why = format!("expected 1 top volume, found {}", remainder.len());
+            let why = format!("expected 1 root volume, found {}", remainder.len());
             let err = Error::new(ValueError).what("geometry").why(&why);
             return Err(err.into());
         }
@@ -396,7 +484,7 @@ pub struct Volume {
     solid: String,
     /// Flag indicating whether or not energy deposits are sampled.
     #[pyo3(get)]
-    sensitive: bool,
+    sensitive: bool, // XXX make this mutable?
     /// The mother of this volume, if any (i.e. directly containing this volume).
     #[pyo3(get)]
     mother: Option<String>,

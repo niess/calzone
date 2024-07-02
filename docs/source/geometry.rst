@@ -99,6 +99,8 @@ below, in :numref:`tab-geometry-items`.
      - :python:`dict` (:numref:`tab-materials-items`)
      - :python:`None`
 
+.. _pathname:
+
 .. topic:: Pathname
 
    Geometry volumes are identified by their absolute pathname, which is formed

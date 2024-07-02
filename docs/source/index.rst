@@ -11,8 +11,17 @@ simplicity in mind. :py:func:`Primary <calzone.primaries>` particles are
 :py:class:`volume <calzone.Geometry>` as a :external:py:class:`numpy.ndarray`,
 and a :external:py:class:`numpy.ndarray` of energy deposits is returned. The
 Monte Carlo :doc:`geometry <geometry>` is encoded in a Python
-:external:py:class:`dict`, which can be loaded from configuration files,
-e.g. using `JSON`_ or `TOML`_ formats.
+:external:py:class:`dict`, which can be loaded from configuration files, e.g.
+using `JSON`_, `TOML`_ or `YAML` formats. This basic workflow is illustrated
+below,
+
+.. code:: python
+
+   import calzone
+
+   simulation = calzone.Simulation("geometry.toml")
+   primaries = calzone.primaries(10000, energy=0.5, position=(0,0,1))
+   deposits = simulation.run(primaries)
 
 Documentation
 -------------
@@ -41,3 +50,4 @@ System of units
 .. _JSON: https://www.json.org/json-en.html
 .. _Geant4: https://geant4.web.cern.ch/docs/
 .. _TOML: https://toml.io/en/
+.. _YAML: https://yaml.org/

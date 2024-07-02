@@ -33,7 +33,7 @@ Python interface
    .. method:: __getitem__(self, pathname)
 
       Return an interface to a Monte Carlo :py:class:`Volume` given its absolute
-      *pathname* inside the geometry. For instance,
+      :ref:`pathname <pathname>` inside the geometry. For instance,
 
       >>> volume = geometry["Environment.Detector"]
 
@@ -88,21 +88,31 @@ Python interface
 
    .. automethod:: delete
 
-      The volume to remove is identified by its absolute *pathname*. For
-      instance, the following deletes the :python:`"Detector"` volume nested
-      inside the root :python:`"Environment"` one.
+      The volume to remove is identified by its absolute :ref:`pathname
+      <pathname>`. For instance, the following deletes the :python:`"Detector"`
+      volume nested inside the root :python:`"Environment"` one.
 
       >>> builder.delete("Environment.Detector")
 
    .. automethod:: modify
 
-      The volume to modify is identified by its absolute *pathname*. The other
-      arguments specify replacement values, if not :python:`None`. See the
-      :doc:`geometry description <geometry>` section for the meaning of each
-      argument. For instance, the following enables the sampling of energy
-      deposits in the root :python:`"Environment"` volume.
+      The volume to modify is identified by its absolute :ref:`pathname
+      <pathname>`. The other arguments specify replacement values, if not
+      :python:`None`. See :numref:`tab-volume-items` for the meaning of
+      arguments. For instance, the following changes the *material* of the root
+      :python:`"Environment"` volume.
 
-      >>> builder.modify("Environment", sensitive=True)
+      >>> builder.modify("Environment", material="G4_WATER")
+
+   .. automethod:: move
+
+      *Source* and *destination* volumes are identified by their absolute
+      :ref:`pathnames <pathname>`. For instance, the following renames the
+      :python:`"Detector"` volume,
+
+      >>> builder.move("Environment.Detector", "Environment.Scintillator")
+
+      .. note:: the root volume cannot be moved, nor replaced with this method.
 
    .. automethod:: place
 
@@ -126,10 +136,10 @@ Python interface
 
    The material(s) *definition* can be provided directly as a Python
    :python:`dict` object, or loaded from a *definition* file (in Gate DB, JSON
-   or TOML format). For instance, the following loads materials from a Gate DB
+   or TOML format). For instance, the following imports materials from a Gate DB
    file.
 
-   >>> calzone.load("materials.db")
+   >>> calzone.import("materials.db")
 
    .. important::
 
@@ -398,20 +408,18 @@ Python interface
    instanciated Monte Carlo geometry. Note that the geometry is static, i.e. it
    cannot be modified once it has been built.
 
-   Since :py:class:`Volume` objects are related to a :py:class:`Geometry`, they
-   cannot be instaciated directly. Instead, they are indexed from a geometry,
-   e.g. as
+   :py:class:`Volume` objects are linked to a :py:class:`Geometry`, and cannot
+   be instanciated directly. Instead, they are indexed from a geometry, e.g. as
 
    >>> volume = geometry["Environment.Detector"]
 
    .. automethod:: aabb
 
       The *frame* argument specifies the reference volume (by its absolute
-      *pathname*) of the axis-aligned bounding-box. If *frame* is
-      :python:`None`, then the bounding box is computed in the root frame of the
-      simulation. For instance, the following computes the volume 
-      AABB in its own frame (thus, the AABB of the underlying `G4VSolid`_,
-      actually).
+      :ref:`pathname <pathname>`) of the axis-aligned bounding-box. If *frame*
+      is :python:`None`, then the bounding box is computed in the root frame of
+      the simulation. For instance, the following computes the volume AABB in
+      its own frame (thus, the AABB of the underlying `G4VSolid`_, actually).
 
       >>> aabb = volume.aabb(volume.name)
 
@@ -423,9 +431,9 @@ Python interface
 
    .. autoattribute:: daughters
 
-      Daughter's absolute pathnames are given, as a :external:py:class:`tuple`
-      of :external:py:class:`str` objects. Note that only direct descendants are
-      reported (e.g., not grand-daughters).
+      Daughter's absolute :ref:`pathnames <pathname>` are returned, as a
+      :external:py:class:`tuple` of :external:py:class:`str` objects. Note that
+      only direct descendants are reported (e.g., not grand-daughters).
 
    .. autoattribute:: material
 
