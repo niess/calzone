@@ -119,3 +119,9 @@ impl From<f64x3x3> for [[f64; 3]; 3] {
         value.0
     }
 }
+
+impl From<[[f64; 3]; 3]> for f64x3x3 {
+    fn from(value: [[f64; 3]; 3]) -> Self {
+        Self(value)
+    }
+}

@@ -49,7 +49,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add("Geant4Exception", py.get_type_bound::<utils::error::Geant4Exception>())?;
 
     // Register function(s).
-    module.add_function(wrap_pyfunction!(geometry::materials::load, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::materials::import, module)?)?;
     module.add_function(wrap_pyfunction!(simulation::source::primaries, module)?)?;
 
     // Register Geant4 finalisation.

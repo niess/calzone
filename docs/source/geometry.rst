@@ -7,7 +7,7 @@ represents this structure using base Python objects
 (:external:py:class:`bool`, :external:py:class:`dict`,
 :external:py:class:`float`, :external:py:class:`int`, :external:py:class:`list`
 and :external:py:class:`str`) that have associated representations in common
-configuration languages, such as `JSON`_ or `TOML`_.
+configuration languages, such as `JSON`_, `TOML`_ or `YAML`_.
 
 Geometry objects
 ----------------
@@ -33,38 +33,41 @@ Substitution rules
 
 For the sake of convenience, the values of geometry objects are subject to
 certain substitution rules, which are listed in
-:numref:`tab-geometry-equivalences`. To illustrate, a :external:py:class:`str`
+:numref:`tab-geometry-substitutions`. To illustrate, a :external:py:class:`str`
 (which refers to a compatible file) can be substituted for any
 :external:py:class:`dict` value. Another useful rule is that a size-one
 :external:py:class:`dict` whose item key can be inferred, can be substituted
 with the item value. This occurs, for instance, for object values that have a
-single mandatory property. For instance, using substitution rules, the previous cubic box shape
-simplifies as,
+single mandatory property. For instance, using substitution rules, the previous
+cubic box shape simplifies as,
 
 >>> { "box": 1.0 }
 
-.. _tab-geometry-equivalences:
+.. _tab-geometry-substitutions:
 
 .. list-table:: Substitution rules.
    :width: 75%
    :widths: auto
    :header-rows: 1
 
-   * - Value type
-     - Equivalent type
+   * - Type
+     - Substitute
      - Comment
    * - :python:`dict`
      - :python:`str`
-     - :python:`"*.json"` or :python:`"*.toml"`.
+     - :python:`"*.json"`, :python:`"*.toml"` or :python:`"*.yaml"`.
    * - :python:`{ key: value }`
      - :python:`value`
-     - If :python:`key` can be inferred.
-   * - :python:`[float; 3]`
-     - :python:`float`
+     - If the :python:`key` can be inferred.
+   * - :python:`[T; N]`
+     - :python:`T`
      - E.g., :python:`1.0 -> [ 1.0, 1.0, 1.0 ]`.
-   * - :python:`[str]`
-     - :python:`str`
+   * - :python:`[T]`
+     - :python:`T`
      - E.g., :python:`"Detector" -> [ "Detector" ]`.
+   * - :python:`[[float; 3]; 3]`
+     - :python:`[float; 3]`
+     - Rotation vector (with :underline:`angle in deg`).
 
 
 Geometry structure
@@ -552,3 +555,4 @@ composition. Optionaly, a *state* can be specified ( :python:`"gas"`,
 .. _NIST: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html?highlight=nist#
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _TOML: https://toml.io/en/
+.. _YAML: https://yaml.org/

@@ -19,9 +19,9 @@ Python interface
 
       Create a new geometry instance from a *definition*. The :doc:`geometry
       definition <geometry>` can be provided directly as a Python :python:`dict`
-      object, or loaded from a *definition* file (in JSON, or TOML format). For
-      instance, the following creates a Monte Carlo geometry from a
-      :python:`dict`-definition encoded in a TOML file.
+      object, or loaded from a *definition* file (in `JSON`_, `TOML`_, or
+      `YAML`_ format). For instance, the following creates a Monte Carlo
+      geometry from a :python:`dict`-definition encoded in a `TOML`_ file.
 
       >>> geometry = calzone.Geometry("geometry.toml")
 
@@ -47,11 +47,13 @@ Python interface
       :py:class:`Geant4Exception` is raised. Thus, only the first found overlap
       is reported, in case that the geometry comprises multiple overlaps.
 
-   .. automethod:: dump
+   .. method:: dump(path=None)
+
+      Dump the geometry to a `GDML`_ file.
 
       If *path* is :python:`None`, then the geometry is dumped to
       :python:`"geometry.gdml"`. Note that contrary to Geant4, this method
-      erases any existing GDML file with the same name.
+      erases any existing `GDML`_ file with the same name.
 
    .. method:: export()
 
@@ -120,7 +122,7 @@ Python interface
 
 ----
 
-.. autofunction:: calzone.load
+.. autofunction:: calzone.import
 
    The material(s) *definition* can be provided directly as a Python
    :python:`dict` object, or loaded from a *definition* file (in Gate DB, JSON
@@ -445,6 +447,8 @@ Python interface
 .. ============================================================================
 
 .. _EMConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/electromagnetic/index.html
+.. _GDML: https://gdml.web.cern.ch/GDML/
+.. _JSON: https://www.json.org/json-en.html
 .. _HadConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/reference_PL/index.html
 .. _ExternalGeometry: https://goupil.readthedocs.io/en/latest/py/external_geometry.html
 .. _G4EmExtraPhysics: https://geant4.kek.jp/Reference/11.2.0/classG4EmExtraPhysics.html
@@ -455,4 +459,6 @@ Python interface
 .. _Geotiff: https://github.com/KipCrossing/geotiff
 .. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
+.. _TOML: https://toml.io/en/
 .. _WikipediaPCG: https://en.wikipedia.org/wiki/Permuted_congruential_generator
+.. _YAML: https://yaml.org/

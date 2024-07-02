@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use nalgebra::{Rotation3, Unit, Vector3};
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::PyDict;
@@ -245,7 +246,7 @@ pub enum PropertyValue<'py> {
     Dict(DictLike<'py>),
     F64(f64),
     F64x3(f64x3),
-    F64x3x3(f64x3x3), // XXX Implement from rotation vector.
+    F64x3x3(f64x3x3),
     None,
     String(String),
     Strings(Vec<String>),
@@ -495,14 +496,14 @@ impl Property {
                 PropertyValue::F64(value)
             },
             PropertyType::F64x3 => {
-                let value: FloatOrVec = extract(value)
+                let value: Vector = extract(value)
                     .or_else(bad_property)?;
                 PropertyValue::F64x3(value.into_vec())
             },
             PropertyType::F64x3x3 => {
-                let value: f64x3x3 = extract(value)
+                let value: Rotation = extract(value)
                     .or_else(bad_property)?;
-                PropertyValue::F64x3x3(value)
+                PropertyValue::F64x3x3(value.into_mat())
             },
             PropertyType::String => {
                 let value: String = extract(value)
@@ -525,18 +526,42 @@ impl Property {
 }
 
 #[derive(FromPyObject)]
-pub enum FloatOrVec {
+pub enum Vector {
     #[pyo3(transparent, annotation = "float")]
     Float(f64),
-    #[pyo3(transparent, annotation = "[float]")]
+    #[pyo3(transparent, annotation = "[float;3]")]
     Vec(f64x3),
 }
 
-impl FloatOrVec {
+impl Vector {
     pub fn into_vec(self) -> f64x3 {
         match self {
             Self::Float(f) => f64x3::splat(f),
             Self::Vec(v) => v,
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+pub enum Rotation {
+    #[pyo3(transparent, annotation = "[[float;3];3]")]
+    Matrix(f64x3x3),
+    #[pyo3(transparent, annotation = "[float;3]")]
+    Vector(f64x3),
+}
+
+impl Rotation {
+    pub fn into_mat(self) -> f64x3x3 {
+        match self {
+            Self::Matrix(m) => m,
+            Self::Vector(v) => {
+                let v = Vector3::<f64>::from_iterator(v.as_ref().iter().map(|v| *v));
+                let angle = (v.norm() / 90.0) * std::f64::consts::PI;
+                let axis = Unit::new_normalize(v);
+                let rotation = Rotation3::from_axis_angle(&axis, angle);
+                let rotation: [[f64; 3]; 3] = rotation.into_inner().into();
+                rotation.into()
+            },
         }
     }
 }
@@ -841,12 +866,12 @@ impl TypeName for f64 {
     fn type_name() -> &'static str { "a 'float'" }
 }
 
-impl TypeName for FloatOrVec {
+impl TypeName for Vector {
     fn type_name() -> &'static str { "a (vector of) 'float'" }
 }
 
-impl TypeName for f64x3x3 {
-    fn type_name() -> &'static str { "a 'matrix'" }
+impl TypeName for Rotation {
+    fn type_name() -> &'static str { "a 'rotation'" }
 }
 
 impl TypeName for PyAny {

@@ -12,43 +12,54 @@ use std::path::{Path, PathBuf};
 
 // ===============================================================================================
 //
-// Dict config loader.
+// Dict loaders.
 //
 // ===============================================================================================
 
-pub fn load_json<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|err| match err.kind() {
-            std::io::ErrorKind::NotFound => {
-                let path = format!("No such file or directory '{}'", path.display());
-                PyFileNotFoundError::new_err(path)
-            },
-            _ => err.into(),
-        })?;
-    let json = py.import_bound("json")?;
-    let loads = json.getattr("loads")?;
-    let content = loads.call1((content,))?;
-    let dict: Bound<PyDict> = content.extract()?;
-    Ok(dict)
+trait ConfigFormat {
+    fn import_module<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyModule>>;
+
+    fn load_dict<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|err| match err.kind() {
+                std::io::ErrorKind::NotFound => {
+                    let path = format!("No such file or directory '{}'", path.display());
+                    PyFileNotFoundError::new_err(path)
+                },
+                _ => err.into(),
+            })?;
+        let module = Self::import_module(py)?;
+        let loads = module.getattr("loads")?;
+        let content = loads.call1((content,))?;
+        let dict: Bound<PyDict> = content.extract()?;
+        Ok(dict)
+    }
 }
 
-pub fn load_toml<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|err| match err.kind() {
-            std::io::ErrorKind::NotFound => {
-                let path = format!("No such file or directory '{}'", path.display());
-                PyFileNotFoundError::new_err(path)
-            },
-            _ => err.into(),
-        })?;
-    let toml = py.import_bound("tomllib")
-        .or_else(|_| py.import_bound("tomli"))?;
-    let loads = toml.getattr("loads")?;
-    let content = loads.call1((content,))?;
-    let dict: Bound<PyDict> = content.extract()?;
-    Ok(dict)
+struct Json;
+
+impl ConfigFormat for Json {
+    fn import_module<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyModule>> {
+        py.import_bound("json")
+    }
 }
 
+struct Toml;
+
+impl ConfigFormat for Toml {
+    fn import_module<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyModule>> {
+        py.import_bound("tomllib")
+            .or_else(|_| py.import_bound("tomli"))
+    }
+}
+
+struct Yaml;
+
+impl ConfigFormat for Yaml {
+    fn import_module<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyModule>> {
+        py.import_bound("yaml")
+    }
+}
 
 // ===============================================================================================
 //
@@ -89,8 +100,9 @@ impl<'py> DictLike<'py> {
                 };
                 let dict = match path.extension().and_then(OsStr::to_str) {
                     Some("db") => load_gate_db(py, &path),
-                    Some("json") => load_json(py, &path),
-                    Some("toml") => load_toml(py, &path),
+                    Some("json") => Json::load_dict(py, &path),
+                    Some("toml") => Toml::load_dict(py, &path),
+                    Some("yml") | Some("yaml") => Yaml::load_dict(py, &path),
                     _ => Err(PyNotImplementedError::new_err("")),
                 }?;
                 (Cow::Owned(dict), Some(path.to_path_buf()))
