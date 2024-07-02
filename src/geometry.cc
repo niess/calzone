@@ -258,11 +258,11 @@ static G4VSolid * build_solids(
             daughters.push_back(s);
             auto && t = local_transform(v);
             transforms[v.name()] = std::move(t);
-            rust::String subtract = std::move(v.subtract());
-            if (!subtract.empty()) {
+
+            for (auto && subtract: v.subtract()) {
                 std::array<rust::String, 2> item = {
                     v.name(),
-                    std::move(subtract)
+                    subtract
                 };
                 subtractions.push_back(std::move(item));
             }
@@ -316,12 +316,12 @@ static G4VSolid * build_solids(
         solids[path0] = boolean;
     };
 
-    for (auto item: subtractions) {
-        subtract(item);
-    }
-
     for (auto overlap: volume.overlaps()) {
         subtract(overlap);
+    }
+
+    for (auto item: subtractions) {
+        subtract(item);
     }
 
     // Build current solid.

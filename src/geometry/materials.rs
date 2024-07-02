@@ -11,7 +11,7 @@ mod hash;
 
 /// Load Geant4 material(s).
 #[pyfunction]
-pub fn load(definition: DictLike) -> PyResult<()> {
+pub fn load(definition: DictLike) -> PyResult<()> { // XXX rename to "import"?
     let tag = Tag::new("", "materials", None);
     let materials = MaterialsDefinition::try_from_dict(&tag, &definition)?;
     materials.build()?;

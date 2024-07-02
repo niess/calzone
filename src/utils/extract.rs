@@ -235,6 +235,7 @@ enum PropertyType {
     F64x3,
     F64x3x3,
     String,
+    Strings,
     U32,
 }
 
@@ -244,9 +245,10 @@ pub enum PropertyValue<'py> {
     Dict(DictLike<'py>),
     F64(f64),
     F64x3(f64x3),
-    F64x3x3(f64x3x3),
+    F64x3x3(f64x3x3), // XXX Implement from rotation vector.
     None,
     String(String),
+    Strings(Vec<String>),
     U32(u32),
 }
 
@@ -401,6 +403,12 @@ impl Property {
         Self::new(name, tp, default)
     }
 
+    pub const fn optional_strs(name: &'static str) -> Self {
+        let tp = PropertyType::Strings;
+        let default = PropertyDefault::Optional;
+        Self::new(name, tp, default)
+    }
+
     pub const fn optional_u32(name: &'static str) -> Self {
         let tp = PropertyType::U32;
         let default = PropertyDefault::Optional;
@@ -434,6 +442,12 @@ impl Property {
 
     pub const fn required_str(name: &'static str) -> Self {
         let tp = PropertyType::String;
+        let default = PropertyDefault::Required;
+        Self::new(name, tp, default)
+    }
+
+    pub const fn required_strs(name: &'static str) -> Self {
+        let tp = PropertyType::Strings;
         let default = PropertyDefault::Required;
         Self::new(name, tp, default)
     }
@@ -495,6 +509,11 @@ impl Property {
                     .or_else(bad_property)?;
                 PropertyValue::String(value)
             },
+            PropertyType::Strings => {
+                let value: Strings = extract(value)
+                    .or_else(bad_property)?;
+                PropertyValue::Strings(value.into_vec())
+            },
             PropertyType::U32 => {
                 let value: u32 = extract(value)
                     .or_else(bad_property)?;
@@ -507,7 +526,9 @@ impl Property {
 
 #[derive(FromPyObject)]
 pub enum FloatOrVec {
+    #[pyo3(transparent, annotation = "float")]
     Float(f64),
+    #[pyo3(transparent, annotation = "[float]")]
     Vec(f64x3),
 }
 
@@ -515,6 +536,23 @@ impl FloatOrVec {
     pub fn into_vec(self) -> f64x3 {
         match self {
             Self::Float(f) => f64x3::splat(f),
+            Self::Vec(v) => v,
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+pub enum Strings {
+    #[pyo3(transparent, annotation = "str")]
+    Scalar(String),
+    #[pyo3(transparent, annotation = "[str]")]
+    Vec(Vec<String>),
+}
+
+impl Strings {
+    pub fn into_vec(self) -> Vec<String> {
+        match self {
+            Self::Scalar(s) => vec![s],
             Self::Vec(v) => v,
         }
     }
@@ -686,6 +724,16 @@ impl<'py> From<PropertyValue<'py>> for Option<String> {
     }
 }
 
+impl<'py> From<PropertyValue<'py>> for Vec<String> {
+    fn from(value: PropertyValue<'py>) -> Vec<String> {
+        match value {
+            PropertyValue::None => Vec::new(),
+            PropertyValue::Strings(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl<'py> From<PropertyValue<'py>> for u32 {
     fn from(value: PropertyValue<'py>) -> u32 {
         match value {
@@ -794,7 +842,7 @@ impl TypeName for f64 {
 }
 
 impl TypeName for FloatOrVec {
-    fn type_name() -> &'static str { "a 'float' or a 'vector'" }
+    fn type_name() -> &'static str { "a (vector of) 'float'" }
 }
 
 impl TypeName for f64x3x3 {
@@ -810,9 +858,13 @@ impl<'py> TypeName for DictLike<'py> {
 }
 
 impl TypeName for String {
-    fn type_name() -> &'static str { "a string" }
+    fn type_name() -> &'static str { "a 'str'" }
+}
+
+impl TypeName for Strings {
+    fn type_name() -> &'static str { "a (sequence of) 'str'" }
 }
 
 impl TypeName for u32 {
-    fn type_name() -> &'static str { "an int" }
+    fn type_name() -> &'static str { "an 'int'" }
 }

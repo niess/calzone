@@ -17,9 +17,9 @@ data structure. A geometry object is represented by a Python
 :external:py:class:`dict` item (i.e. a :python:`[key: str, value: dict]`
 pair), where the :python:`key` is the object name, and the :python:`value` might
 be another :external:py:class:`dict`, e.g. containing the object's properties.
-To illustrate, a cylinder shape writes,
+To illustrate, a 1 |nbsp| cm\ :sup:`3` cubic box shape writes,
 
->>> { "cylinder": { "length": 2.0, "radius": 1.0 }}
+>>> { "box": { "size": [ 1.0, 1.0, 1.0 ] }}
 
 .. topic:: Objects names
 
@@ -28,12 +28,51 @@ To illustrate, a cylinder shape writes,
    are typically `CamelCased`. Conversely, common names (designating properties,
    shape types, etc.) adhere to the `snake_case` syntax.
 
+Substitution rules
+------------------
+
+For the sake of convenience, the values of geometry objects are subject to
+certain substitution rules, which are listed in
+:numref:`tab-geometry-equivalences`. To illustrate, a :external:py:class:`str`
+(which refers to a compatible file) can be substituted for any
+:external:py:class:`dict` value. Another useful rule is that a size-one
+:external:py:class:`dict` whose item key can be inferred, can be substituted
+with the item value. This occurs, for instance, for object values that have a
+single mandatory property. For instance, using substitution rules, the previous cubic box shape
+simplifies as,
+
+>>> { "box": 1.0 }
+
+.. _tab-geometry-equivalences:
+
+.. list-table:: Substitution rules.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Value type
+     - Equivalent type
+     - Comment
+   * - :python:`dict`
+     - :python:`str`
+     - :python:`"*.json"` or :python:`"*.toml"`.
+   * - :python:`{ key: value }`
+     - :python:`value`
+     - If :python:`key` can be inferred.
+   * - :python:`[float; 3]`
+     - :python:`float`
+     - E.g., :python:`1.0 -> [ 1.0, 1.0, 1.0 ]`.
+   * - :python:`[str]`
+     - :python:`str`
+     - E.g., :python:`"Detector" -> [ "Detector" ]`.
+
+
 Geometry structure
 ------------------
 
 A geometry definition starts with a root volume, for instance as follows,
 
->>> { "Environment": { "cylinder" : { "length": 2.0, "radius": 1.0 }, ... }}
+>>> { "Environment": { "box" : 1.0, ... }}
 
 There can be only one root volume in a geometry. However, the geometry
 :external:py:class:`dict` might contain an additional :python:`"materials"` key,
@@ -73,9 +112,10 @@ Volume definition
 
 The items of a Monte Carlo volume are presented in :numref:`tab-volume-items`
 below. Note that it is mandatory to define a *material* and a *shape*. For
-example, a box volume would be represented as follows,
+example, a 1 |nbsp| cm\ :sup:`3` cubic box volume filled with air would be
+represented as follows,
 
->>> { "material": "G4_AIR", "box": { "size": [ 1.0, 1.0, 1.0 ] }}
+>>> { "material": "G4_AIR", "box": 1.0 }
 
 Note also that a volume can only have a single shape item (but multiple daughter
 volumes). For further information on shape types and their corresponding items,
@@ -107,7 +147,7 @@ see :ref:`geometry:Shape definition`.
      - :python:`bool`
      - :python:`False`
    * - :python:`"subtract"`
-     - :python:`str`
+     - :python:`[str]`
      - :python:`None`
    * - :python:`"overlaps"`
      - :python:`dict` (:numref:`tab-overlaps-items`)
@@ -137,9 +177,9 @@ Overlaps
 
 The :python:`"subtract"` and :python:`"overlaps"` volume properties address the
 issue of overlaps between sister volumes in two distinct ways. The
-:python:`"subtract"` property explicitly specifies a sister volume (by its name)
-whose shape is to be subtracted from the current volume. This can be employed,
-for instance, to subtract a portion of a :python:`"Ground"` volume to
+:python:`"subtract"` property explicitly specifies sister volumes (by their
+name) whose shape are to be subtracted from the current volume. This can be
+employed, for instance, to dig out a portion of a :python:`"Ground"` volume to
 accommodate a partially buried :python:`"Detector"` volume.
 
 .. note::
@@ -168,7 +208,7 @@ of patching small (erroneous) overlaps (e.g. due to numeric approximations).
      - Value type
      - Default value
    * - :python:`VolumeName`
-     - :python:`str | [str]`
+     - :python:`[str]`
      - 
 
 Shape definition

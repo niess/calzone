@@ -310,7 +310,7 @@ pub mod ffi {
         fn sensitive(self: &Volume) -> bool;
         fn shape(self: &Volume) -> ShapeType;
         fn sphere_shape(self: &Volume) -> &SphereShape;
-        fn subtract(self: &Volume) -> String;
+        fn subtract(self: &Volume) -> &[String];
         fn tessellated_shape(self: &Volume) -> &TessellatedShape;
         fn volumes(self: &Volume) -> &[Volume];
 

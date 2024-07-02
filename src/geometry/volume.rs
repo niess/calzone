@@ -17,6 +17,11 @@ use super::ffi;
 use super::map::Map;
 
 
+// XXX Normalise shapes (Tube, Orb, etc.)
+// XXX Add other shapes, & booleans, & displaced.
+// XXX Optimise duplicated solids on C++ side?
+
+
 // ===============================================================================================
 //
 // Geometry volume.
@@ -32,7 +37,7 @@ pub struct Volume {
     pub(super) rotation: Option<f64x3x3>,
     pub(super) volumes: Vec<Volume>,
     overlaps: Vec<[String; 2]>,
-    pub(super) subtract: Option<String>,
+    pub(super) subtract: Vec<String>,
 }
 
 pub enum Shape {
@@ -86,11 +91,11 @@ impl Volume {
     pub(super) fn validate(&self) -> PyResult<()> {
         fn inspect(tag: &Tag, volume: &Volume) -> PyResult<()> {
             let daughters: Vec<_> = volume.volumes.iter()
-                .map(|v| (v.name(), v.subtract.is_some()))
+                .map(|v| (v.name(), !v.subtract.is_empty()))
                 .collect();
             for v in volume.volumes.iter() {
                 let vtag = tag.extend(v.name.as_ref(), None, None);
-                if let Some(subtract) = v.subtract.as_ref() {
+                for subtract in v.subtract.iter() {
                     if subtract == v.name() {
                         let why = format!("cannot subtract self ('{}.{}')", tag.path(), subtract);
                         return Err(vtag.bad().what("subtract").why(why).to_err(ValueError))
@@ -141,8 +146,8 @@ impl Volume {
         }
 
         let tag = Tag::new("volume", self.name.as_ref(), None);
-        if let Some(subtract) = self.subtract.as_ref() {
-            let why = format!("unknown volume '{}'", subtract);
+        if !self.subtract.is_empty() {
+            let why = format!("unknown volume '{}'", self.subtract[0]);
             return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
         }
         inspect(&tag, self)
@@ -168,7 +173,7 @@ impl TryFromBound for Volume {
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
             Property::optional_dict("overlaps"),
-            Property::optional_str("subtract"),
+            Property::optional_strs("subtract"),
         ]);
 
         let tag = tag.cast("volume");
@@ -183,7 +188,7 @@ impl TryFromBound for Volume {
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
         let overlaps: Option<DictLike> = overlaps.into();
-        let subtract: Option<String> = subtract.into();
+        let subtract: Vec<String> = subtract.into();
 
         // Split shape(s) and volumes from remainder.
         let (volumes, shapes) = {
@@ -286,7 +291,7 @@ impl TryFromBound for Volume {
                     match result {
                         Err(_) => {
                             let right: String = extract(&right)
-                                .expect("a string or a sequence of strings")
+                                .expect("a (sequence of) 'str'")
                                 .or_else(|| tag.bad().what("right overlap").into())?;
                             push(left, right)?;
                         },
@@ -576,11 +581,8 @@ impl Volume {
         }
     }
 
-    pub fn subtract(&self) -> String {
-        self.subtract
-            .as_ref()
-            .map(|s| s.clone())
-            .unwrap_or_else(|| "".to_string())
+    pub fn subtract(&self) -> &[String] {
+        self.subtract.as_slice()
     }
 
     pub fn tessellated_shape(&self) -> &ffi::TessellatedShape {

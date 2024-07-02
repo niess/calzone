@@ -1,4 +1,4 @@
-use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
+use crate::utils::extract::{Extractor, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::{Error, variant_explain};
 use crate::utils::error::ErrorKind::{IndexError, ValueError};
 use crate::utils::float::{f64x3, f64x3x3};
@@ -220,7 +220,10 @@ impl GeometryBuilder {
         position: Option<f64x3>,
         rotation: Option<f64x3x3>,
         sensitive: Option<bool>,
-        subtract: Option<String>,
+        subtract: Option<Strings>,
+        // XXX Overlaps as well?
+        // XXX Relocate (mother as well)?
+        // XXX Modify shape as well?
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
         let mut builder = slf.borrow_mut();
         let volume = builder.find_mut(pathname)?;
@@ -245,7 +248,7 @@ impl GeometryBuilder {
             volume.sensitive = sensitive;
         }
         if let Some(subtract) = subtract {
-            volume.subtract = Some(subtract);
+            volume.subtract = subtract.into_vec();
         }
         Ok(slf)
     }
