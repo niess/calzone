@@ -1,7 +1,7 @@
 use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
-use crate::utils::io::DictLike;
+use crate::utils::io::{DictLike, PathString};
 use crate::utils::numpy::PyArray;
 use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
@@ -127,7 +127,7 @@ enum GeometryArg<'py> {
     #[pyo3(transparent, annotation = "Geometry")]
     Geometry(Bound<'py, Geometry>),
     #[pyo3(transparent, annotation = "str")]
-    String(Bound<'py, PyString>),
+    String(PathString<'py>),
 }
 
 impl<'py> TryFrom<GeometryArg<'py>> for Py<Geometry> {
@@ -137,7 +137,7 @@ impl<'py> TryFrom<GeometryArg<'py>> for Py<Geometry> {
         match value {
             GeometryArg::Geometry(geometry) => Ok(geometry.unbind()),
             GeometryArg::String(path) => {
-                let py = path.py();
+                let py = path.0.py();
                 let path = DictLike::String(path);
                 let geometry = Geometry::new(path)?;
                 Py::new(py, geometry)

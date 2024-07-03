@@ -1,6 +1,7 @@
 use crate::geometry::materials::gate::load_gate_db;
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyFileNotFoundError, PyNotImplementedError};
+use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyString};
 use std::borrow::Cow;
 use std::ffi::OsStr;
@@ -72,7 +73,7 @@ pub enum DictLike<'py> {
     #[pyo3(transparent, annotation = "dict")]
     Dict(Bound<'py, PyDict>),
     #[pyo3(transparent, annotation = "str")]
-    String(Bound<'py, PyString>),
+    String(PathString<'py>),
 }
 
 impl<'py> DictLike<'py> {
@@ -83,8 +84,8 @@ impl<'py> DictLike<'py> {
         let result = match &self {
             Self::Dict(dict) => (Cow::Borrowed(dict), None),
             Self::String(path) => {
-                let py = path.py();
-                let path = path.to_cow()?;
+                let py = path.0.py();
+                let path = path.0.to_cow()?;
                 let path = Path::new(path.deref());
                 let path = match file {
                     None => Cow::Borrowed(path),
@@ -114,7 +115,34 @@ impl<'py> DictLike<'py> {
     pub fn py(&self) -> Python<'py> {
         match self {
             Self::Dict(dict) => dict.py(),
-            Self::String(path) => path.py(),
+            Self::String(path) => path.0.py(),
+        }
+    }
+}
+
+
+// ===============================================================================================
+//
+// Pathlib.Path wrapper.
+//
+// ===============================================================================================
+
+pub struct PathString<'py> (pub Bound<'py, PyString>);
+
+impl<'py> FromPyObject<'py> for PathString<'py> {
+    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+        static TYPE: GILOnceCell<PyObject> = GILOnceCell::new();
+        let py = ob.py();
+        let tp = TYPE.get_or_try_init(py, || py.import_bound("pathlib")
+            .and_then(|m| m.getattr("Path"))
+            .map(|m| m.unbind())
+        )?.bind(py);
+        if ob.is_instance(tp)? {
+            let path = ob.str()?;
+            Ok(Self(path))
+        } else {
+            let path: Bound<PyString> = ob.extract()?;
+            Ok(Self(path))
         }
     }
 }
