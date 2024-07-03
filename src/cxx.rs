@@ -186,6 +186,15 @@ pub mod ffi {
     // ===========================================================================================
 
     #[derive(Clone, Copy)]
+    struct GoupilState {
+        energy: f64,
+        position: [f64; 3],
+        direction: [f64; 3],
+        length: f64,
+        weight: f64,
+    }
+
+    #[derive(Clone, Copy)]
     struct Primary {
         pid: i32,
         energy: f64,
@@ -349,9 +358,10 @@ pub mod ffi {
         fn events(self: &RunAgent) -> usize;
         unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
         fn is_sampler(self: &RunAgent) -> bool;
+        fn is_secondaries(self: &RunAgent) -> bool;
         fn is_tracker(self: &RunAgent) -> bool;
         fn next_open01(self: &mut RunAgent) -> f64;
-        unsafe fn next_primary<'b>(self: &'b mut RunAgent) -> &'b Primary;
+        unsafe fn next_primary(self: &mut RunAgent) -> Primary;
         unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
         fn prng_name(self: &RunAgent) -> &'static str;
         unsafe fn push_deposit(

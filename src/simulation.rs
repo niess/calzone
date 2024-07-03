@@ -7,6 +7,7 @@ use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
+use std::ffi::c_char;
 
 mod physics;
 mod random;
@@ -42,6 +43,9 @@ pub struct Simulation {
     /// Sampling mode for sensitive volumes.
     #[pyo3(get, set)]
     sampling: Option<SamplerMode>,
+    #[pyo3(get, set)]
+    /// Flag to (de)activate the production of secondary particles.
+    secondaries: bool,
     /// Flag to (de)activate the recording of Monte Carlo tracks.
     #[pyo3(get, set)]
     tracking: bool,
@@ -56,6 +60,7 @@ impl Simulation {
         physics: Option<PhysicsArg>,
         random: Option<&Bound<'py, Random>>,
         sampling: Option<SamplerMode>,
+        secondaries: Option<bool>,
         tracking: Option<bool>,
     ) -> PyResult<Self> {
         let geometry = geometry
@@ -74,8 +79,9 @@ impl Simulation {
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
         let sampling = sampling.or_else(|| Some(SamplerMode::Brief));
+        let secondaries = secondaries.unwrap_or(true);
         let tracking = tracking.unwrap_or(false);
-        let simulation = Self { geometry, physics, random, sampling, tracking };
+        let simulation = Self { geometry, physics, random, sampling, secondaries, tracking };
         Ok(simulation)
     }
 
@@ -105,7 +111,7 @@ impl Simulation {
     fn run(
         &self,
         py: Python,
-        primaries: &PyArray<ffi::Primary>,
+        primaries: Primaries<'_>,
         verbose: Option<bool>,
     ) -> PyResult<PyObject> {
         let verbose = verbose.unwrap_or(false);
@@ -184,7 +190,7 @@ pub fn drop_simulation() {
 pub struct RunAgent<'a> {
     geometry: SharedPtr<ffi::GeometryBorrow>,
     physics: ffi::Physics,
-    primaries: &'a PyArray<ffi::Primary>,
+    primaries: Primaries<'a>,
     random: Random,
     // Iterator.
     index: usize,
@@ -192,11 +198,13 @@ pub struct RunAgent<'a> {
     deposits: Option<Deposits>,
     // tracks.
     tracker: Option<Tracker>,
+    // secondaries.
+    secondaries: bool,
 }
 
 impl<'a> RunAgent<'a> {
     pub fn events(&self) -> usize {
-        self.primaries.len().unwrap()
+        self.primaries.len()
     }
 
     fn export(self, py: Python) -> PyResult<PyObject> {
@@ -230,6 +238,10 @@ impl<'a> RunAgent<'a> {
         self.deposits.is_some()
     }
 
+    pub fn is_secondaries(&self) -> bool {
+        self.secondaries
+    }
+
     pub fn is_tracker(&self) -> bool {
         self.tracker.is_some()
     }
@@ -237,7 +249,7 @@ impl<'a> RunAgent<'a> {
     fn new(
         py: Python,
         simulation: &Simulation,
-        primaries: &'a PyArray<ffi::Primary>,
+        primaries: Primaries<'a>,
     ) -> PyResult<RunAgent<'a>> {
         let geometry = simulation.geometry
             .as_ref()
@@ -248,7 +260,10 @@ impl<'a> RunAgent<'a> {
         let index = 0;
         let deposits = simulation.sampling.map(|mode| Deposits::new(mode));
         let tracker = if simulation.tracking { Some(Tracker::new()) } else { None };
-        let agent = RunAgent { geometry, physics, primaries, random, index, deposits, tracker };
+        let secondaries = simulation.secondaries;
+        let agent = RunAgent {
+            geometry, physics, primaries, random, index, deposits, tracker, secondaries
+        };
         Ok(agent)
     }
 
@@ -256,10 +271,24 @@ impl<'a> RunAgent<'a> {
         self.random.open01()
     }
 
-    pub fn next_primary<'b>(&'b mut self) -> &'b ffi::Primary {
+    pub fn next_primary(&mut self) -> ffi::Primary {
         let primary = self.primaries.data(self.index).unwrap();
         self.index += 1;
-        unsafe { (primary as *const ffi::Primary).as_ref().unwrap() }
+        match self.primaries {
+            Primaries::Calzone(_) => {
+                let primary = unsafe { (primary as *const ffi::Primary).as_ref().unwrap() };
+                primary.clone()
+            },
+            Primaries::Goupil(_) => {
+                let state = unsafe { (primary as *const ffi::GoupilState).as_ref().unwrap() };
+                ffi::Primary {
+                    pid: 22,
+                    energy: state.energy,
+                    position: state.position,
+                    direction: state.direction,
+                }
+            },
+        }
     }
 
     pub fn physics<'b>(&'b self) -> &'b ffi::Physics {
@@ -294,6 +323,28 @@ impl<'a> RunAgent<'a> {
         if let Some(tracker) = self.tracker.as_mut() {
             vertex.event = self.index;
             tracker.push_vertex(vertex)
+        }
+    }
+}
+
+#[derive(FromPyObject)]
+enum Primaries<'a> {
+    Calzone(&'a PyArray<ffi::Primary>),
+    Goupil(&'a PyArray<ffi::GoupilState>),
+}
+
+impl<'a> Primaries<'a> {
+    fn data(&self, index: usize) -> PyResult<*mut c_char> {
+        match self {
+            Self::Calzone(v) => v.data(index),
+            Self::Goupil(v) => v.data(index),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Calzone(v) => v.len().unwrap(),
+            Self::Goupil(v) => v.len().unwrap(),
         }
     }
 }

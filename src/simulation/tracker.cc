@@ -55,6 +55,32 @@ static Translator TRANSLATOR;
 
 // ============================================================================
 //
+// Stacking implementation.
+//
+// ============================================================================
+
+G4ClassificationOfNewTrack StackingImpl::ClassifyNewTrack (
+    const G4Track * track
+) {
+    if (track->GetParentID() == 0) {
+        return fUrgent;
+    } else {
+        return fKill;
+    }
+}
+
+StackingImpl * StackingImpl::Get() {
+    static StackingImpl * instance = new StackingImpl();
+    return instance;
+}
+
+StackingImpl * StackingImpl::None() {
+    return nullptr;
+}
+
+
+// ============================================================================
+//
 // Tracking implementation.
 //
 // ============================================================================

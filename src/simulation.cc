@@ -60,6 +60,12 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
         manager->SetUserAction(SteppingImpl::None());
     }
 
+    if (RUN_AGENT->is_secondaries()) {
+        manager->SetUserAction(StackingImpl::None());
+    } else {
+        manager->SetUserAction(StackingImpl::Get());
+    }
+
     if (verbose) {
         auto ui = G4UImanager::GetUIpointer();
         ui->ApplyCommand("/tracking/verbose 1");

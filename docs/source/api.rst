@@ -112,7 +112,7 @@ Python interface
 
       >>> builder.move("Environment.Detector", "Environment.Scintillator")
 
-      .. note:: the root volume cannot be moved, nor replaced with this method.
+      .. note:: the root volume cannot be moved, nor replaced, with this method.
 
    .. automethod:: place
 
@@ -394,6 +394,18 @@ Python interface
       In :python:`"brief"` mode, only the total energy deposits per sensitive
       volume is recorded. On the contrary, in :python:`"detailed"` mode the full
       detail of energy deposition is reported.
+
+   .. autoattribute:: secondaries
+
+      Must be a :python:`bool`, or :python:`None`. By default, secondary
+      particles are enabled.
+
+      .. tip::
+
+         The deactivation of secondary particles can significantly speed up the
+         Monte Carlo simulation, by orders of magnitude depending on the
+         application. However, care must be exercised as it may be crucial to
+         account for these secondary particles as part of the detector response.
 
    .. autoattribute:: tracking
 
