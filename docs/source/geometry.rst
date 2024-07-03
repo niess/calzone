@@ -116,13 +116,13 @@ Volume definition
 -----------------
 
 The items of a Monte Carlo volume are presented in :numref:`tab-volume-items`
-below. Note that it is mandatory to define a *material* and a *shape*. For
-example, a 1 |nbsp| cm\ :sup:`3` cubic box volume filled with air would be
-represented as follows,
+below. It is required to define a *material*. If no *shape* is specified, then a
+box envelope is assumed. To illustrate, a 1 |nbsp| cm\ :sup:`3` cubic box volume
+filled with air would be represented as follows,
 
 >>> { "material": "G4_AIR", "box": 1.0 }
 
-Note also that a volume can only have a single shape item (but multiple daughter
+Note that a volume can only have a single shape item (but multiple daughter
 volumes). For further information on shape types and their corresponding items,
 see :ref:`geometry:Shape definition`.
 
@@ -141,7 +141,7 @@ see :ref:`geometry:Shape definition`.
      - 
    * - :python:`shape_type`
      - :python:`dict` (:ref:`Shape items <geometry:Shape definition>`)
-     - 
+     - :python:`None`
    * - :python:`"position"`
      - :python:`[float; 3]`
      - :python:`numpy.zeros(3)`

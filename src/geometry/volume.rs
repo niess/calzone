@@ -238,6 +238,21 @@ impl Shape {
     }
 }
 
+impl Default for Shape {
+    fn default() -> Self {
+        Self::Envelope(ffi::EnvelopeShape {
+            safety: ffi::EnvelopeShape::DEFAULT_SAFETY,
+            shape: ffi::EnvelopeShape::DEFAULT_SHAPE,
+        })
+    }
+}
+
+impl ffi::EnvelopeShape {
+    const DEFAULT_SAFETY: f64 = 0.01;
+    const DEFAULT_SHAPE: ffi::ShapeType = ffi::ShapeType::Box;
+    const DEFAULT_SHAPE_NAME: &'static str = "box";
+}
+
 // ===============================================================================================
 //
 // Conversion (from a Python dict).
@@ -298,21 +313,22 @@ impl TryFromBound for Volume {
                 })
         };
 
-        if shapes.len() == 0 {
-            get_shape_type("None")?; // This always fails.
-        }
-        let (shape_name, shape) = shapes.get(0).unwrap();
-        let shape_type = get_shape_type(shape_name)?;
-        if let Some((alt_name, _)) = shapes.get(1) {
-            let _unused = get_shape_type(alt_name)?;
-            let err = tag.bad().why(format!(
-                "multiple shape definitions ({}, {}, ..)",
-                shape_name,
-                alt_name,
-            )).to_err(ValueError);
-            return Err(err);
-        }
-        let shape = Shape::new(&tag, shape_type, shape)?;
+        let shape = if shapes.len() == 0 {
+            Shape::default()
+        } else {
+            let (shape_name, shape) = shapes.get(0).unwrap();
+            let shape_type = get_shape_type(shape_name)?;
+            if let Some((alt_name, _)) = shapes.get(1) {
+                let _unused = get_shape_type(alt_name)?;
+                let err = tag.bad().why(format!(
+                    "multiple shape definitions ({}, {}, ..)",
+                    shape_name,
+                    alt_name,
+                )).to_err(ValueError);
+                return Err(err);
+            }
+            Shape::new(&tag, shape_type, shape)?
+        };
 
         // Extract sub-volumes.
         let volumes: PyResult<Vec<Volume>> = volumes
@@ -417,9 +433,6 @@ impl TryFromBound for ffi::CylinderShape {
 
 impl TryFromBound for ffi::EnvelopeShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
-        const DEFAULT_SHAPE: &str = "box";
-        const DEFAULT_SAFETY: f64 = 0.01;
-
         let mut safety: Option<f64> = None;
         let shape: PyResult<String> = value.extract();
         let shape: String = match shape {
@@ -428,7 +441,7 @@ impl TryFromBound for ffi::EnvelopeShape {
                 match sfty {
                     Err(_) => {
                         const EXTRACTOR: Extractor<2> = Extractor::new([
-                            Property::new_str("shape", DEFAULT_SHAPE),
+                            Property::new_str("shape", ffi::EnvelopeShape::DEFAULT_SHAPE_NAME),
                             Property::optional_f64("safety"),
                         ]);
 
@@ -439,7 +452,7 @@ impl TryFromBound for ffi::EnvelopeShape {
                     }
                     Ok(sfty) => {
                         safety = Some(sfty);
-                        DEFAULT_SHAPE.to_string()
+                        Self::DEFAULT_SHAPE_NAME.to_string()
                     },
                 }
             },
@@ -457,7 +470,7 @@ impl TryFromBound for ffi::EnvelopeShape {
                 let options = ["box", "cylinder", "sphere"];
                 variant_error(message.as_str(), shape.as_str(), &options)
             })?;
-        let safety = safety.unwrap_or(DEFAULT_SAFETY);
+        let safety = safety.unwrap_or(Self::DEFAULT_SAFETY);
         let envelope = Self { shape, safety };
         Ok(envelope)
     }
