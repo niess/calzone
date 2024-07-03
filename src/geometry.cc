@@ -11,6 +11,7 @@
 #include "G4NistManager.hh"
 #include "G4Orb.hh"
 #include "G4PVPlacement.hh"
+#include "G4Sphere.hh"
 #include "G4SmartVoxelHeader.hh"
 #include "G4SubtractionSolid.hh"
 #include "G4TessellatedSolid.hh"
@@ -359,10 +360,36 @@ static G4VSolid * build_solids(
             break;
         case ShapeType::Sphere: {
                 auto shape = volume.sphere_shape();
-                solid = new G4Orb(
-                    std::string(pathname),
-                    shape.radius * CLHEP::cm
-                );
+                if ((shape.thickness <= 0.0) &&
+                    (shape.azimuth_section[0] == 0.0) &&
+                    (shape.azimuth_section[1] == 360.0) &&
+                    (shape.zenith_section[0] == 0.0) &&
+                    (shape.zenith_section[1] == 180.0)) {
+                    solid = new G4Orb(
+                        std::string(pathname),
+                        shape.radius * CLHEP::cm
+                    );
+                } else {
+                    double rmin = (shape.thickness > 0.0) ?
+                        shape.radius - shape.thickness : 0.0;
+                    double phi0 = (shape.azimuth_section[0] / 360.0) *
+                        CLHEP::twopi;
+                    double dphi = ((shape.azimuth_section[1] -
+                        shape.azimuth_section[0]) / 360.0) * CLHEP::twopi;
+                    double theta0 = (shape.zenith_section[0] / 180.0) *
+                        CLHEP::pi;
+                    double dtheta = ((shape.zenith_section[1] -
+                        shape.zenith_section[0]) / 180.0) * CLHEP::pi;
+                    solid = new G4Sphere(
+                        std::string(pathname),
+                        shape.radius * CLHEP::cm,
+                        rmin * CLHEP::cm,
+                        phi0,
+                        dphi,
+                        theta0,
+                        dtheta
+                    );
+                }
             }
             break;
         case ShapeType::Tessellation:

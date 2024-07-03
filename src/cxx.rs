@@ -68,6 +68,9 @@ pub mod ffi {
 
     struct SphereShape {
         radius: f64,
+        thickness: f64,
+        azimuth_section: [f64; 2],
+        zenith_section: [f64; 2],
     }
 
     struct TessellatedShape {

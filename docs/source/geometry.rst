@@ -38,8 +38,8 @@ certain substitution rules, which are listed in
 :external:py:class:`dict` value. Another useful rule is that a size-one
 :external:py:class:`dict` whose item key can be inferred, can be substituted
 with the item value. This occurs, for instance, for object values that have a
-single mandatory property. For instance, using substitution rules, the previous
-cubic box shape simplifies as,
+single mandatory property. Thus, using substitution rules, the previous cubic
+box shape simplifies as,
 
 >>> { "box": 1.0 }
 
@@ -275,7 +275,7 @@ the xOy plane.
 
 .. topic:: Cylindrical section.
 
-   The optional *section* arguments specifies the angular span of the
+   The optional *section* argument specifies the angular span of the
    cylindrical shape (in deg). By default, the cylinder is closed, i.e. it spans
    the whole azimuth angle ([0, 360] deg).
 
@@ -305,7 +305,8 @@ around bounded objects.
 Sphere shape
 ~~~~~~~~~~~~
 
-A sphere (`G4Orb`_), centred on the origin, and defined by its *radius* (in cm).
+A sphere (`G4Orb`_ or `G4Sphere`_), centred on the origin, and defined by its
+*radius* (in cm).
 
 .. list-table:: Sphere items.
    :width: 75%
@@ -318,6 +319,27 @@ A sphere (`G4Orb`_), centred on the origin, and defined by its *radius* (in cm).
    * - :python:`"radius"`
      - :python:`float`
      - 
+   * - :python:`"thickness"`
+     - :python:`float` (cm)
+     - :python:`None`
+   * - :python:`"azimuth_section"`
+     - :python:`[float; 2]` (deg)
+     - :python:`None`
+   * - :python:`"zenith_section"`
+     - :python:`[float; 2]` (deg)
+     - :python:`None`
+
+.. topic:: Hollow sphere.
+
+   If *thickness* is not :python:`None`, then the sphere is hollow, with the
+   specified thickness value.
+
+.. topic:: Spherical section.
+
+   The optional *azimuth_section* and *zenith_section* arguments specify the
+   angular span of the spherical shape (in deg). By default, the sphere is
+   closed, i.e. it spans the whole azimuth angle ([0, 360] deg), and the whole
+   zenith angle ([0, 180] deg).
 
 Tessellation shape
 ~~~~~~~~~~~~~~~~~~
@@ -568,6 +590,7 @@ composition. Optionaly, a *state* can be specified ( :python:`"gas"`,
 .. _G4Element: https://geant4.kek.jp/Reference/11.2.0/classG4Element.html
 .. _G4Material: https://geant4.kek.jp/Reference/11.2.0/classG4Material.html
 .. _G4Orb: https://geant4.kek.jp/Reference/11.2.0/classG4Orb.html
+.. _G4Sphere: https://geant4.kek.jp/Reference/11.2.0/classG4Sphere.html
 .. _G4Tubs: https://geant4.kek.jp/Reference/11.2.0/classG4Tubs.html
 .. _G4VPhysicalVolume: https://geant4.kek.jp/Reference/11.2.0/classG4VPhysicalVolume.html
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html

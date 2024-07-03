@@ -17,9 +17,7 @@ use super::ffi;
 use super::map::Map;
 
 
-// XXX Normalise shapes (Tube, Orb, etc.)
 // XXX Add other shapes, & booleans, & displaced.
-// XXX Optimise duplicated solids on C++ side?
 
 
 // ===============================================================================================
@@ -478,20 +476,30 @@ impl TryFromBound for ffi::EnvelopeShape {
 
 impl TryFromBound for ffi::SphereShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let mut thickness: Option<f64> = None;
+        let mut azimuth_section = [0.0 , 360.0];
+        let mut zenith_section = [0.0 , 180.0];
         let radius: PyResult<f64> = value.extract();
         let radius: f64 = match radius {
             Err(_) => {
-                const EXTRACTOR: Extractor<1> = Extractor::new([
+                const EXTRACTOR: Extractor<4> = Extractor::new([
                     Property::required_f64("radius"),
+                    Property::optional_f64("thickness"),
+                    Property::new_interval("azimuth_section", [0.0, 360.0]),
+                    Property::new_interval("zenith_section", [0.0, 180.0]),
                 ]);
 
                 let tag = tag.cast("Sphere");
-                let [size] = EXTRACTOR.extract_any(&tag, value, None)?;
-                size.into()
+                let [r, e, az, ze] = EXTRACTOR.extract_any(&tag, value, None)?;
+                thickness = e.into();
+                azimuth_section = az.into();
+                zenith_section = ze.into();
+                r.into()
             },
             Ok(radius) => radius,
         };
-        let shape = Self { radius: radius.into() };
+        let thickness = thickness.unwrap_or(0.0);
+        let shape = Self { radius, thickness, azimuth_section, zenith_section };
         Ok(shape)
     }
 }
