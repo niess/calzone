@@ -1,4 +1,4 @@
-use crate::utils::error::variant_error;
+use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::export::Export;
 use crate::utils::numpy::{PyArray, PyUntypedArray};
 use crate::utils::tuple::NamedTuple;
@@ -76,6 +76,74 @@ impl Deposits {
                 cell.push(event, deposit, non_ionising, start, end);
                 cell
             });
+    }
+}
+
+// ===========================================================================================
+//
+// Sampler roles interface.
+//
+// ===========================================================================================
+
+#[derive(EnumVariantsStrings)]
+#[enum_variants_strings_transform(transform="snake_case")]
+pub enum Role {
+    CatchAll,
+    CatchIngoing,
+    CatchOutgoing,
+    SampleDeposits,
+}
+
+impl ffi::Roles {
+    pub fn any(&self) -> bool {
+        self.catch_ingoing | self.catch_outgoing | self.sample_deposits
+    }
+}
+
+impl TryFrom<&[String]> for ffi::Roles {
+    type Error = String;
+
+    fn try_from(value: &[String]) -> Result<ffi::Roles, Self::Error> {
+        let mut roles = ffi::Roles::default();
+        for role in value.iter() {
+            let role = Role::from_str(role)
+                .map_err(|options| variant_explain(role, options))?;
+            match role {
+                Role::CatchAll => {
+                    roles.catch_ingoing = true;
+                    roles.catch_outgoing = true;
+                },
+                Role::CatchIngoing => {
+                    roles.catch_ingoing = true;
+                },
+                Role::CatchOutgoing => {
+                    roles.catch_outgoing = true;
+                },
+                Role::SampleDeposits => {
+                    roles.sample_deposits = true;
+                },
+            }
+        }
+        Ok(roles)
+    }
+}
+
+impl From<ffi::Roles> for Vec<String> {
+    fn from(roles: ffi::Roles) -> Self {
+        let mut strings = Vec::<String>::new();
+        if roles.catch_ingoing {
+            if roles.catch_outgoing {
+                strings.push("catch_all".to_string());
+            } else {
+                strings.push("catch_ingoing".to_string());
+            }
+        } else if roles.catch_outgoing {
+            strings.push("catch_outgoing".to_string());
+        }
+        if roles.sample_deposits {
+            strings.push("sample_deposits".to_string());
+        }
+        strings
     }
 }
 

@@ -424,6 +424,7 @@ static void drop_them_all(G4LogicalVolume * logical) {
     delete logical->GetVoxelHeader();
     logical->SetVoxelHeader(nullptr);
     delete logical->GetSolid();
+    delete logical->GetSensitiveDetector();
     delete logical;
 }
 
@@ -478,7 +479,8 @@ static G4LogicalVolume * build_volumes(
 
     // Set any sensitive detector.
     if (volume.sensitive()) {
-        logical->SetSensitiveDetector(SamplerImpl::Get());
+        auto sampler = new SamplerImpl(pathname, std::move(volume.roles()));
+        logical->SetSensitiveDetector(sampler);
     }
 
     // Build sub-volumes.
@@ -852,7 +854,6 @@ VolumeInfo GeometryBorrow::describe_volume(rust::Str name_) const {
         auto logical = volume->GetLogicalVolume();
         info.material = rust::String(logical->GetMaterial()->GetName());
         info.solid = rust::String(logical->GetSolid()->GetName());
-        info.sensitive = logical->GetSensitiveDetector() != nullptr;
         auto mother = this->data->mothers[volume];
         if (mother == nullptr) {
             info.mother = rust::String("");
@@ -886,6 +887,70 @@ size_t GeometryBorrow::id() const {
 
 G4VPhysicalVolume * GeometryBorrow::world() const {
     return this->data->world;
+}
+
+// ============================================================================
+//
+// Volume roles interface.
+//
+// ============================================================================
+
+std::shared_ptr<Error> GeometryBorrow::clear_roles(rust::Str name_) const {
+    auto name = std::string(name_);
+    auto volume = get_volume(name, this->data->elements);
+    if (volume == nullptr) {
+        return get_error();
+    }
+    auto && logical = volume->GetLogicalVolume();
+    SamplerImpl * sensitive = static_cast<SamplerImpl *>(
+        logical->GetSensitiveDetector()
+    );
+    if (sensitive != nullptr) {
+        logical->SetSensitiveDetector(nullptr);
+        delete sensitive;
+    }
+    return get_error();
+}
+
+Roles GeometryBorrow::get_roles(rust::Str name_) const {
+    SamplerImpl * sensitive = nullptr;
+    auto name = std::string(name_);
+    auto volume = get_volume(name, this->data->elements);
+    if (volume != nullptr) {
+        auto && logical = volume->GetLogicalVolume();
+        sensitive = static_cast<SamplerImpl *>(
+            logical->GetSensitiveDetector()
+        );
+    }
+    if (sensitive == nullptr) {
+        Roles roles;
+        std::memset(&roles, 0x0, sizeof(Roles));
+        return roles;
+    } else {
+        return sensitive->roles;
+    }
+}
+
+std::shared_ptr<Error> GeometryBorrow::set_roles(
+    rust::Str name_,
+    Roles roles
+) const {
+    auto name = std::string(name_);
+    auto volume = get_volume(name, this->data->elements);
+    if (volume == nullptr) {
+        return get_error();
+    }
+    auto && logical = volume->GetLogicalVolume();
+    SamplerImpl * sensitive = static_cast<SamplerImpl *>(
+        logical->GetSensitiveDetector()
+    );
+    if (sensitive == nullptr) {
+        sensitive = new SamplerImpl(std::string(name), std::move(roles));
+        logical->SetSensitiveDetector(sensitive);
+    } else {
+        sensitive->roles = std::move(roles);
+    }
+    return get_error();
 }
 
 // ============================================================================

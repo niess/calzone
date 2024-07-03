@@ -45,6 +45,11 @@ struct GeometryBorrow {
     size_t id() const;
     G4VPhysicalVolume * world() const;
 
+    // Volume roles interface.
+    std::shared_ptr<Error> clear_roles(rust::Str) const;
+    Roles get_roles(rust::Str) const;
+    std::shared_ptr<Error> set_roles(rust::Str, Roles) const;
+
     // Goupil interface.
     void set_goupil() const;
 

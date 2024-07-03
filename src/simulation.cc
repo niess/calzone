@@ -75,9 +75,6 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
     auto && randomImpl = RandomImpl::Get();
     randomImpl->Switch();
 
-    // Activate (or not) the sampler.
-    SamplerImpl::Get()->Activate(RUN_AGENT->is_sampler());
-
     // Process events in bunches (in order to check for Ctrl+C).
     constexpr int bunch_size = 100;
     const size_t n = agent.events();

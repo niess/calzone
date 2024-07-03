@@ -86,7 +86,6 @@ pub mod ffi {
     struct VolumeInfo { // From Geant4.
         material: String,
         solid: String,
-        sensitive: bool,
         mother: String,
         daughters: Vec<String>,
     }
@@ -181,6 +180,19 @@ pub mod ffi {
 
     // ===========================================================================================
     //
+    // Sampler interface.
+    //
+    // ===========================================================================================
+
+    #[derive(Clone, Copy, Default)]
+    struct Roles {
+        catch_ingoing: bool,
+        catch_outgoing: bool,
+        sample_deposits: bool,
+    }
+
+    // ===========================================================================================
+    //
     // Source interface.
     //
     // ===========================================================================================
@@ -270,6 +282,10 @@ pub mod ffi {
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn set_goupil(self: &GeometryBorrow);
 
+        fn clear_roles(self: &GeometryBorrow, name: &str) -> SharedPtr<Error>;
+        fn get_roles(self: &GeometryBorrow, name: &str) -> Roles;
+        fn set_roles(self: &GeometryBorrow, name: &str, roles: Roles) -> SharedPtr<Error>;
+
         // Material interface.
         type G4State;
         fn add_element(element: &Element) -> SharedPtr<Error>;
@@ -319,6 +335,7 @@ pub mod ffi {
         fn name(self: &Volume) -> &String;
         fn overlaps(self: &Volume) -> &[[String; 2]];
         fn position(self: &Volume) -> [f64; 3];
+        fn roles(self: &Volume) -> Roles;
         fn rotation(self: &Volume) -> &[[f64; 3]];
         fn sensitive(self: &Volume) -> bool;
         fn shape(self: &Volume) -> ShapeType;

@@ -46,7 +46,7 @@ impl Geometry {
     }
 
     fn __getitem__(&self, volume: &str) -> PyResult<Volume> {
-        let ffi::VolumeInfo { material, solid, sensitive, mother, daughters } =
+        let ffi::VolumeInfo { material, solid, mother, daughters } =
             self.0.describe_volume(volume);
         if let Some(msg) = ffi::get_error().value() {
             let err = Error::new(IndexError).what("volume").why(msg);
@@ -62,7 +62,6 @@ impl Geometry {
             name: volume.to_string(),
             material,
             solid,
-            sensitive,
             mother,
             daughters,
         };
@@ -243,7 +242,7 @@ impl GeometryBuilder {
             volume.rotation = Some(rotation.into_mat());
         }
         if let Some(sensitive) = sensitive {
-            volume.sensitive = sensitive;
+            volume.roles.sample_deposits = sensitive; // XXX parse role.
         }
         if let Some(shape) = shape {
             let tag = Tag::new("", "shape", None);
@@ -486,9 +485,6 @@ pub struct Volume {
     /// The volume shape (according to Geant4).
     #[pyo3(get)]
     solid: String,
-    /// Flag indicating whether or not energy deposits are sampled.
-    #[pyo3(get)]
-    sensitive: bool, // XXX make this mutable?
     /// The mother of this volume, if any (i.e. directly containing this volume).
     #[pyo3(get)]
     mother: Option<String>,
@@ -501,6 +497,44 @@ impl Volume {
     #[getter]
     fn get_daughters<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
         PyTuple::new_bound(py, &self.daughters)
+    }
+
+    #[getter]
+    fn get_role(&self, py: Python) -> PyResult<PyObject> {
+        let roles = self.geometry.get_roles(self.name.as_str());
+        let _unused = ffi::get_error().to_result()
+            .map_err(|why| {
+                let why = format!("{}", why);
+                Error::new(ValueError).what("role").why(&why).to_err()
+            })?;
+        let roles: Vec<String> = roles.into();
+        let role = match roles.len() {
+            0 => py.None(),
+            1 => (&roles[0]).into_py(py),
+            _ => PyTuple::new_bound(py, roles.iter()).into_any().unbind(),
+        };
+        Ok(role)
+    }
+
+    #[setter]
+    fn set_role(&self, role: Option<Strings>) -> PyResult<()> {
+        let roles = role.map(|role| role.into_vec()).unwrap_or(Vec::new());
+        let result = if roles.is_empty() {
+            self.geometry.clear_roles(self.name.as_str())
+        } else {
+            let roles: ffi::Roles = roles.as_slice().try_into()
+                .map_err(|why: String| {
+                    Error::new(ValueError).what("role").why(&why).to_err()
+                })?;
+            self.geometry.set_roles(self.name.as_str(), roles)
+        };
+        result
+            .to_result()
+            .map_err(|why| {
+                let why = format!("{}", why);
+                Error::new(ValueError).what("role").why(&why).to_err()
+            })?;
+        Ok(())
     }
 
     /// Return the volume's Axis-Aligned Bounding-Box (AABB).

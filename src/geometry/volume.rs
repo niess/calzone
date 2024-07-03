@@ -29,12 +29,12 @@ use super::map::Map;
 pub struct Volume {
     pub(super) name: String,
     pub(super) material: String,
-    pub(super) sensitive: bool,
     pub(super) shape: Shape,
     pub(super) position: Option<f64x3>,
     pub(super) rotation: Option<f64x3x3>,
     pub(super) volumes: Vec<Volume>,
     pub(super) overlaps: Vec<[String; 2]>,
+    pub(super) roles: ffi::Roles,
     pub(super) subtract: Vec<String>,
 }
 
@@ -266,7 +266,7 @@ impl TryFromBound for Volume {
         // Extract base properties.
         const EXTRACTOR: Extractor<6> = Extractor::new([
             Property::required_str("material"),
-            Property::new_bool("sensitive", false),
+            Property::optional_strs("role"),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
             Property::optional_dict("overlaps"),
@@ -275,17 +275,24 @@ impl TryFromBound for Volume {
 
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, sensitive, position, rotation, overlaps, subtract] = EXTRACTOR.extract(
+        let [material, role, position, rotation, overlaps, subtract] = EXTRACTOR.extract(
             &tag, value, Some(&mut remainder)
         )?;
 
         let name = tag.name().to_string();
         let material: String = material.into();
-        let sensitive: bool = sensitive.into();
+        let role: Vec<String> = role.into();
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
         let overlaps: Option<DictLike> = overlaps.into();
         let subtract: Vec<String> = subtract.into();
+
+        // Parse role(s).
+        let (_, tag) = tag.resolve(value)?;
+        let roles: ffi::Roles = role.as_slice().try_into()
+            .map_err(|why| {
+                tag.bad().what("role").why(why).to_err(ValueError)
+            })?;
 
         // Split shape(s) and volumes from remainder.
         let (volumes, shapes) = {
@@ -302,7 +309,6 @@ impl TryFromBound for Volume {
         };
 
         // Extract shape properties.
-        let (_, tag) = tag.resolve(value)?;
         let get_shape_type = |shape: &str| -> PyResult<ShapeType> {
             ShapeType::from_str(shape)
                 .map_err(|_| {
@@ -345,7 +351,7 @@ impl TryFromBound for Volume {
         };
 
         let volume = Self {
-            name, material, sensitive, shape, position, rotation, volumes, overlaps, subtract
+            name, material, roles, shape, position, rotation, volumes, overlaps, subtract
         };
         Ok(volume)
     }
@@ -648,6 +654,10 @@ impl Volume {
         }
     }
 
+    pub fn roles(&self) -> ffi::Roles {
+        self.roles
+    }
+
     pub fn rotation(&self) -> &[[f64; 3]] {
         match self.rotation.as_ref() {
             Some(rotation) => rotation.as_ref(),
@@ -656,7 +666,7 @@ impl Volume {
     }
 
     pub fn sensitive(&self) -> bool {
-        self.sensitive
+        self.roles.any() // XXX still needed?
     }
 
     pub fn shape(&self) -> ffi::ShapeType {
