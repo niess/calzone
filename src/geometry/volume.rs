@@ -32,7 +32,7 @@ pub struct Volume {
     pub(super) name: String,
     pub(super) material: String,
     pub(super) sensitive: bool,
-    shape: Shape,
+    pub(super) shape: Shape,
     pub(super) position: Option<f64x3>,
     pub(super) rotation: Option<f64x3x3>,
     pub(super) volumes: Vec<Volume>,
@@ -62,7 +62,7 @@ impl From<&Shape> for ffi::ShapeType {
 
 #[derive(EnumVariantsStrings)]
 #[enum_variants_strings_transform(transform="lower_case")]
-enum ShapeType {
+pub(super) enum ShapeType {
     Box,
     Cylinder,
     Envelope,
@@ -216,6 +216,28 @@ impl Volume {
     }
 }
 
+impl Shape {
+    fn new<'py>(
+        tag: &Tag,
+        shape_type: ShapeType,
+        properties: &Bound<'py, PyAny>
+    ) -> PyResult<Shape> {
+        let tag = tag.extend(shape_type.to_str(), Some("shape"), None);
+        let shape = match shape_type {
+            ShapeType::Box => Shape::Box(ffi::BoxShape::try_from_any(&tag, properties)?),
+            ShapeType::Cylinder => Shape::Cylinder(
+                ffi::CylinderShape::try_from_any(&tag, properties)?),
+            ShapeType::Envelope => Shape::Envelope(
+                ffi::EnvelopeShape::try_from_any(&tag, properties)?),
+            ShapeType::Sphere => Shape::Sphere(
+                ffi::SphereShape::try_from_any(&tag, properties)?),
+            ShapeType::Tessellation => Shape::Tessellation(
+                ffi::TessellatedShape::try_from_any(&tag, properties)?),
+        };
+        Ok(shape)
+    }
+}
+
 // ===============================================================================================
 //
 // Conversion (from a Python dict).
@@ -290,18 +312,7 @@ impl TryFromBound for Volume {
             )).to_err(ValueError);
             return Err(err);
         }
-        let shape_tag = tag.extend(shape_name, Some("shape"), None);
-        let shape = match shape_type {
-            ShapeType::Box => Shape::Box(ffi::BoxShape::try_from_any(&shape_tag, shape)?),
-            ShapeType::Cylinder => Shape::Cylinder(
-                ffi::CylinderShape::try_from_any(&shape_tag, shape)?),
-            ShapeType::Envelope => Shape::Envelope(
-                ffi::EnvelopeShape::try_from_any(&shape_tag, shape)?),
-            ShapeType::Sphere => Shape::Sphere(
-                ffi::SphereShape::try_from_any(&shape_tag, shape)?),
-            ShapeType::Tessellation => Shape::Tessellation(
-                ffi::TessellatedShape::try_from_any(&shape_tag, shape)?),
-        };
+        let shape = Shape::new(&tag, shape_type, shape)?;
 
         // Extract sub-volumes.
         let volumes: PyResult<Vec<Volume>> = volumes
@@ -323,6 +334,43 @@ impl TryFromBound for Volume {
             name, material, sensitive, shape, position, rotation, volumes, overlaps, subtract
         };
         Ok(volume)
+    }
+}
+
+impl TryFromBound for Shape {
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
+        let (value, tag) = tag.resolve(value)?;
+
+        let get_shape_type = |shape: &str| -> PyResult<ShapeType> {
+            ShapeType::from_str(shape)
+                .map_err(|_| {
+                    let why = format!("unknown shape '{}'", shape);
+                    tag.bad().why(why).to_err(ValueError)
+                })
+        };
+
+        if value.len() == 0 {
+            get_shape_type("None")?; // This always fails.
+        }
+
+        let mut items = value.iter();
+        let (shape_name, shape) = items.next().unwrap();
+        let shape_name: String = extract(&shape_name)
+                .or_else(|| tag.bad_type())?;
+        let shape_type = get_shape_type(shape_name.as_str())?;
+        let shape = Shape::new(&tag, shape_type, &shape)?;
+        if let Some((alt_name, _)) = items.next() {
+            let alt_name: String = extract(&alt_name)
+                    .or_else(|| tag.bad_type())?;
+            let _unused = get_shape_type(alt_name.as_str())?;
+            let err = tag.bad().why(format!(
+                "multiple shape definitions ({}, {}, ..)",
+                shape_name,
+                alt_name,
+            )).to_err(ValueError);
+            return Err(err);
+        }
+        Ok(shape)
     }
 }
 

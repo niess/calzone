@@ -220,8 +220,8 @@ impl GeometryBuilder {
         position: Option<f64x3>,
         rotation: Option<Rotation>,
         sensitive: Option<bool>,
+        shape: Option<DictLike<'py>>,
         subtract: Option<Strings>,
-        // XXX Modify shape as well?
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
         let mut builder = slf.borrow_mut();
         let volume = builder.find_mut(pathname)?;
@@ -229,7 +229,7 @@ impl GeometryBuilder {
             volume.material = material;
         }
         if let Some(overlaps) = overlaps {
-            let tag = Tag::empty();
+            let tag = Tag::new("", "overlaps", None);
             volume.overlaps = volume::Volume::flatten_overlaps(
                 &tag,
                 &overlaps,
@@ -244,6 +244,10 @@ impl GeometryBuilder {
         }
         if let Some(sensitive) = sensitive {
             volume.sensitive = sensitive;
+        }
+        if let Some(shape) = shape {
+            let tag = Tag::new("", "shape", None);
+            volume.shape = volume::Shape::try_from_dict(&tag, &shape)?;
         }
         if let Some(subtract) = subtract {
             volume.subtract = subtract.into_vec();

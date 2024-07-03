@@ -99,10 +99,10 @@ Python interface
       The volume to modify is identified by its absolute :ref:`pathname
       <pathname>`. The other arguments specify replacement values, if not
       :python:`None`. See :numref:`tab-volume-items` for the meaning of
-      arguments. For instance, the following changes the *material* of the root
+      arguments. For instance, the following changes the *shape* of the root
       :python:`"Environment"` volume.
 
-      >>> builder.modify("Environment", material="G4_WATER")
+      >>> builder.modify("Environment", shape={"box": 1.0})
 
    .. automethod:: move
 
