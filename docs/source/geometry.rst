@@ -219,8 +219,8 @@ of patching small (erroneous) overlaps (e.g. due to numeric approximations).
 Shape definition
 ----------------
 
-The available shape types are described below. Note that the shape type name
-follows the `snake_case` syntax (i.e. like property names).
+The available shape types (`G4vSolid`_) are described below. Note that the shape
+type name follows the `snake_case` syntax (i.e. like property names).
 
 Box shape
 ~~~~~~~~~
@@ -256,11 +256,29 @@ the xOy plane.
      - Value type
      - Default value
    * - :python:`"length"`
-     - :python:`float`
+     - :python:`float` (cm)
      - 
    * - :python:`"radius"`
-     - :python:`float`
+     - :python:`float` (cm)
      - 
+   * - :python:`"thickness"`
+     - :python:`float` (cm)
+     - :python:`None`
+   * - :python:`"section"`
+     - :python:`[float; 2]` (deg)
+     - :python:`None`
+
+.. topic:: Hollow cylinder.
+
+   If *thickness* is not :python:`None`, then the cylinder is hollow (i.e.
+   actually a tube, with the specified thickness).
+
+.. topic:: Cylindrical section.
+
+   The optional *section* arguments specifies the angular span of the
+   cylindrical shape (in deg). By default, the cylinder is closed, i.e. it spans
+   the whole azimuth angle ([0, 360] deg).
+
 
 Envelope shape
 ~~~~~~~~~~~~~~

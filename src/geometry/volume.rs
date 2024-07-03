@@ -396,18 +396,20 @@ impl TryFromBound for ffi::BoxShape {
 
 impl TryFromBound for ffi::CylinderShape {
     fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
-        const EXTRACTOR: Extractor<3> = Extractor::new([
+        const EXTRACTOR: Extractor<4> = Extractor::new([
             Property::required_f64("length"),
             Property::required_f64("radius"),
             Property::new_f64("thickness", 0.0),
+            Property::new_interval("thickness", [0.0, 360.0]),
         ]);
 
         let tag = tag.cast("Cylinder");
-        let [length, radius, thickness] = EXTRACTOR.extract(&tag, value, None)?;
+        let [length, radius, thickness, section] = EXTRACTOR.extract(&tag, value, None)?;
         let shape = Self {
             length: length.into(),
             radius: radius.into(),
             thickness: thickness.into(),
+            section: section.into(),
         };
         Ok(shape)
     }
@@ -415,19 +417,31 @@ impl TryFromBound for ffi::CylinderShape {
 
 impl TryFromBound for ffi::EnvelopeShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        const DEFAULT_SHAPE: &str = "box";
+        const DEFAULT_SAFETY: f64 = 0.01;
+
         let mut safety: Option<f64> = None;
         let shape: PyResult<String> = value.extract();
         let shape: String = match shape {
             Err(_) => {
-                const EXTRACTOR: Extractor<2> = Extractor::new([
-                    Property::new_str("shape", "box"),
-                    Property::optional_f64("safety"),
-                ]);
+                let sfty: PyResult<f64> = value.extract();
+                match sfty {
+                    Err(_) => {
+                        const EXTRACTOR: Extractor<2> = Extractor::new([
+                            Property::new_str("shape", DEFAULT_SHAPE),
+                            Property::optional_f64("safety"),
+                        ]);
 
-                let tag = tag.cast("Envelope");
-                let [shape, sfty] = EXTRACTOR.extract_any(&tag, value, None)?;
-                safety = sfty.into();
-                shape.into()
+                        let tag = tag.cast("Envelope");
+                        let [shape, sfty] = EXTRACTOR.extract_any(&tag, value, None)?;
+                        safety = sfty.into();
+                        shape.into()
+                    }
+                    Ok(sfty) => {
+                        safety = Some(sfty);
+                        DEFAULT_SHAPE.to_string()
+                    },
+                }
             },
             Ok(shape) => shape,
         };
@@ -443,7 +457,7 @@ impl TryFromBound for ffi::EnvelopeShape {
                 let options = ["box", "cylinder", "sphere"];
                 variant_error(message.as_str(), shape.as_str(), &options)
             })?;
-        let safety = safety.unwrap_or(0.01);
+        let safety = safety.unwrap_or(DEFAULT_SAFETY);
         let envelope = Self { shape, safety };
         Ok(envelope)
     }

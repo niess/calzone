@@ -222,6 +222,7 @@ enum PropertyDefault {
     F64(f64),
     F64x3(f64x3),
     F64x3x3(f64x3x3),
+    Interval([f64; 2]),
     Optional,
     Required,
     String(&'static str),
@@ -235,6 +236,7 @@ enum PropertyType {
     F64,
     F64x3,
     F64x3x3,
+    Interval,
     String,
     Strings,
     U32,
@@ -247,6 +249,7 @@ pub enum PropertyValue<'py> {
     F64(f64),
     F64x3(f64x3),
     F64x3x3(f64x3x3),
+    Interval([f64; 2]),
     None,
     String(String),
     Strings(Vec<String>),
@@ -340,6 +343,12 @@ impl Property {
     pub const fn new_f64(name: &'static str, default: f64) -> Self {
         let tp = PropertyType::F64;
         let default = PropertyDefault::F64(default);
+        Self::new(name, tp, default)
+    }
+
+    pub const fn new_interval(name: &'static str, default: [f64; 2]) -> Self {
+        let tp = PropertyType::Interval;
+        let default = PropertyDefault::Interval(default);
         Self::new(name, tp, default)
     }
 
@@ -504,6 +513,11 @@ impl Property {
                 let value: Rotation = extract(value)
                     .or_else(bad_property)?;
                 PropertyValue::F64x3x3(value.into_mat())
+            },
+            PropertyType::Interval => {
+                let value: [f64; 2] = extract(value)
+                    .or_else(bad_property)?;
+                PropertyValue::Interval(value)
             },
             PropertyType::String => {
                 let value: String = extract(value)
@@ -730,6 +744,25 @@ impl<'py> From<PropertyValue<'py>> for Option<f64x3x3> {
     }
 }
 
+impl<'py> From<PropertyValue<'py>> for [f64; 2] {
+    fn from(value: PropertyValue<'py>) -> [f64; 2] {
+        match value {
+            PropertyValue::Interval(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<[f64; 2]> {
+    fn from(value: PropertyValue<'py>) -> Option<[f64; 2]> {
+        match value {
+            PropertyValue::Interval(value) => Some(value),
+            PropertyValue::None => None,
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl<'py> From<PropertyValue<'py>> for String {
     fn from(value: PropertyValue<'py>) -> String {
         match value {
@@ -864,6 +897,10 @@ impl TypeName for bool {
 
 impl TypeName for f64 {
     fn type_name() -> &'static str { "a 'float'" }
+}
+
+impl TypeName for [f64; 2] {
+    fn type_name() -> &'static str { "an 'interval'" }
 }
 
 impl TypeName for Vector {

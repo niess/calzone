@@ -42,6 +42,7 @@ pub mod ffi {
         radius: f64,
         length: f64,
         thickness: f64,
+        section: [f64; 2],
     }
 
     #[repr(u32)]

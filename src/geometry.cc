@@ -341,13 +341,16 @@ static G4VSolid * build_solids(
                 auto shape = volume.cylinder_shape();
                 double rmin = (shape.thickness > 0.0) ?
                     shape.radius - shape.thickness : 0.0;
+                double phi0 = (shape.section[0] / 360.0) * CLHEP::twopi;
+                double dphi = ((shape.section[1] - shape.section[0]) / 360.0)
+                    * CLHEP::twopi;
                 solid = new G4Tubs(
                     std::string(pathname),
                     rmin * CLHEP::cm,
                     shape.radius * CLHEP::cm,
                     0.5 * shape.length * CLHEP::cm,
-                    0.0,
-                    CLHEP::twopi
+                    phi0,
+                    dphi
                 );
             }
             break;
