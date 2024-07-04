@@ -131,23 +131,41 @@ TrackingImpl * TrackingImpl::None() {
 //
 // ============================================================================
 
-void SteppingImpl::UserSteppingAction(const G4Step * step) { 
-    if (step->IsLastStepInVolume()) {
-        // XXX implement catch & record.
-        auto && volume = step->GetPostStepPoint()->GetPhysicalVolume();
+void SteppingImpl::UserSteppingAction(const G4Step * step) {
+    if (RUN_AGENT->is_particles() && step->IsLastStepInVolume()) {
+        auto && point = step->GetPostStepPoint();
+        G4VPhysicalVolume * volume = point->GetPhysicalVolume();
         if (volume != nullptr) {
             auto && sensitive = static_cast<SamplerImpl *>(
                 volume->GetLogicalVolume()->GetSensitiveDetector()
             );
             if (sensitive != nullptr) {
+                auto && track = step->GetTrack();
                 auto && action = sensitive->roles.ingoing;
                 if ((action == Action::Catch) ||
+                    (action == Action::Record)) {
+                    auto && pid = track
+                        ->GetParticleDefinition()
+                        ->GetPDGEncoding();
+                    auto && r = point->GetPosition() / CLHEP::cm;
+                    auto && u = point->GetMomentumDirection();
+                    Particle particle = {
+                        pid,
+                        point->GetKineticEnergy() / CLHEP::MeV,
+                        { r.x(), r.y(), r.z() },
+                        { u.x(), u.y(), u.z() },
+                    };
+                    RUN_AGENT->push_particle(volume, std::move(particle));
+                }
+                if ((action == Action::Catch) ||
                     (action == Action::Kill)) {
-                    step->GetTrack()->SetTrackStatus(fStopAndKill);
+                    track->SetTrackStatus(fStopAndKill);
                 }
             }
         }
     }
+
+    // XXX Flag killed particles for the tracker?
 
     if (!RUN_AGENT->is_tracker()) {
         return;

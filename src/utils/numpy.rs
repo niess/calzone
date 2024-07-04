@@ -1,5 +1,5 @@
 // Calzone interface.
-use crate::cxx::ffi::{GoupilState, Primary, Track, Vertex};
+use crate::cxx::ffi::{GoupilState, Particle, SampledParticle, Track, Vertex};
 use crate::simulation::sampler::{LineDeposit, PointDeposit, TotalDeposit};
 // PyO3 interface.
 use pyo3::prelude::*;
@@ -30,6 +30,7 @@ struct ArrayInterface {
     dtype_line_deposit: PyObject,
     dtype_point_deposit: PyObject,
     dtype_primary: PyObject,
+    dtype_sampled_particle: PyObject,
     dtype_total_deposit: PyObject,
     dtype_track: PyObject,
     dtype_u16: PyObject,
@@ -166,6 +167,16 @@ pub fn initialise(py: Python) -> PyResult<()> {
             .into_py(py)
     };
 
+    let dtype_sampled_particle: PyObject = {
+        let arg: [PyObject; 2] = [
+            ("event", "u8").into_py(py),
+            ("state", dtype_primary.clone()).into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
+
     let dtype_total_deposit: PyObject = {
         let arg: [PyObject; 2] = [
             ("event", "u8").into_py(py),
@@ -234,6 +245,7 @@ pub fn initialise(py: Python) -> PyResult<()> {
         dtype_line_deposit,
         dtype_point_deposit,
         dtype_primary,
+        dtype_sampled_particle,
         dtype_total_deposit,
         dtype_track,
         dtype_u16,
@@ -704,10 +716,17 @@ impl Dtype for PointDeposit {
     }
 }
 
-impl Dtype for Primary {
+impl Dtype for Particle {
     #[inline]
     fn dtype(py: Python) -> PyResult<PyObject> {
         Ok(api(py).dtype_primary.clone_ref(py))
+    }
+}
+
+impl Dtype for SampledParticle {
+    #[inline]
+    fn dtype(py: Python) -> PyResult<PyObject> {
+        Ok(api(py).dtype_sampled_particle.clone_ref(py))
     }
 }
 

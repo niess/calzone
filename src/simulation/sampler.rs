@@ -10,75 +10,6 @@ use pyo3::types::PyDict;
 use super::ffi;
 
 
-// ===============================================================================================
-//
-// Sampler interface.
-//
-// ===============================================================================================
-
-#[derive(Clone, Copy, EnumVariantsStrings)]
-#[enum_variants_strings_transform(transform="lower_case")]
-pub enum SamplerMode {
-    Brief,
-    Detailed,
-}
-
-impl<'py> FromPyObject<'py> for SamplerMode {
-    fn extract(obj: &'py PyAny) -> PyResult<Self> {
-        let mode: String = obj.extract()?;
-        let mode = SamplerMode::from_str(mode.as_str())
-            .map_err(|options| variant_error("bad sampler mode", mode.as_str(), options))?;
-        Ok(mode)
-    }
-}
-
-impl IntoPy<PyObject> for SamplerMode {
-    fn into_py(self, py: Python) -> PyObject {
-        self.to_str().into_py(py)
-    }
-}
-
-pub struct Deposits {
-    mode: SamplerMode,
-    values: IndexMap<*const ffi::G4VPhysicalVolume, DepositsCell>,
-}
-
-impl Deposits {
-    pub fn new(mode: SamplerMode) -> Self {
-        let values = IndexMap::new();
-        Self { mode, values }
-    }
-
-    pub fn export(mut self, py: Python) -> PyResult<PyObject> {
-        let data = PyDict::new_bound(py);
-        for (volume, deposits) in self.values.drain(..) {
-            let volume: &ffi::G4VPhysicalVolume = unsafe { &*volume };
-            let volume = ffi::as_str(volume.GetName());
-            let deposits = deposits.export(py)?;
-            data.set_item(volume, deposits)?
-        }
-        Ok(data.into_any().unbind())
-    }
-
-    pub fn push(
-        &mut self,
-        volume: *const ffi::G4VPhysicalVolume,
-        event: usize,
-        deposit: f64,
-        non_ionising: f64,
-        start: &ffi::G4ThreeVector,
-        end: &ffi::G4ThreeVector,
-    ) {
-        self.values.entry(volume)
-            .and_modify(|e| e.push(event, deposit, non_ionising, start, end))
-            .or_insert_with(|| {
-                let mut cell = DepositsCell::new(self.mode);
-                cell.push(event, deposit, non_ionising, start, end);
-                cell
-            });
-    }
-}
-
 // ===========================================================================================
 //
 // Sampler roles interface.
@@ -219,6 +150,77 @@ impl From<ffi::Roles> for Vec<String> {
     }
 }
 
+
+// ===============================================================================================
+//
+// Deposits sampler interface.
+//
+// ===============================================================================================
+
+#[derive(Clone, Copy, EnumVariantsStrings)]
+#[enum_variants_strings_transform(transform="lower_case")]
+pub enum SamplerMode {
+    Brief,
+    Detailed,
+}
+
+impl<'py> FromPyObject<'py> for SamplerMode {
+    fn extract(obj: &'py PyAny) -> PyResult<Self> {
+        let mode: String = obj.extract()?;
+        let mode = SamplerMode::from_str(mode.as_str())
+            .map_err(|options| variant_error("bad sampler mode", mode.as_str(), options))?;
+        Ok(mode)
+    }
+}
+
+impl IntoPy<PyObject> for SamplerMode {
+    fn into_py(self, py: Python) -> PyObject {
+        self.to_str().into_py(py)
+    }
+}
+
+pub struct Deposits {
+    mode: SamplerMode,
+    values: IndexMap<*const ffi::G4VPhysicalVolume, DepositsCell>,
+}
+
+impl Deposits {
+    pub fn new(mode: SamplerMode) -> Self {
+        let values = IndexMap::new();
+        Self { mode, values }
+    }
+
+    pub fn export(mut self, py: Python) -> PyResult<PyObject> {
+        let data = PyDict::new_bound(py);
+        for (volume, deposits) in self.values.drain(..) {
+            let volume: &ffi::G4VPhysicalVolume = unsafe { &*volume };
+            let volume = ffi::as_str(volume.GetName());
+            let deposits = deposits.export(py)?;
+            data.set_item(volume, deposits)?
+        }
+        Ok(data.into_any().unbind())
+    }
+
+    pub fn push(
+        &mut self,
+        volume: *const ffi::G4VPhysicalVolume,
+        event: usize,
+        deposit: f64,
+        non_ionising: f64,
+        start: &ffi::G4ThreeVector,
+        end: &ffi::G4ThreeVector,
+    ) {
+        self.values.entry(volume)
+            .and_modify(|e| e.push(event, deposit, non_ionising, start, end))
+            .or_insert_with(|| {
+                let mut cell = DepositsCell::new(self.mode);
+                cell.push(event, deposit, non_ionising, start, end);
+                cell
+            });
+    }
+}
+
+
 // ===========================================================================================
 //
 // Deposits implementation.
@@ -306,7 +308,7 @@ impl DepositsCell {
 
 // ===========================================================================================
 //
-// Export formats.
+// Deposits export formats.
 //
 // ===========================================================================================
 
@@ -341,3 +343,86 @@ struct LineDepositsExport (Export<LineDeposit>);
 #[derive(AsMut, AsRef, From)]
 #[pyclass(module="calzone")]
 struct PointDepositsExport (Export<PointDeposit>);
+
+
+// ===============================================================================================
+//
+// Particles sampler interface.
+//
+// ===============================================================================================
+
+pub struct ParticlesSampler {
+    samples: IndexMap<*const ffi::G4VPhysicalVolume, ParticlesCell>,
+}
+
+impl ParticlesSampler {
+    pub fn new() -> Self {
+        let samples = IndexMap::new();
+        Self { samples }
+    }
+
+    pub fn export(mut self, py: Python) -> PyResult<PyObject> {
+        let data = PyDict::new_bound(py);
+        for (volume, samples) in self.samples.drain(..) {
+            let volume: &ffi::G4VPhysicalVolume = unsafe { &*volume };
+            let volume = ffi::as_str(volume.GetName());
+            let samples = samples.export(py)?;
+            data.set_item(volume, samples)?
+        }
+        Ok(data.into_any().unbind())
+    }
+
+    pub fn push(
+        &mut self,
+        volume: *const ffi::G4VPhysicalVolume,
+        event: usize,
+        particle: ffi::Particle,
+    ) {
+        self.samples.entry(volume)
+            .and_modify(|e| e.push(event, particle))
+            .or_insert_with(|| {
+                let mut cell = ParticlesCell::new();
+                cell.push(event, particle);
+                cell
+            });
+    }
+}
+
+
+// ===========================================================================================
+//
+// Particles cell implementation.
+//
+// ===========================================================================================
+
+#[derive(Default)]
+struct ParticlesCell {
+    samples: Vec<ffi::SampledParticle>,
+}
+
+impl ParticlesCell {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn export(self, py: Python) -> PyResult<PyObject> {
+        let samples = Export::export::<SampledParticlesExport>(py, self.samples)?;
+        Ok(samples)
+    }
+
+    fn push(&mut self, event: usize, state: ffi::Particle) {
+        let sample = ffi::SampledParticle { event, state };
+        self.samples.push(sample);
+    }
+}
+
+
+// ===========================================================================================
+//
+// Sampled particles export format.
+//
+// ===========================================================================================
+
+#[derive(AsMut, AsRef, From)]
+#[pyclass(module="calzone")]
+struct SampledParticlesExport (Export<ffi::SampledParticle>);

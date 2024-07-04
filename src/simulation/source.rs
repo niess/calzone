@@ -10,16 +10,16 @@ use super::ffi;
 //
 // ===============================================================================================
 
-/// Create and array of primary Monte Carlo particles.
+/// Create and array of Monte Carlo particles.
 #[pyfunction]
 #[pyo3(signature=(shape, **kwargs))]
-pub fn primaries(
+pub fn particles(
     py: Python,
     shape: ShapeArg,
     kwargs: Option<&Bound<PyDict>>
 ) -> PyResult<PyObject> {
     let shape: Vec<usize> = shape.into();
-    let array: &PyAny = PyArray::<ffi::Primary>::zeros(py, &shape)?;
+    let array: &PyAny = PyArray::<ffi::Particle>::zeros(py, &shape)?;
     let mut has_direction = false;
     let mut has_energy = false;
     let mut has_pid = false;

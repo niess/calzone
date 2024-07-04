@@ -49,6 +49,7 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
         auto sourceImpl = SourceImpl::Get(); // Must be after geometry and
                                              // physics.
         manager->SetUserAction(sourceImpl);
+        manager->SetUserAction(SteppingImpl::Get());
         manager->Initialize();
     }
 

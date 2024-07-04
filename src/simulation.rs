@@ -17,7 +17,7 @@ pub mod tracker;
 
 pub use physics::Physics;
 pub use random::Random;
-use sampler::{SamplerMode, Deposits};
+use sampler::{Deposits, ParticlesSampler, SamplerMode};
 use tracker::Tracker;
 pub use super::cxx::ffi;
 
@@ -40,13 +40,16 @@ pub struct Simulation {
     /// Monte Carlo pseudo-random stream.
     #[pyo3(get, set)]
     random: Py<Random>,
-    /// Sampling mode for sensitive volumes.
+    /// Sampling mode for energy deposits.
     #[pyo3(get, set)]
-    sampling: Option<SamplerMode>,
+    sample_deposits: Option<SamplerMode>,
+    /// Flag controlling the sampling of Monte Carlo particles.
     #[pyo3(get, set)]
-    /// Flag to (de)activate the production of secondary particles.
+    sample_particles: bool,
+    /// Flag controlling the production of secondary Monte Carlo particles.
+    #[pyo3(get, set)]
     secondaries: bool,
-    /// Flag to (de)activate the recording of Monte Carlo tracks.
+    /// Flag controlling the recording of Monte Carlo tracks.
     #[pyo3(get, set)]
     tracking: bool,
 }
@@ -59,7 +62,8 @@ impl Simulation {
         geometry: Option<GeometryArg>,
         physics: Option<PhysicsArg>,
         random: Option<&Bound<'py, Random>>,
-        sampling: Option<SamplerMode>,
+        sample_deposits: Option<SamplerMode>,
+        sample_particles: Option<bool>,
         secondaries: Option<bool>,
         tracking: Option<bool>,
     ) -> PyResult<Self> {
@@ -78,10 +82,19 @@ impl Simulation {
         let random = random
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
-        let sampling = sampling.or_else(|| Some(SamplerMode::Brief));
+        let sample_deposits = sample_deposits.or_else(|| Some(SamplerMode::Brief));
+        let sample_particles = sample_particles.unwrap_or(false);
         let secondaries = secondaries.unwrap_or(true);
         let tracking = tracking.unwrap_or(false);
-        let simulation = Self { geometry, physics, random, sampling, secondaries, tracking };
+        let simulation = Self {
+            geometry,
+            physics,
+            random,
+            sample_deposits,
+            sample_particles,
+            secondaries,
+            tracking
+        };
         Ok(simulation)
     }
 
@@ -194,8 +207,10 @@ pub struct RunAgent<'a> {
     random: Random,
     // Iterator.
     index: usize,
-    // Samples.
+    // Energy deposits.
     deposits: Option<Deposits>,
+    // Sampled particles.
+    particles: Option<ParticlesSampler>,
     // tracks.
     tracker: Option<Tracker>,
     // secondaries.
@@ -208,23 +223,50 @@ impl<'a> RunAgent<'a> {
     }
 
     fn export(self, py: Python) -> PyResult<PyObject> {
-        static RESULT2: NamedTuple<2> = NamedTuple::new("Result", ["tracks", "vertices"]);
-        static RESULT3: NamedTuple<3> = NamedTuple::new(
-            "Result", ["deposits", "tracks", "vertices"]
-        );
+        let deposits = self.deposits.map(|deposits| deposits.export(py)).transpose()?;
+        let particles = self.particles.map(|particles| particles.export(py)).transpose()?;
+        let tracker = self.tracker.map(|tracker| tracker.export(py)).transpose()?;
 
-        let result = match self.deposits {
-            None => match self.tracker {
-                None => py.None(),
-                Some(tracker) => RESULT2.instance(py, tracker.export(py)?)?.unbind(),
+        let result = match deposits {
+            Some(deposits) => match particles {
+                Some(particles) => match tracker {
+                    Some((tracks, vertices)) => {
+                        static RESULT: NamedTuple<4> = NamedTuple::new(
+                            "Result", ["deposits", "particles", "tracks", "vertices"]);
+                        RESULT.instance(py, (deposits, particles, tracks, vertices))?.unbind()
+                    },
+                    None => {
+                        static RESULT: NamedTuple<2> = NamedTuple::new(
+                            "Result", ["deposits", "particles"]);
+                        RESULT.instance(py, (deposits, particles))?.unbind()
+                    },
+                },
+                None => match tracker {
+                    Some((tracks, vertices)) => {
+                        static RESULT: NamedTuple<3> = NamedTuple::new(
+                            "Result", ["deposits", "tracks", "vertices"]);
+                        RESULT.instance(py, (deposits, tracks, vertices))?.unbind()
+                    },
+                    None => deposits,
+                },
             },
-            Some(deposits) => match self.tracker {
-                None => deposits.export(py)?,
-                Some(tracker) => {
-                    let deposits = deposits.export(py)?;
-                    let (tracks, vertices) = tracker.export(py)?;
-                    RESULT3.instance(py, (deposits, tracks, vertices))?.unbind()
-                }
+            None => match particles {
+                Some(particles) => match tracker {
+                    Some((tracks, vertices)) => {
+                        static RESULT: NamedTuple<3> = NamedTuple::new(
+                            "Result", ["particles", "tracks", "vertices"]);
+                        RESULT.instance(py, (particles, tracks, vertices))?.unbind()
+                    },
+                    None => particles,
+                },
+                None => match tracker {
+                    Some((tracks, vertices)) => {
+                        static RESULT: NamedTuple<2> = NamedTuple::new(
+                            "Result", ["tracks", "vertices"]);
+                        RESULT.instance(py, (tracks, vertices))?.unbind()
+                    },
+                    None => py.None(),
+                },
             },
         };
         Ok(result)
@@ -234,8 +276,12 @@ impl<'a> RunAgent<'a> {
         self.geometry.as_ref().unwrap()
     }
 
-    pub fn is_sampler(&self) -> bool {
+    pub fn is_deposits(&self) -> bool {
         self.deposits.is_some()
+    }
+
+    pub fn is_particles(&self) -> bool {
+        self.particles.is_some()
     }
 
     pub fn is_secondaries(&self) -> bool {
@@ -258,11 +304,16 @@ impl<'a> RunAgent<'a> {
         let physics = simulation.physics.bind(py).borrow().0;
         let random = simulation.random.bind(py).borrow().clone();
         let index = 0;
-        let deposits = simulation.sampling.map(|mode| Deposits::new(mode));
+        let deposits = simulation.sample_deposits.map(|mode| Deposits::new(mode));
+        let particles = if simulation.sample_particles {
+            Some(ParticlesSampler::new())
+        } else {
+            None
+        };
         let tracker = if simulation.tracking { Some(Tracker::new()) } else { None };
         let secondaries = simulation.secondaries;
         let agent = RunAgent {
-            geometry, physics, primaries, random, index, deposits, tracker, secondaries
+            geometry, physics, primaries, random, index, deposits, particles, tracker, secondaries
         };
         Ok(agent)
     }
@@ -271,17 +322,17 @@ impl<'a> RunAgent<'a> {
         self.random.open01()
     }
 
-    pub fn next_primary(&mut self) -> ffi::Primary {
+    pub fn next_primary(&mut self) -> ffi::Particle {
         let primary = self.primaries.data(self.index).unwrap();
         self.index += 1;
         match self.primaries {
             Primaries::Calzone(_) => {
-                let primary = unsafe { (primary as *const ffi::Primary).as_ref().unwrap() };
+                let primary = unsafe { (primary as *const ffi::Particle).as_ref().unwrap() };
                 primary.clone()
             },
             Primaries::Goupil(_) => {
                 let state = unsafe { (primary as *const ffi::GoupilState).as_ref().unwrap() };
-                ffi::Primary {
+                ffi::Particle {
                     pid: 22,
                     energy: state.energy,
                     position: state.position,
@@ -312,6 +363,16 @@ impl<'a> RunAgent<'a> {
         }
     }
 
+    pub fn push_particle(
+        &mut self,
+        volume: *const ffi::G4VPhysicalVolume,
+        particle: ffi::Particle,
+    ) {
+        if let Some(particles) = self.particles.as_mut() {
+            particles.push(volume, self.index, particle)
+        }
+    }
+
     pub fn push_track(&mut self, mut track: ffi::Track) {
         if let Some(tracker) = self.tracker.as_mut() {
             track.event = self.index;
@@ -329,7 +390,7 @@ impl<'a> RunAgent<'a> {
 
 #[derive(FromPyObject)]
 enum Primaries<'a> {
-    Calzone(&'a PyArray<ffi::Primary>),
+    Calzone(&'a PyArray<ffi::Particle>),
     Goupil(&'a PyArray<ffi::GoupilState>),
 }
 

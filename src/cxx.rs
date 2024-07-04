@@ -199,6 +199,12 @@ pub mod ffi {
         deposits: Action,
     }
 
+    #[derive(Clone, Copy)]
+    struct SampledParticle {
+        event: usize,
+        state: Particle,
+    }
+
     // ===========================================================================================
     //
     // Source interface.
@@ -215,7 +221,7 @@ pub mod ffi {
     }
 
     #[derive(Clone, Copy)]
-    struct Primary {
+    struct Particle {
         pid: i32,
         energy: f64,
         position: [f64; 3],
@@ -382,11 +388,12 @@ pub mod ffi {
 
         fn events(self: &RunAgent) -> usize;
         unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
-        fn is_sampler(self: &RunAgent) -> bool;
+        fn is_deposits(self: &RunAgent) -> bool;
+        fn is_particles(self: &RunAgent) -> bool;
         fn is_secondaries(self: &RunAgent) -> bool;
         fn is_tracker(self: &RunAgent) -> bool;
         fn next_open01(self: &mut RunAgent) -> f64;
-        unsafe fn next_primary(self: &mut RunAgent) -> Primary;
+        unsafe fn next_primary(self: &mut RunAgent) -> Particle;
         unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
         fn prng_name(self: &RunAgent) -> &'static str;
         unsafe fn push_deposit(
@@ -396,6 +403,11 @@ pub mod ffi {
             non_ionising: f64,
             start: &G4ThreeVector,
             end: &G4ThreeVector,
+        );
+        unsafe fn push_particle(
+            self: &mut RunAgent,
+            volume: *const G4VPhysicalVolume,
+            mut particle: Particle,
         );
         fn push_track(self: &mut RunAgent, mut track: Track);
         fn push_vertex(self: &mut RunAgent, mut vertex: Vertex);
