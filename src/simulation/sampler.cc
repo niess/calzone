@@ -10,7 +10,7 @@ SamplerImpl::SamplerImpl(const std::string & name, Roles r) :
 }
 
 G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
-    if (RUN_AGENT->is_sampler() && this->roles.sample_deposits) {
+    if (RUN_AGENT->is_sampler() && this->roles.deposits == Action::Record) {
         double deposit = step->GetTotalEnergyDeposit() / CLHEP::MeV;
         if (deposit == 0.0) {
             return false;
@@ -24,6 +24,15 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
             auto end = post->GetPosition() / CLHEP::cm;
 
             RUN_AGENT->push_deposit(volume, deposit, non_ionising, start, end);
+        }
+    }
+
+    if (step->IsLastStepInVolume()) {
+        // XXX implement catch & record.
+        auto && action = this->roles.outgoing;
+        if ((action == Action::Catch) ||
+            (action == Action::Kill)) {
+            step->GetTrack()->SetTrackStatus(fStopAndKill);
         }
     }
 

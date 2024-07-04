@@ -666,7 +666,7 @@ impl Volume {
     }
 
     pub fn sensitive(&self) -> bool {
-        self.roles.any() // XXX still needed?
+        self.roles.any()
     }
 
     pub fn shape(&self) -> ffi::ShapeType {

@@ -86,17 +86,78 @@ impl Deposits {
 // ===========================================================================================
 
 #[derive(EnumVariantsStrings)]
-#[enum_variants_strings_transform(transform="snake_case")]
-pub enum Role {
-    CatchAll,
-    CatchIngoing,
-    CatchOutgoing,
-    SampleDeposits,
+#[enum_variants_strings_transform(transform="lower_case")]
+pub enum RoleVerb {
+    Catch,
+    Kill,
+    Record,
+}
+
+#[derive(EnumVariantsStrings)]
+#[enum_variants_strings_transform(transform="lower_case")]
+pub enum RoleSubject {
+    All,
+    Deposits,
+    Ingoing,
+    Outgoing,
+    Particles,
+}
+
+struct Role {
+    verb: RoleVerb,
+    subject: RoleSubject,
+}
+
+impl TryFrom<&str> for Role {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let (verb, subject) = value.split_once('_')
+            .ok_or_else(|| "syntax error: missing verb or subject".to_string())?;
+        let verb = RoleVerb::from_str(verb)
+            .map_err(|options| format!("unknown verb: {}", variant_explain(verb, options)))?;
+        let subject = RoleSubject::from_str(subject)
+            .map_err(|options| format!("unknown subject: {}", variant_explain(subject, options)))?;
+        let role = Self { verb, subject };
+        Ok(role)
+    }
+}
+
+impl From<RoleVerb> for ffi::Action {
+    fn from(value: RoleVerb) -> Self {
+        match value {
+            RoleVerb::Catch => Self::Catch,
+            RoleVerb::Kill => Self::Kill,
+            RoleVerb::Record => Self::Record,
+        }
+    }
+}
+
+impl From<ffi::Action> for &'static str {
+    fn from(value: ffi::Action) -> Self {
+        match value {
+            ffi::Action::Catch => "catch",
+            ffi::Action::Kill => "kill",
+            ffi::Action::Record => "record",
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl ffi::Roles {
     pub fn any(&self) -> bool {
-        self.catch_ingoing | self.catch_outgoing | self.sample_deposits
+        self.ingoing != ffi::Action::None ||
+        self.outgoing != ffi::Action::None ||
+        self.deposits != ffi::Action::None
+    }
+}
+
+impl Default for ffi::Roles {
+    fn default() -> Self {
+        let deposits = ffi::Action::None;
+        let ingoing = ffi::Action::None;
+        let outgoing = ffi::Action::None;
+        Self { deposits, ingoing, outgoing }
     }
 }
 
@@ -106,21 +167,32 @@ impl TryFrom<&[String]> for ffi::Roles {
     fn try_from(value: &[String]) -> Result<ffi::Roles, Self::Error> {
         let mut roles = ffi::Roles::default();
         for role in value.iter() {
-            let role = Role::from_str(role)
-                .map_err(|options| variant_explain(role, options))?;
-            match role {
-                Role::CatchAll => {
-                    roles.catch_ingoing = true;
-                    roles.catch_outgoing = true;
+            let role: Role = role.as_str().try_into()?;
+            let action: ffi::Action = role.verb.into();
+            match role.subject {
+                RoleSubject::All => {
+                    roles.ingoing = action;
+                    roles.outgoing = action;
+                    if action == ffi::Action::Record {
+                        roles.deposits = action;
+                    }
                 },
-                Role::CatchIngoing => {
-                    roles.catch_ingoing = true;
+                RoleSubject::Deposits => {
+                    if action != ffi::Action::Record {
+                        let action: &'static str = action.into();
+                        return Err(format!("cannot '{}' deposits", action));
+                    }
+                    roles.deposits = action;
                 },
-                Role::CatchOutgoing => {
-                    roles.catch_outgoing = true;
+                RoleSubject::Ingoing => {
+                    roles.ingoing = action;
                 },
-                Role::SampleDeposits => {
-                    roles.sample_deposits = true;
+                RoleSubject::Outgoing => {
+                    roles.outgoing = action;
+                },
+                RoleSubject::Particles => {
+                    roles.ingoing = action;
+                    roles.outgoing = action;
                 },
             }
         }
@@ -131,17 +203,17 @@ impl TryFrom<&[String]> for ffi::Roles {
 impl From<ffi::Roles> for Vec<String> {
     fn from(roles: ffi::Roles) -> Self {
         let mut strings = Vec::<String>::new();
-        if roles.catch_ingoing {
-            if roles.catch_outgoing {
-                strings.push("catch_all".to_string());
-            } else {
-                strings.push("catch_ingoing".to_string());
-            }
-        } else if roles.catch_outgoing {
-            strings.push("catch_outgoing".to_string());
+        if roles.deposits != ffi::Action::None {
+            let verb: &'static str = roles.deposits.into();
+            strings.push(format!("{}_deposits", verb));
         }
-        if roles.sample_deposits {
-            strings.push("sample_deposits".to_string());
+        if roles.ingoing != ffi::Action::None {
+            let verb: &'static str = roles.ingoing.into();
+            strings.push(format!("{}_ingoing", verb));
+        }
+        if roles.outgoing != ffi::Action::None {
+            let verb: &'static str = roles.outgoing.into();
+            strings.push(format!("{}_outgoing", verb));
         }
         strings
     }

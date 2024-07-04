@@ -54,10 +54,8 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
 
     if (RUN_AGENT->is_tracker()) {
         manager->SetUserAction(TrackingImpl::Get());
-        manager->SetUserAction(SteppingImpl::Get());
     } else {
         manager->SetUserAction(TrackingImpl::None());
-        manager->SetUserAction(SteppingImpl::None());
     }
 
     if (RUN_AGENT->is_secondaries()) {

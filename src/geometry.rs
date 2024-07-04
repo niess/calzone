@@ -217,8 +217,8 @@ impl GeometryBuilder {
         material: Option<String>,
         overlaps: Option<DictLike<'py>>,
         position: Option<f64x3>,
+        role: Option<Strings>,
         rotation: Option<Rotation>,
-        sensitive: Option<bool>,
         shape: Option<DictLike<'py>>,
         subtract: Option<Strings>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
@@ -241,8 +241,11 @@ impl GeometryBuilder {
         if let Some(rotation) = rotation {
             volume.rotation = Some(rotation.into_mat());
         }
-        if let Some(sensitive) = sensitive {
-            volume.roles.sample_deposits = sensitive; // XXX parse role.
+        if let Some(role) = role {
+            volume.roles = role.into_vec().as_slice().try_into()
+                .map_err(|why: String| {
+                    Error::new(ValueError).what("role").why(&why).to_err()
+                })?;
         }
         if let Some(shape) = shape {
             let tag = Tag::new("", "shape", None);

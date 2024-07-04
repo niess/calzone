@@ -184,11 +184,19 @@ pub mod ffi {
     //
     // ===========================================================================================
 
-    #[derive(Clone, Copy, Default)]
+    #[repr(u32)]
+    enum Action {
+        None = 0,
+        Catch,
+        Kill,
+        Record,
+    }
+
+    #[derive(Clone, Copy)]
     struct Roles {
-        catch_ingoing: bool,
-        catch_outgoing: bool,
-        sample_deposits: bool,
+        ingoing: Action,
+        outgoing: Action,
+        deposits: Action,
     }
 
     // ===========================================================================================

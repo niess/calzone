@@ -1,4 +1,5 @@
 #include "calzone.h"
+#include "sampler.h"
 #include "tracker.h"
 // Geant4 interface.
 #include "G4Step.hh"
@@ -130,7 +131,28 @@ TrackingImpl * TrackingImpl::None() {
 //
 // ============================================================================
 
-void SteppingImpl::UserSteppingAction(const G4Step * step) {
+void SteppingImpl::UserSteppingAction(const G4Step * step) { 
+    if (step->IsLastStepInVolume()) {
+        // XXX implement catch & record.
+        auto && volume = step->GetPostStepPoint()->GetPhysicalVolume();
+        if (volume != nullptr) {
+            auto && sensitive = static_cast<SamplerImpl *>(
+                volume->GetLogicalVolume()->GetSensitiveDetector()
+            );
+            if (sensitive != nullptr) {
+                auto && action = sensitive->roles.ingoing;
+                if ((action == Action::Catch) ||
+                    (action == Action::Kill)) {
+                    step->GetTrack()->SetTrackStatus(fStopAndKill);
+                }
+            }
+        }
+    }
+
+    if (!RUN_AGENT->is_tracker()) {
+        return;
+    }
+
     auto && track = step->GetTrack();
     auto && tid = track->GetTrackID();
     auto push_vertex = [&](const G4StepPoint * p) {
