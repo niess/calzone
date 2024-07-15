@@ -121,15 +121,16 @@ impl Simulation {
     }
 
     /// Run a Geant4 Monte Carlo simulation.
+    #[pyo3(signature = (particles, /, verbose=false), text_signature="(particles, /)")]
     fn run(
         &self,
         py: Python,
-        primaries: Primaries<'_>,
-        verbose: Option<bool>,
+        particles: Primaries<'_>,
+        verbose: Option<bool>, // Hidden argument.
     ) -> PyResult<PyObject> {
         let verbose = verbose.unwrap_or(false);
 
-        let mut agent = RunAgent::new(py, self, primaries)?;
+        let mut agent = RunAgent::new(py, self, particles)?;
         let result = ffi::run_simulation(&mut agent, verbose)
             .to_result();
 

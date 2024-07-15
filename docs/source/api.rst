@@ -299,8 +299,8 @@ Python interface
 
    .. topic:: Particle ID
 
-      The type of a Monte Carlo particle (:python:`"pid"`) is encoded following
-      the Particle Data Group (PDG) `numbering scheme <PdgScheme_>`_.
+      The type of a Monte Carlo particle (:python:`"pid"`) is encoded according
+      to the Particle Data Group (PDG) `numbering scheme <PdgScheme_>`_.
 
 ----
 
@@ -355,25 +355,28 @@ Python interface
    simulation is configured through a set of attributes described hereafter, or
    using the class constructor, below.
 
-   .. method:: __new__(geometry=None, physics=None, random=None, sampling=None, tracking=None)
+   .. method:: __new__(geometry=None, **kwargs)
 
       Create a new interface to a Geant4 simulation.
 
-      The optional arguments set the corresponding attributes, as described
-      below.
+      The optional keyword arguments initialise the corresponding simulation
+      attributes, described below. For instance, the following creates a new
+      simulation interface with :py:attr:`tracking` enabled.
 
-   .. automethod:: run
+      >>> Simulation = calzone.simulation("geometry.toml", tracking=True)
 
-      Run a Geant4 Monte Carlo simulation with the provided set of primary
-      *particles*. Note that a :py:attr:`geometry` must have been set first. The
-      returned object depends on the simulation :py:attr:`sampling` and
-      :py:attr:`tracking` flags. For example, if both are enabled, then a
+   .. method:: run(particles, /)
+
+      Run a Geant4 Monte Carlo simulation.
+
+      The provided primary *particles* are transported through the Monte Carlo
+      :py:attr:`geometry`, which must have been set first. The returned object
+      depends on the simulation :py:attr:`sample_deposits`,
+      :py:attr:`sample_particles` and :py:attr:`tracking` attributes. For
+      example, if both deposits sampling and tracking are enabled, then a
       :external:py:class:`NamedTuple <typing.NamedTuple>` is returned,
       containing the sampled energy deposits, as well as the recorded tracks and
       vertices (as :external:py:class:`numpy.ndarray`, each).
-
-      The *verbose* flag (:python:`False` by default) controls Geant4 tracking
-      prints, e.g. for cross-checking results.
 
    .. autoattribute:: geometry
 

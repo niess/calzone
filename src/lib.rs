@@ -9,6 +9,8 @@ mod geometry;
 mod simulation;
 mod utils;
 
+// XXX Particles generator?
+
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
