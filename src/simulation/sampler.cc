@@ -3,8 +3,6 @@
 // Geant4 interface.
 #include "G4SDManager.hh"
 
-// XXX Document samplers and roles.
-
 SamplerImpl::SamplerImpl(const std::string & name, Roles r) :
     G4VSensitiveDetector(name) {
     this->roles = std::move(r);

@@ -263,7 +263,7 @@ Python interface
 
 ----
 
-.. autofunction:: calzone.primaries
+.. autofunction:: calzone.particles
 
    This function returns a `structured numpy array <StructuredArray_>`_ with the
    given *shape*. Primary particles are initialised with default properties, if
@@ -271,7 +271,7 @@ Python interface
    array of 100 primary particles (photons, by default) with a kinetic energy of
    0.5 MeV, starting from the origin (by default), and going downwards.
 
-   >>> primaries = calzone.primaries(100, energy=0.5, direction=(0, 0, -1))
+   >>> particles = calzone.particles(100, energy=0.5, direction=(0, 0, -1))
 
    The data structure (:external:py:class:`numpy.dtype`) of a primary particle
    is the following (the corresponding physical units are also indicated).
@@ -296,6 +296,11 @@ Python interface
       * - :python:`"direction"`
         - :python:`"(f8, 3)"`
         - 
+
+   .. topic:: Particle ID
+
+      The type of a Monte Carlo particle (:python:`"pid"`) is encoded following
+      the Particle Data Group (PDG) `numbering scheme <PdgScheme_>`_.
 
 ----
 
@@ -359,9 +364,9 @@ Python interface
 
    .. automethod:: run
 
-      Run a Geant4 Monte Carlo simulation with the provided set of *primaries*.
-      Note that a :py:attr:`geometry` must have been set first. The returned
-      object depends on the simulation :py:attr:`sampling` and
+      Run a Geant4 Monte Carlo simulation with the provided set of primary
+      *particles*. Note that a :py:attr:`geometry` must have been set first. The
+      returned object depends on the simulation :py:attr:`sampling` and
       :py:attr:`tracking` flags. For example, if both are enabled, then a
       :external:py:class:`NamedTuple <typing.NamedTuple>` is returned,
       containing the sampled energy deposits, as well as the recorded tracks and
@@ -385,15 +390,20 @@ Python interface
       This property is a :py:class:`Random` instance. By default, the
       pseudo-random stream is seeded using the system entropy.
 
-   .. autoattribute:: sampling
+   .. autoattribute:: sample_deposits
 
       Must be one of :python:`"brief"` (default) or :python:`"detailed"`. If set
       to :python:`None`, then energy deposits sampling is disabled for all
       volumes.
 
-      In :python:`"brief"` mode, only the total energy deposits per sensitive
+      In :python:`"brief"` mode, only the total energy deposits per active
       volume is recorded. On the contrary, in :python:`"detailed"` mode the full
       detail of energy deposition is reported.
+
+   .. autoattribute:: sample_particles
+
+      Must be a :python:`bool`, or :python:`None`. If :python:`False` (the
+      default), then particles sampling is disabled at all volumes boundaries.
 
    .. autoattribute:: secondaries
 
@@ -418,7 +428,8 @@ Python interface
 
    This class provides an interface for inspecting a `G4VPhysicalVolume`_ of an
    instanciated Monte Carlo geometry. Note that the geometry is static, i.e. it
-   cannot be modified once it has been built.
+   cannot be modified once it has been built, except for volume's
+   :py:class:`role <Volume.role>`.
 
    :py:class:`Volume` objects are linked to a :py:class:`Geometry`, and cannot
    be instanciated directly. Instead, they are indexed from a geometry, e.g. as
@@ -453,7 +464,16 @@ Python interface
 
    .. autoattribute:: mother
    .. autoattribute:: name
-   .. autoattribute:: sensitive
+
+   .. autoattribute:: role
+
+      See the the :ref:`geometry:roles` section for a list of potential volume
+      roles.
+
+      .. tip::
+
+         Unlike other volume properties, roles can be modified after the Monte
+         Carlo geometry has been built.
 
    .. autoattribute:: solid
 
@@ -478,6 +498,7 @@ Python interface
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
 .. _Geotiff: https://github.com/KipCrossing/geotiff
 .. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
+.. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
 .. _TOML: https://toml.io/en/
 .. _WikipediaPCG: https://en.wikipedia.org/wiki/Permuted_congruential_generator

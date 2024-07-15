@@ -9,6 +9,9 @@ represents this structure using base Python objects
 and :external:py:class:`str`) that have associated representations in common
 configuration languages, such as `JSON`_, `TOML`_ or `YAML`_.
 
+.. XXX Refer to examples instead, as a more pragmatic way to learn about
+   geometry descriptions.
+
 Geometry objects
 ----------------
 
@@ -148,8 +151,8 @@ see :ref:`geometry:Shape definition`.
    * - :python:`"rotation"`
      - :python:`[[float; 3]; 3]`
      - :python:`numpy.eye(3)`
-   * - :python:`"sensitive"`
-     - :python:`bool`
+   * - :python:`"role"`
+     - :python:`[str]`
      - :python:`False`
    * - :python:`"subtract"`
      - :python:`[str]`
@@ -167,15 +170,66 @@ see :ref:`geometry:Shape definition`.
    relative to the mother volume frame. By default, the volume is placed
    unrotated with its origin coinciding with the mother one.
 
-.. topic:: Sensitive volumes.
-
-   The :python:`"sensitive"` flag determines whether a volume records energy
-   deposits or not. By default, Monte Carlo volumes are inert.
-
 .. topic:: Daughter volumes.
 
    The daughter volumes are included directly with the volume properties. They
    are identified by their `CamelCase` syntax.
+
+Roles
+~~~~~
+
+By default, geometry volumes are inert, i.e. they do not record any Monte Carlo
+information. The :python:`"role"` property can be used to assign specific tasks.
+A volume *role* is formed by a two words snake-cased sentence starting with a
+verb (the action), and followed by a subject (the recipient). For example, the
+following indicates that the volume should record energy deposits, and capture
+outgoing particles.
+
+>>> { "role": ["record_deposits", "catch_outgoing"] }
+
+Possible actions and recipients are listed in :numref:`tab-volume-roles` below.
+
+.. _tab-volume-roles:
+
+.. list-table:: Volume roles vocabulary.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Word
+     - Nature
+     - Description
+   * - :python:`"catch"`
+     - Verb
+     - Extract Monte Carlo particles at the volume boundary.
+   * - :python:`"kill"`
+     - Verb
+     - Silenty kill Monte Carlo particles at the volume boundary.
+   * - :python:`"record"`
+     - Verb
+     - Record energy deposits and/or Monte Carlo particles.
+   * - :python:`"all"`
+     - Subject
+     - Designates both energy deposits and particles.
+   * - :python:`"deposits"`
+     - Subject
+     - Designates only energy deposits.
+   * - :python:`"ingoing"`
+     - Subject
+     - Designates only ingoing particles.
+   * - :python:`"outgoing"`
+     - Subject
+     - Designates only outgoing particles.
+   * - :python:`"particles"`
+     - Subject
+     - Designates both ingoing and outgoing particles.
+
+.. note::
+
+   Unlike other geometric properties, roles are not fixed. E.g., they can be
+   modified after the Monte Carlo geometry has been loaded (see the
+   :py:attr:`Volume.role <calzone.Volume.role>` attribute).
+
 
 Overlaps
 ~~~~~~~~

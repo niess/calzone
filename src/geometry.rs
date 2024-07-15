@@ -502,6 +502,7 @@ impl Volume {
         PyTuple::new_bound(py, &self.daughters)
     }
 
+    /// The volume role(s), if any.
     #[getter]
     fn get_role(&self, py: Python) -> PyResult<PyObject> {
         let roles = self.geometry.get_roles(self.name.as_str());
