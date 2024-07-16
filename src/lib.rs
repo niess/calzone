@@ -45,6 +45,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add_class::<simulation::Physics>()?;
     module.add_class::<simulation::Random>()?;
     module.add_class::<simulation::Simulation>()?;
+    module.add_class::<simulation::source::ParticlesGenerator>()?;
     module.add_class::<geometry::Volume>()?;
 
     // Register exception(s).

@@ -786,7 +786,7 @@ impl From<PyArrayFlags> for c_int {
 // Conversion utilities.
 //================================================================================================
 
-#[derive(pyo3::FromPyObject)]
+#[derive(Clone, pyo3::FromPyObject)]
 pub enum ShapeArg {
     Scalar(usize),
     Vector(Vec<usize>),
