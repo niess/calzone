@@ -677,6 +677,30 @@ std::shared_ptr<GeometryBorrow> create_geometry(
     }
 }
 
+static const G4VPhysicalVolume * get_volume(
+    const std::string & path,
+    std::map<std::string, const G4VPhysicalVolume *> & elements
+) {
+    auto volume = elements[path];
+    if (volume == nullptr) {
+        auto msg = fmt::format("unknown volume '{}'", path);
+        set_error(ErrorType::ValueError, msg.c_str());
+    }
+    return volume;
+}
+
+std::shared_ptr<VolumeBorrow> GeometryBorrow::borrow_volume(
+    rust::Str name_
+) const {
+    auto name = std::string(name_);
+    auto volume = get_volume(name, this->data->elements);
+    if (volume == nullptr) {
+        return nullptr;
+    } else {
+        return std::make_shared<VolumeBorrow>(this->data, volume);
+    }
+}
+
 
 // ============================================================================
 //
@@ -703,174 +727,6 @@ std::shared_ptr<Error> GeometryBorrow::check(int resolution) const {
     return get_error();
 }
 
-static const G4VPhysicalVolume * get_volume(
-    std::string & path,
-    std::map<std::string, const G4VPhysicalVolume *> & elements
-) {
-    auto volume = elements[path];
-    if (volume == nullptr) {
-        auto msg = fmt::format("unknown volume '{}'", path);
-        set_error(ErrorType::ValueError, msg.c_str());
-    }
-    return volume;
-}
-
-std::pair<G4AffineTransform, const G4VPhysicalVolume *> get_transform(
-    std::string & volume,
-    std::string & frame,
-    std::map<std::string, const G4VPhysicalVolume *> & elements,
-    std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> & mothers
-) {
-    auto transform = G4AffineTransform();
-    if (volume == frame) {
-        return std::make_pair(transform, nullptr);
-    }
-
-    const G4VPhysicalVolume * current = get_volume(volume, elements);
-    const G4VPhysicalVolume * target = get_volume(frame, elements);
-    if (any_error()) {
-        return std::make_pair(transform, nullptr);
-    }
-
-    std::list<const G4VPhysicalVolume *> volumes;
-    while (current != target) {
-        volumes.push_back(current);
-        current = mothers[current];
-        if (current == nullptr) {
-            auto msg = fmt::format(
-                "'{}' does not contain '{}'",
-                frame,
-                volume
-            );
-            set_error(ErrorType::ValueError, msg.c_str());
-            return std::make_pair(transform, nullptr);
-        }
-    }
-
-    while (!volumes.empty()) {
-        current = volumes.back();
-        transform *= G4AffineTransform(
-            current->GetRotation(),
-            current->GetTranslation()
-        );
-        volumes.pop_back();
-    }
-
-    return std::make_pair(transform, current);
-}
-
-std::array<double, 6> GeometryBorrow::compute_box(
-    rust::Str volume_,
-    rust::Str frame_
-) const {
-    std::array<double, 6> box = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    auto volume = std::string(volume_);
-    std::string frame;
-    if (frame_.empty()) {
-        frame = this->data->world->GetName();
-    } else {
-        frame = std::string(frame_);
-    }
-
-    auto result = get_transform(
-        volume,
-        frame,
-        this->data->elements,
-        this->data->mothers
-    );
-    if (any_error()) {
-        return box;
-    }
-
-    G4AffineTransform transform = std::move(result.first);
-    const G4VPhysicalVolume * physical = std::move(result.second);
-    if (physical == nullptr) {
-        physical = get_volume(volume, this->data->elements);
-        if (physical == nullptr) {
-            return box;
-        }
-    }
-
-    auto solid = physical->GetLogicalVolume()->GetSolid();
-    if (transform.IsTranslated() || transform.IsRotated()) {
-        auto limits = G4VoxelLimits();
-        solid->CalculateExtent(kXAxis, limits, transform, box[0], box[1]);
-        solid->CalculateExtent(kYAxis, limits, transform, box[2], box[3]);
-        solid->CalculateExtent(kZAxis, limits, transform, box[4], box[5]);
-    } else {
-        auto extent = solid->GetExtent();
-        box[0] = extent.GetXmin();
-        box[1] = extent.GetXmax();
-        box[2] = extent.GetYmin();
-        box[3] = extent.GetYmax();
-        box[4] = extent.GetZmin();
-        box[5] = extent.GetZmax();
-    }
-
-    for (auto && value: box) {
-        value /= CLHEP::cm;
-    }
-
-    return box;
-}
-
-std::array<double, 3> GeometryBorrow::compute_origin(
-    rust::Str volume_,
-    rust::Str frame_
-) const {
-    std::array<double, 3> origin = { 0.0, 0.0, 0.0 };
-    auto volume = std::string(volume_);
-    std::string frame;
-    if (frame_.empty()) {
-        frame = this->data->world->GetName();
-    } else {
-        frame = std::string(frame_);
-    }
-
-    auto result = get_transform(
-        volume,
-        frame,
-        this->data->elements,
-        this->data->mothers
-    );
-    if (any_error()) {
-        return origin;
-    }
-
-    G4AffineTransform transform = std::move(result.first);
-    auto p = transform.TransformPoint(G4ThreeVector(0.0, 0.0, 0.0));
-    for (auto i = 0; i < 3; i++) {
-        origin[i] = p[i] / CLHEP::cm;
-    }
-
-    return origin;
-}
-
-VolumeInfo GeometryBorrow::describe_volume(rust::Str name_) const {
-    VolumeInfo info;
-    auto name = std::string(name_);
-    auto volume = get_volume(name, this->data->elements);
-    if (volume != nullptr) {
-        auto logical = volume->GetLogicalVolume();
-        info.material = rust::String(logical->GetMaterial()->GetName());
-        info.solid = rust::String(logical->GetSolid()->GetName());
-        auto mother = this->data->mothers[volume];
-        if (mother == nullptr) {
-            info.mother = rust::String("");
-        } else {
-            info.mother = rust::String(mother->GetName());
-        }
-        int n = logical->GetNoDaughters();
-        for (int i = 0; i < n; i++) {
-            auto daughter = logical->GetDaughter(i);
-            info.daughters.push_back(
-                std::move(std::string(daughter->GetName()
-            )));
-        }
-    }
-    return info;
-}
-
 std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {
     clear_error();
     G4GDMLParser parser;
@@ -887,70 +743,6 @@ size_t GeometryBorrow::id() const {
 
 G4VPhysicalVolume * GeometryBorrow::world() const {
     return this->data->world;
-}
-
-// ============================================================================
-//
-// Volume roles interface.
-//
-// ============================================================================
-
-std::shared_ptr<Error> GeometryBorrow::clear_roles(rust::Str name_) const {
-    auto name = std::string(name_);
-    auto volume = get_volume(name, this->data->elements);
-    if (volume == nullptr) {
-        return get_error();
-    }
-    auto && logical = volume->GetLogicalVolume();
-    SamplerImpl * sensitive = static_cast<SamplerImpl *>(
-        logical->GetSensitiveDetector()
-    );
-    if (sensitive != nullptr) {
-        logical->SetSensitiveDetector(nullptr);
-        delete sensitive;
-    }
-    return get_error();
-}
-
-Roles GeometryBorrow::get_roles(rust::Str name_) const {
-    SamplerImpl * sensitive = nullptr;
-    auto name = std::string(name_);
-    auto volume = get_volume(name, this->data->elements);
-    if (volume != nullptr) {
-        auto && logical = volume->GetLogicalVolume();
-        sensitive = static_cast<SamplerImpl *>(
-            logical->GetSensitiveDetector()
-        );
-    }
-    if (sensitive == nullptr) {
-        Roles roles;
-        std::memset(&roles, 0x0, sizeof(Roles));
-        return roles;
-    } else {
-        return sensitive->roles;
-    }
-}
-
-std::shared_ptr<Error> GeometryBorrow::set_roles(
-    rust::Str name_,
-    Roles roles
-) const {
-    auto name = std::string(name_);
-    auto volume = get_volume(name, this->data->elements);
-    if (volume == nullptr) {
-        return get_error();
-    }
-    auto && logical = volume->GetLogicalVolume();
-    SamplerImpl * sensitive = static_cast<SamplerImpl *>(
-        logical->GetSensitiveDetector()
-    );
-    if (sensitive == nullptr) {
-        sensitive = new SamplerImpl(std::string(name), std::move(roles));
-        logical->SetSensitiveDetector(sensitive);
-    } else {
-        sensitive->roles = std::move(roles);
-    }
-    return get_error();
 }
 
 // ============================================================================
@@ -994,4 +786,230 @@ const G4VPhysicalVolume * G4Goupil::NewGeometry() {
 void G4Goupil::DropGeometry(const G4VPhysicalVolume * volume) {
     auto geometry = GeometryData::get(volume);
     geometry->drop();
+}
+
+
+// ============================================================================
+//
+// Volume interface.
+//
+// ============================================================================
+
+VolumeBorrow::VolumeBorrow(GeometryData * g, const G4VPhysicalVolume * v):
+    geometry(g->clone()), volume(v) {};
+
+VolumeBorrow::~VolumeBorrow() {
+    this->geometry->drop();
+}
+
+std::array<double, 6> VolumeBorrow::compute_box(rust::Str frame) const {
+    std::array<double, 6> box = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    auto transform = this->compute_transform(frame);
+    if (any_error()) {
+        return box;
+    }
+
+    auto solid = this->volume->GetLogicalVolume()->GetSolid();
+    if (transform->IsTranslated() || transform->IsRotated()) {
+        auto limits = G4VoxelLimits();
+        solid->CalculateExtent(kXAxis, limits, *transform, box[0], box[1]);
+        solid->CalculateExtent(kYAxis, limits, *transform, box[2], box[3]);
+        solid->CalculateExtent(kZAxis, limits, *transform, box[4], box[5]);
+    } else {
+        auto extent = solid->GetExtent();
+        box[0] = extent.GetXmin();
+        box[1] = extent.GetXmax();
+        box[2] = extent.GetYmin();
+        box[3] = extent.GetYmax();
+        box[4] = extent.GetZmin();
+        box[5] = extent.GetZmax();
+    }
+
+    for (auto && value: box) {
+        value /= CLHEP::cm;
+    }
+
+    return box;
+}
+
+std::unique_ptr<G4AffineTransform> VolumeBorrow::compute_transform(
+    rust::Str frame_
+) const {
+    std::string frame;
+    if (frame_.empty()) {
+        frame = this->geometry->world->GetName();
+    } else {
+        frame = std::string(frame_);
+    }
+    auto transform = std::make_unique<G4AffineTransform>();
+    auto && volume = this->volume->GetName();
+    if (volume == frame) {
+        return transform;
+    }
+
+    const G4VPhysicalVolume * current = this->volume;
+    const G4VPhysicalVolume * target = get_volume(
+        frame,
+        this->geometry->elements
+    );
+    if (any_error()) {
+        return nullptr;
+    }
+
+    std::list<const G4VPhysicalVolume *> volumes;
+    while (current != target) {
+        volumes.push_back(current);
+        current = this->geometry->mothers[current];
+        if (current == nullptr) {
+            auto msg = fmt::format(
+                "'{}' does not contain '{}'",
+                frame,
+                volume
+            );
+            set_error(ErrorType::ValueError, msg.c_str());
+            return nullptr;
+        }
+    }
+
+    while (!volumes.empty()) {
+        current = volumes.back();
+        *transform *= G4AffineTransform(
+            current->GetRotation(),
+            current->GetTranslation()
+        );
+        volumes.pop_back();
+    }
+
+    return transform;
+}
+
+std::array<double, 3> VolumeBorrow::compute_origin(rust::Str frame) const {
+    std::array<double, 3> origin = { 0.0, 0.0, 0.0 };
+    auto transform = this->compute_transform(frame);
+    if (any_error()) {
+        return origin;
+    }
+
+    auto p = transform->TransformPoint(G4ThreeVector(0.0, 0.0, 0.0));
+    for (auto i = 0; i < 3; i++) {
+        origin[i] = p[i] / CLHEP::cm;
+    }
+
+    return origin;
+}
+
+VolumeInfo VolumeBorrow::describe() const {
+    VolumeInfo info;
+    auto logical = this->volume->GetLogicalVolume();
+    info.material = rust::String(logical->GetMaterial()->GetName());
+    info.solid = rust::String(logical->GetSolid()->GetName());
+    auto mother = this->geometry->mothers[this->volume];
+    if (mother == nullptr) {
+        info.mother = rust::String("");
+    } else {
+        info.mother = rust::String(mother->GetName());
+    }
+    int n = logical->GetNoDaughters();
+    for (int i = 0; i < n; i++) {
+        auto daughter = logical->GetDaughter(i);
+        info.daughters.push_back(
+            std::move(std::string(daughter->GetName()
+        )));
+    }
+    return info;
+}
+
+EInside VolumeBorrow::inside(
+    const std::array<double, 3> & point_,
+    const G4AffineTransform & transform,
+    bool exclude_daughters
+) const {
+    G4ThreeVector point(
+        point_[0] * CLHEP::cm,
+        point_[1] * CLHEP::cm,
+        point_[2] * CLHEP::cm
+    );
+    if (transform.IsTranslated() || transform.IsRotated()) {
+        point = transform.InverseTransformPoint(point);
+    }
+    auto && solid = this->volume->GetLogicalVolume()->GetSolid();
+    auto inside = solid->Inside(point);
+    if ((exclude_daughters == false) || (inside != EInside::kInside)) {
+        return inside;
+    }
+
+    auto && logical = this->volume->GetLogicalVolume();
+    size_t n = logical->GetNoDaughters();
+    for (size_t i = 0; i < n; i++) {
+        auto && daughter = logical->GetDaughter(i);
+        auto && translation = daughter->GetTranslation();
+        auto && rotation = daughter->GetRotation();
+        G4AffineTransform t;
+        if (rotation == nullptr) {
+            t = G4AffineTransform(translation);
+        } else {
+            t = G4AffineTransform(rotation, translation);
+        }
+        G4ThreeVector ri;
+        if (t.IsTranslated() || t.IsRotated()) {
+            ri = t.InverseTransformPoint(point);
+        } else {
+            ri = point;
+        }
+        auto si = daughter->GetLogicalVolume()->GetSolid()->Inside(ri);
+        switch (si) {
+            case EInside::kSurface:
+                return EInside::kSurface;
+            case EInside::kInside:
+                return EInside::kOutside;
+            default:
+                continue;
+        }
+    }
+    return EInside::kInside;
+}
+
+
+// ============================================================================
+//
+// Volume roles interface.
+//
+// ============================================================================
+
+void VolumeBorrow::clear_roles() const {
+    auto && logical = this->volume->GetLogicalVolume();
+    SamplerImpl * sensitive = static_cast<SamplerImpl *>(
+        logical->GetSensitiveDetector()
+    );
+    if (sensitive != nullptr) {
+        logical->SetSensitiveDetector(nullptr);
+        delete sensitive;
+    }
+}
+
+Roles VolumeBorrow::get_roles() const {
+    auto && logical = this->volume->GetLogicalVolume();
+    auto sensitive = static_cast<SamplerImpl *>(
+        logical->GetSensitiveDetector()
+    );
+    if (sensitive == nullptr) {
+        Roles roles;
+        std::memset(&roles, 0x0, sizeof(Roles));
+        return roles;
+    } else {
+        return sensitive->roles;
+    }
+}
+
+void VolumeBorrow::set_roles(Roles roles) const {
+    auto && logical = this->volume->GetLogicalVolume();
+    SamplerImpl * sensitive = static_cast<SamplerImpl *>(
+        logical->GetSensitiveDetector()
+    );
+    if (sensitive == nullptr) {
+        sensitive = new SamplerImpl(logical->GetName(), std::move(roles));
+        logical->SetSensitiveDetector(sensitive);
+    } else {
+        sensitive->roles = std::move(roles);
+    }
 }

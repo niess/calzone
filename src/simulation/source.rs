@@ -1,6 +1,6 @@
 use crate::geometry::Volume;
-use crate::utils::error::Error;
-use crate::utils::error::ErrorKind::ValueError;
+use crate::utils::error::{ctrlc_catched, Error};
+use crate::utils::error::ErrorKind::{KeyboardInterrupt, ValueError};
 use crate::utils::numpy::{PyArray, ShapeArg};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySlice};
@@ -70,6 +70,8 @@ pub struct ParticlesGenerator {
     weights: PyObject, // XXX weighted particles instead?
 }
 
+// XXX Function to activate / deactivate weights.
+
 #[pymethods]
 impl ParticlesGenerator {
     #[new]
@@ -95,10 +97,50 @@ impl ParticlesGenerator {
 
     fn inside<'py>(
         slf: Bound<'py, Self>,
-        volume: &Volume,
-        daughters: Option<bool>,
+        volume: &Volume, // XXX Or pathname (add geometry attribute).
+        exclude_daughters: Option<bool>,
     ) -> PyResult<Bound<'py, Self>> {
-        let daughters = daughters.unwrap_or(false);
+        let exclude_daughters = exclude_daughters.unwrap_or(false);
+        let [xmin, xmax, ymin, ymax, zmin, zmax] = volume.volume.compute_box("");
+        let transform = volume.volume.compute_transform("");
+        let py = slf.py();
+        let generator = slf.borrow();
+        let positions: &PyArray<f64> = generator
+            .particles
+            .bind(py)
+            .get_item("position")?
+            .extract()?;
+        let weights: &PyArray<f64> = generator
+            .weights
+            .bind(py)
+            .extract()?;
+        let mut random = generator.random.bind(py).borrow_mut();
+        let n = positions.size() / 3;
+        let mut trials = 0;
+        let mut i = 0_usize;
+        while i < n {
+            let r = [
+                (xmax - xmin) * random.open01() + xmin,
+                (ymax - ymin) * random.open01() + ymin,
+                (zmax - zmin) * random.open01() + zmin,
+            ];
+            if volume.volume.inside(&r, &transform, exclude_daughters) == ffi::EInside::kInside {
+                for j in 0..3 {
+                    positions.set(3 * i + j, r[j])?;
+                }
+                i += 1;
+            }
+            trials += 1;
+            if ((trials % 1000) == 0) && ctrlc_catched() {
+                return Err(Error::new(KeyboardInterrupt).to_err())
+            }
+        }
+        let p = (n as f64) / (trials as f64);
+        let volume = (xmax - xmin) * (ymax - ymin) * (zmax - zmin) * p;
+        for i in 0..n {
+            let weight = weights.get(i)? * volume;
+            weights.set(i, weight)?;
+        }
         Ok(slf)
     }
 
@@ -159,7 +201,7 @@ impl ParticlesGenerator {
             .bind(py)
             .extract()?;
         let mut random = generator.random.bind(py).borrow_mut();
-        for i in 0..particles_energy.len()? {
+        for i in 0..particles_energy.size() {
             let energy = {
                 let target = random.open01() * total_intensity;
                 let mut acc = 0.0;

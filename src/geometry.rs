@@ -45,21 +45,22 @@ impl Geometry {
         Ok(geometry)
     }
 
-    fn __getitem__(&self, volume: &str) -> PyResult<Volume> {
-        let ffi::VolumeInfo { material, solid, mother, daughters } =
-            self.0.describe_volume(volume);
+    fn __getitem__(&self, path: &str) -> PyResult<Volume> {
+        let volume = self.0.borrow_volume(path);
         if let Some(msg) = ffi::get_error().value() {
             let err = Error::new(IndexError).what("volume").why(msg);
             return Err(err.into())
         }
+        let ffi::VolumeInfo { material, solid, mother, daughters } =
+            volume.describe();
         let mother = if mother.is_empty() {
             None
         } else {
             Some(mother)
         };
         let volume = Volume {
-            geometry: self.0.clone(),
-            name: volume.to_string(),
+            volume,
+            name: path.to_string(),
             material,
             solid,
             mother,
@@ -478,7 +479,7 @@ impl GeometryDefinition {
 /// A volume of a Monte Carlo geometry.
 #[pyclass(frozen, module="calzone")]
 pub struct Volume {
-    geometry: SharedPtr<ffi::GeometryBorrow>,
+    pub(crate) volume: SharedPtr<ffi::VolumeBorrow>,
     /// The volume absolute pathname.
     #[pyo3(get)]
     name: String,
@@ -494,6 +495,11 @@ pub struct Volume {
     daughters: Vec<String>,
 }
 
+unsafe impl Send for ffi::VolumeBorrow {}
+unsafe impl Sync for ffi::VolumeBorrow {}
+
+// XXX Compute volume method?
+
 #[pymethods]
 impl Volume {
     /// Daughter volume(s), if any (i.e. included insides).
@@ -505,12 +511,7 @@ impl Volume {
     /// The volume role(s), if any.
     #[getter]
     fn get_role(&self, py: Python) -> PyResult<PyObject> {
-        let roles = self.geometry.get_roles(self.name.as_str());
-        let _unused = ffi::get_error().to_result()
-            .map_err(|why| {
-                let why = format!("{}", why);
-                Error::new(ValueError).what("role").why(&why).to_err()
-            })?;
+        let roles = self.volume.get_roles();
         let roles: Vec<String> = roles.into();
         let role = match roles.len() {
             0 => py.None(),
@@ -523,21 +524,15 @@ impl Volume {
     #[setter]
     fn set_role(&self, role: Option<Strings>) -> PyResult<()> {
         let roles = role.map(|role| role.into_vec()).unwrap_or(Vec::new());
-        let result = if roles.is_empty() {
-            self.geometry.clear_roles(self.name.as_str())
+        if roles.is_empty() {
+            self.volume.clear_roles()
         } else {
             let roles: ffi::Roles = roles.as_slice().try_into()
                 .map_err(|why: String| {
                     Error::new(ValueError).what("role").why(&why).to_err()
                 })?;
-            self.geometry.set_roles(self.name.as_str(), roles)
+            self.volume.set_roles(roles)
         };
-        result
-            .to_result()
-            .map_err(|why| {
-                let why = format!("{}", why);
-                Error::new(ValueError).what("role").why(&why).to_err()
-            })?;
         Ok(())
     }
 
@@ -549,7 +544,7 @@ impl Volume {
         frame: Option<&str>
     ) -> PyResult<PyObject> {
         let frame = frame.unwrap_or("");
-        let bbox = self.geometry.compute_box(self.name.as_str(), frame);
+        let bbox = self.volume.compute_box(frame);
         if let Some(why) = ffi::get_error().value() {
             let err = Error::new(ValueError).what("box operation").why(why);
             return Err(err.into());
@@ -570,7 +565,7 @@ impl Volume {
     #[pyo3(name = "origin")]
     fn compute_origin(&self, frame: Option<&str>) -> PyResult<f64x3> {
         let frame = frame.unwrap_or("");
-        let origin = self.geometry.compute_origin(self.name.as_str(), frame);
+        let origin = self.volume.compute_origin(frame);
         if let Some(why) = ffi::get_error().value() {
             let err = Error::new(ValueError).what("origin operation").why(why);
             return Err(err.into());

@@ -282,6 +282,7 @@ pub mod ffi {
 
         // Geometry interface.
         type EInside;
+        type G4AffineTransform;
 
         type GeometryBorrow;
         fn create_geometry(
@@ -289,16 +290,26 @@ pub mod ffi {
             algorithm: &TSTAlgorithm,
         ) -> SharedPtr<GeometryBorrow>;
 
+        fn borrow_volume(self: &GeometryBorrow, name: &str) -> SharedPtr<VolumeBorrow>;
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
-        fn compute_box(self: &GeometryBorrow, volume: &str, frame: &str) -> [f64; 6];
-        fn compute_origin(self: &GeometryBorrow, volume: &str, frame: &str) -> [f64; 3];
-        fn describe_volume(self: &GeometryBorrow, name: &str) -> VolumeInfo;
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn set_goupil(self: &GeometryBorrow);
 
-        fn clear_roles(self: &GeometryBorrow, name: &str) -> SharedPtr<Error>;
-        fn get_roles(self: &GeometryBorrow, name: &str) -> Roles;
-        fn set_roles(self: &GeometryBorrow, name: &str, roles: Roles) -> SharedPtr<Error>;
+        type VolumeBorrow;
+        fn compute_box(self: &VolumeBorrow, frame: &str) -> [f64; 6];
+        fn compute_transform(self: &VolumeBorrow, frame: &str) -> UniquePtr<G4AffineTransform>;
+        fn compute_origin(self: &VolumeBorrow, frame: &str) -> [f64; 3];
+        fn describe(self: &VolumeBorrow) -> VolumeInfo;
+        fn inside(
+            self: &VolumeBorrow,
+            point: &[f64; 3],
+            transform: &G4AffineTransform,
+            exclude_daughters: bool
+        ) -> EInside;
+
+        fn clear_roles(self: &VolumeBorrow);
+        fn get_roles(self: &VolumeBorrow) -> Roles;
+        fn set_roles(self: &VolumeBorrow, roles: Roles);
 
         // Material interface.
         type G4State;

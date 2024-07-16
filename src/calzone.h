@@ -2,10 +2,12 @@
 // Standard library.
 #include <memory>
 // Geant4 interface.
+#include "G4AffineTransform.hh"
 #include "G4Material.hh"
 #include "G4VPhysicalVolume.hh"
 // Calzone interface.
 struct GeometryBorrow;
+struct VolumeBorrow;
 #include "calzone/src/cxx.rs.h"
 
 
@@ -36,19 +38,14 @@ struct GeometryBorrow {
 
     GeometryBorrow(const GeometryBorrow &) = delete; // Forbid copy.
 
+    // User interface.
+    std::shared_ptr<VolumeBorrow> borrow_volume(rust::Str) const;
+
     // Geant4 interface.
     std::shared_ptr<Error> check(int resolution) const;
-    std::array<double, 6> compute_box(rust::Str, rust::Str) const;
-    std::array<double, 3> compute_origin(rust::Str, rust::Str) const;
-    VolumeInfo describe_volume(rust::Str) const;
     std::shared_ptr<Error> dump(rust::Str) const;
     size_t id() const;
     G4VPhysicalVolume * world() const;
-
-    // Volume roles interface.
-    std::shared_ptr<Error> clear_roles(rust::Str) const;
-    Roles get_roles(rust::Str) const;
-    std::shared_ptr<Error> set_roles(rust::Str, Roles) const;
 
     // Goupil interface.
     void set_goupil() const;
@@ -61,6 +58,39 @@ std::shared_ptr<GeometryBorrow> create_geometry(
     const rust::Box<Volume> &,
     const TSTAlgorithm &
 );
+
+
+// ============================================================================
+//
+// Volume interface.
+//
+// ============================================================================
+
+struct VolumeBorrow {
+    VolumeBorrow(GeometryData *, const G4VPhysicalVolume *);
+    ~VolumeBorrow();
+    VolumeBorrow(const VolumeBorrow &) = delete; // Forbid copy.
+
+    // User interface.
+    std::array<double, 6> compute_box(rust::Str) const;
+    std::unique_ptr<G4AffineTransform> compute_transform(rust::Str) const;
+    std::array<double, 3> compute_origin(rust::Str) const;
+    VolumeInfo describe() const;
+    EInside inside(
+        const std::array<double, 3> &,
+        const G4AffineTransform &,
+        bool
+    ) const;
+
+    // Roles interface.
+    void clear_roles() const;
+    Roles get_roles() const;
+    void set_roles(Roles) const;
+
+private:
+    GeometryData * geometry;
+    const G4VPhysicalVolume * volume;
+};
 
 
 // ============================================================================
