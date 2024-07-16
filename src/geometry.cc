@@ -503,6 +503,7 @@ static G4LogicalVolume * build_volumes(
             auto rowX = G4ThreeVector(m[0][0], m[0][1], m[0][2]);
             auto rowY = G4ThreeVector(m[1][0], m[1][1], m[1][2]);
             auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
+            rotation = new G4RotationMatrix();
             rotation->setRows(rowX, rowY, rowZ);
         }
         auto v_name = std::string(v.name());
@@ -571,6 +572,7 @@ GeometryData::GeometryData(
             auto rowX = G4ThreeVector(m[0][0], m[0][1], m[0][2]);
             auto rowY = G4ThreeVector(m[1][0], m[1][1], m[1][2]);
             auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
+            rotation = new G4RotationMatrix();
             rotation->setRows(rowX, rowY, rowZ);
         }
         this->orphans.push_back(top_solid);

@@ -1,0 +1,14 @@
+[Environment]
+box = 2E+05
+material = "G4_AIR"
+
+[Environment.Ground]
+box = [2E+05, 2E+05, 1E+05]
+position = [0.0, 0.0, -5E+04]
+material = "G4_CALCIUM_CARBONATE"
+
+[Environment.Detector]
+box = [2E+03, 2E+03, 1E+03]
+position = [0.0, 0.0, 5.05E+02]
+material = "G4_SODIUM_IODIDE"
+role = "record_deposits"
