@@ -299,8 +299,14 @@ pub mod ffi {
         fn compute_box(self: &VolumeBorrow, frame: &str) -> [f64; 6];
         fn compute_transform(self: &VolumeBorrow, frame: &str) -> UniquePtr<G4AffineTransform>;
         fn compute_origin(self: &VolumeBorrow, frame: &str) -> [f64; 3];
+        fn compute_surface(self: &VolumeBorrow) -> f64;
         fn compute_volume(self: &VolumeBorrow, include_daughters: bool) -> f64;
         fn describe(self: &VolumeBorrow) -> VolumeInfo;
+        fn generate_onto(
+            self: &VolumeBorrow,
+            transform: &G4AffineTransform,
+            compute_normal: bool
+        ) -> [f64; 6];
         fn inside(
             self: &VolumeBorrow,
             point: &[f64; 3],

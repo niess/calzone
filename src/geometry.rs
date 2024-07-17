@@ -49,6 +49,8 @@ impl Geometry {
         Volume::new(&self.0, path)
     }
 
+    // XXX Add a "find" (by name / stem) method.
+
     /// Check the geometry by looking for overlapping volumes.
     fn check(&self, resolution: Option<i32>) -> PyResult<()> {
         let resolution = resolution.unwrap_or(1000);
@@ -479,14 +481,22 @@ pub struct Volume {
 unsafe impl Send for ffi::VolumeBorrow {}
 unsafe impl Sync for ffi::VolumeBorrow {}
 
-// XXX Compute volume method?
-
 #[pymethods]
 impl Volume {
     /// Daughter volume(s), if any (i.e. included insides).
     #[getter]
     fn get_daughters<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
         PyTuple::new_bound(py, &self.daughters)
+    }
+
+    #[getter]
+    fn get_surface<'py>(&self) -> PyResult<f64> {
+        let surface = self.volume.compute_surface();
+        if let Some(why) = ffi::get_error().value() { // XXX Check implemented.
+            let err = Error::new(ValueError).what("surface operation").why(why);
+            return Err(err.into());
+        }
+        Ok(surface)
     }
 
     /// The volume role(s), if any.
@@ -557,6 +567,7 @@ impl Volume {
     /// Return the cubic volume of this volume.
     #[pyo3(name = "volume")]
     fn compute_volume(&self, include_daughters: Option<bool>) -> PyResult<f64> {
+        // XXX Check if implemented.
         let include_daughters = include_daughters.unwrap_or(false);
         let volume = self.volume.compute_volume(include_daughters);
         if let Some(why) = ffi::get_error().value() {
@@ -565,6 +576,8 @@ impl Volume {
         }
         Ok(volume)
     }
+
+    // XXX Add "inside" method?
 }
 
 impl Volume {

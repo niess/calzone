@@ -1,9 +1,11 @@
 use crate::geometry::{Geometry, Volume};
-use crate::utils::error::{ctrlc_catched, Error};
+use crate::utils::error::{ctrlc_catched, Error, variant_explain};
 use crate::utils::error::ErrorKind::{KeyboardInterrupt, TypeError, ValueError};
+use crate::utils::float::f64x3;
 use crate::utils::numpy::{PyArray, ShapeArg};
 use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
+use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySlice, PyString};
 use std::borrow::Cow;
@@ -79,6 +81,7 @@ pub struct ParticlesGenerator {
 // XXX Surface generator / cos(theta).
 // XXX Power law generator.
 // XXX Pid / charge selector.
+// XXX PRNG context (for reproducibility).
 
 #[pymethods]
 impl ParticlesGenerator {
@@ -265,6 +268,115 @@ impl ParticlesGenerator {
         Ok(slf)
     }
 
+    fn onto<'py>(
+        slf: Bound<'py, Self>,
+        volume: VolumeArg,
+        direction: Option<String>,
+        weight: Option<bool>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let py = slf.py();
+        let direction = direction
+            .map(|direction| Direction::from_str(direction.as_str())
+                .map_err(|options| {
+                    let why = variant_explain(direction.as_str(), options);
+                    Error::new(ValueError).what("direction").why(&why).to_err()
+                })
+            )
+            .transpose()?;
+        let is_weights = {
+            let generator = slf.borrow();
+            if generator.is_position {
+                let err = Error::new(ValueError)
+                    .what("onto")
+                    .why("position already defined");
+                return Err(err.to_err())
+            }
+            if direction.is_some() && generator.is_direction {
+                let err = Error::new(ValueError)
+                    .what("onto")
+                    .why("direction already defined");
+                return Err(err.to_err())
+            }
+            generator.weights.is_some()
+        };
+
+        let volume = volume.resolve(slf.borrow().geometry.as_ref())?;
+        // XXX Check G4TessellatedSolid.
+
+        let weight = weight.unwrap_or(is_weights);
+        if weight && !is_weights {
+            let mut generator = slf.borrow_mut();
+            generator.initialise_weights(py)?;
+        }
+
+        let transform = volume.volume.compute_transform("");
+        let generator = slf.borrow();
+        let particles = generator.particles.bind(py);
+        let positions: &PyArray<f64> = particles
+            .get_item("position")?
+            .extract()?;
+        let directions: Option<&PyArray<f64>> = if direction.is_some() {
+            Some(particles
+                .get_item("direction")?
+                .extract()?
+            )
+        } else {
+            None
+        };
+        let weights: Option<&PyArray<f64>> = if weight {
+            generator
+                .weights
+                .as_ref()
+                .map(|weights| weights.bind(py).extract())
+                .transpose()?
+        } else {
+            None
+        };
+        let mut random = generator.random.bind(py).borrow_mut();
+        let n = positions.size() / 3;
+        for i in 0..n {
+            let data = volume.volume.generate_onto(&transform, direction.is_some());
+            for j in 0..3 {
+                positions.set(3 * i + j, data[j])?;
+            }
+            if let Some(directions) = directions {
+                let mut direction = match direction.as_ref().unwrap() {
+                    Direction::Ingoing => f64x3::new(-data[3], -data[4], -data[5]),
+                    Direction::Outgoing => f64x3::new(data[3], data[4], data[5]),
+                };
+                let cos_theta = random.open01().sqrt(); // cosine distribution.
+                let phi = 2.0 * std::f64::consts::PI * random.open01();
+                direction.rotate(cos_theta, phi);
+                let direction: [f64; 3] = direction.into();
+                for j in 0..3 {
+                    directions.set(3 * i + j, direction[j])?;
+                }
+            }
+        }
+        if let Some(weights) = weights {
+            let surface = volume.volume.compute_surface(); // XXX Check implemented.
+            let solid_angle = if direction.is_some() {
+                std::f64::consts::PI
+            } else {
+                1.0
+            };
+            let generation_weight = surface * solid_angle;
+            for i in 0..n {
+                let weight = weights.get(i)? * generation_weight;
+                weights.set(i, weight)?;
+            }
+        }
+
+        drop(generator);
+        let mut generator = slf.borrow_mut();
+        generator.is_position = true;
+        if direction.is_some() {
+            generator.is_direction = true;
+        }
+
+        Ok(slf)
+    }
+
     fn pid<'py>(
         slf: Bound<'py, Self>,
         value: &Bound<'py, PyAny>,
@@ -404,6 +516,13 @@ impl ParticlesGenerator {
 
         Ok(slf)
     }
+}
+
+#[derive(EnumVariantsStrings)]
+#[enum_variants_strings_transform(transform="lower_case")]
+enum Direction {
+    Ingoing,
+    Outgoing,
 }
 
 #[derive(FromPyObject)]

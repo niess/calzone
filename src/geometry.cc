@@ -900,6 +900,11 @@ std::array<double, 3> VolumeBorrow::compute_origin(rust::Str frame) const {
     return origin;
 }
 
+double VolumeBorrow::compute_surface() const {
+    auto && solid = this->volume->GetLogicalVolume()->GetSolid();
+    return solid->GetSurfaceArea() / CLHEP::cm2;
+}
+
 double VolumeBorrow::compute_volume(bool include_daughters) const {
     auto && logical = this->volume->GetLogicalVolume();
     auto volume = logical->GetSolid()->GetCubicVolume();
@@ -935,6 +940,32 @@ VolumeInfo VolumeBorrow::describe() const {
         )));
     }
     return info;
+}
+
+std::array<double, 6> VolumeBorrow::generate_onto(
+    const G4AffineTransform & transform,
+    bool compute_normal
+) const {
+    // XXX Use CalZone RNG (for reproductibility).
+    auto && solid = this->volume->GetLogicalVolume()->GetSolid();
+    auto && point = solid->GetPointOnSurface();
+    G4ThreeVector normal;
+    if (compute_normal) {
+        normal = solid->SurfaceNormal(point);
+    }
+    if (transform.IsRotated() || transform.IsTranslated()) {
+        point = transform.TransformPoint(point);
+        normal = transform.TransformAxis(normal);
+    }
+    std::array<double, 6> result = {
+        point.x() / CLHEP::cm,
+        point.y() / CLHEP::cm,
+        point.z() / CLHEP::cm,
+        normal.x(),
+        normal.y(),
+        normal.z()
+    };
+    return result;
 }
 
 EInside VolumeBorrow::inside(

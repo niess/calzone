@@ -403,7 +403,7 @@ impl<'a> RunAgent<'a> {
     }
 }
 
-#[derive(FromPyObject)]
+#[derive(FromPyObject)] // XXX Any structured array with ("energy", "position", "direction") keys.
 enum Primaries<'a> {
     Calzone(&'a PyArray<ffi::Particle>),
     Goupil(&'a PyArray<ffi::GoupilState>),

@@ -75,8 +75,13 @@ struct VolumeBorrow {
     std::array<double, 6> compute_box(rust::Str) const;
     std::unique_ptr<G4AffineTransform> compute_transform(rust::Str) const;
     std::array<double, 3> compute_origin(rust::Str) const;
+    double compute_surface() const;
     double compute_volume(bool) const;
     VolumeInfo describe() const;
+    std::array<double, 6> generate_onto(
+        const G4AffineTransform &,
+        bool
+    ) const;
     EInside inside(
         const std::array<double, 3> &,
         const G4AffineTransform &,
