@@ -46,8 +46,7 @@ result = simulation.run(particles)
 
 collected = result.particles["Environment.Detector"]
 source_density = 1E-05 # Bq/cm^3
-WORLD_SIZE, DETECTOR_WIDTH, DETECTOR_HEIGHT = 2E+05, 2E+03, 1E+03
-source_volume = 0.5 * WORLD_SIZE**3 - DETECTOR_WIDTH**2 * DETECTOR_HEIGHT
+source_volume = simulation.geometry["Environment"].volume()
 total_activity = source_density * source_volume
 
 efficiency = collected.size / N

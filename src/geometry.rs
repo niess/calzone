@@ -553,6 +553,18 @@ impl Volume {
         }
         Ok((&origin).into())
     }
+
+    /// Return the cubic volume of this volume.
+    #[pyo3(name = "volume")]
+    fn compute_volume(&self, include_daughters: Option<bool>) -> PyResult<f64> {
+        let include_daughters = include_daughters.unwrap_or(false);
+        let volume = self.volume.compute_volume(include_daughters);
+        if let Some(why) = ffi::get_error().value() {
+            let err = Error::new(ValueError).what("volume operation").why(why);
+            return Err(err.into());
+        }
+        Ok(volume)
+    }
 }
 
 impl Volume {

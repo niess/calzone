@@ -900,6 +900,22 @@ std::array<double, 3> VolumeBorrow::compute_origin(rust::Str frame) const {
     return origin;
 }
 
+double VolumeBorrow::compute_volume(bool include_daughters) const {
+    auto && logical = this->volume->GetLogicalVolume();
+    auto volume = logical->GetSolid()->GetCubicVolume();
+    if (!include_daughters) {
+        size_t n = logical->GetNoDaughters();
+        for (size_t i = 0; i < n; i++) {
+            auto && daughter = logical->GetDaughter(i);
+            volume -= daughter
+                -> GetLogicalVolume()
+                -> GetSolid()
+                -> GetCubicVolume();
+        }
+    }
+    return std::max(volume, 0.0) / CLHEP::cm3;
+}
+
 VolumeInfo VolumeBorrow::describe() const {
     VolumeInfo info;
     auto logical = this->volume->GetLogicalVolume();
