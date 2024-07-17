@@ -76,10 +76,9 @@ pub struct ParticlesGenerator {
     is_direction: bool,
 }
 
-// XXX Solid angle generator.
 // XXX Surface generator / cos(theta).
 // XXX Power law generator.
-// XXX const setters.
+// XXX Pid / charge selector.
 
 #[pymethods]
 impl ParticlesGenerator {
@@ -114,6 +113,44 @@ impl ParticlesGenerator {
             is_direction: false,
         };
         Ok(generator)
+    }
+
+    fn direction<'py>(
+        slf: Bound<'py, Self>,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let py = slf.py();
+        let mut generator = slf.borrow_mut();
+        if generator.is_direction {
+            let err = Error::new(ValueError)
+                .what("direction")
+                .why("direction already defined");
+            return Err(err.to_err())
+        }
+        generator.particles
+            .bind(py)
+            .set_item("direction", value)?;
+        generator.is_direction = true;
+        Ok(slf)
+    }
+
+    fn energy<'py>(
+        slf: Bound<'py, Self>,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let py = slf.py();
+        let mut generator = slf.borrow_mut();
+        if generator.is_energy {
+            let err = Error::new(ValueError)
+                .what("energy")
+                .why("energy already defined");
+            return Err(err.to_err())
+        }
+        generator.particles
+            .bind(py)
+            .set_item("energy", value)?;
+        generator.is_energy = true;
+        Ok(slf)
     }
 
     fn generate<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -225,6 +262,44 @@ impl ParticlesGenerator {
         let mut generator = slf.borrow_mut();
         generator.is_position = true;
 
+        Ok(slf)
+    }
+
+    fn pid<'py>(
+        slf: Bound<'py, Self>,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let py = slf.py();
+        let mut generator = slf.borrow_mut();
+        if generator.is_pid {
+            let err = Error::new(ValueError)
+                .what("pid")
+                .why("pid already defined");
+            return Err(err.to_err())
+        }
+        generator.particles
+            .bind(py)
+            .set_item("pid", value)?;
+        generator.is_pid = true;
+        Ok(slf)
+    }
+
+    fn position<'py>(
+        slf: Bound<'py, Self>,
+        value: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let py = slf.py();
+        let mut generator = slf.borrow_mut();
+        if generator.is_position {
+            let err = Error::new(ValueError)
+                .what("position")
+                .why("position already defined");
+            return Err(err.to_err())
+        }
+        generator.particles
+            .bind(py)
+            .set_item("position", value)?;
+        generator.is_position = true;
         Ok(slf)
     }
 

@@ -11,4 +11,3 @@ material = "G4_CALCIUM_CARBONATE"
 box = [2E+03, 2E+03, 1E+03]
 position = [0.0, 0.0, 5.05E+02]
 material = "G4_SODIUM_IODIDE"
-role = "record_deposits"

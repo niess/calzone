@@ -420,7 +420,7 @@ impl TryFromBound for ffi::CylinderShape {
             Property::required_f64("length"),
             Property::required_f64("radius"),
             Property::new_f64("thickness", 0.0),
-            Property::new_interval("thickness", [0.0, 360.0]),
+            Property::new_interval("section", [0.0, 360.0]),
         ]);
 
         let tag = tag.cast("Cylinder");

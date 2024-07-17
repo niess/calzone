@@ -622,6 +622,7 @@ impl<'py> From<&PropertyDefault> for PropertyValue<'py> {
             PropertyDefault::F64(value) => Self::F64(*value),
             PropertyDefault::F64x3(value) => Self::F64x3(*value),
             PropertyDefault::F64x3x3(value) => Self::F64x3x3(*value),
+            PropertyDefault::Interval(value) => Self::Interval(*value),
             PropertyDefault::Optional => Self::None,
             PropertyDefault::String(value) => Self::String(value.to_string()),
             PropertyDefault::U32(value) => Self::U32(*value),
