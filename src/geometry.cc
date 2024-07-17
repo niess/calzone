@@ -924,7 +924,7 @@ VolumeInfo VolumeBorrow::describe() const {
 EInside VolumeBorrow::inside(
     const std::array<double, 3> & point_,
     const G4AffineTransform & transform,
-    bool exclude_daughters
+    bool include_daughters
 ) const {
     G4ThreeVector point(
         point_[0] * CLHEP::cm,
@@ -936,7 +936,7 @@ EInside VolumeBorrow::inside(
     }
     auto && solid = this->volume->GetLogicalVolume()->GetSolid();
     auto inside = solid->Inside(point);
-    if ((exclude_daughters == false) || (inside != EInside::kInside)) {
+    if ((include_daughters == true) || (inside != EInside::kInside)) {
         return inside;
     }
 

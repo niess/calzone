@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::create_exception;
 use pyo3::exceptions::{
     PyException, PyFileNotFoundError, PyIndexError, PyKeyboardInterrupt, PyMemoryError,
-    PyNotImplementedError, PyValueError
+    PyNotImplementedError, PyTypeError, PyValueError
 };
 use pyo3::ffi::PyErr_CheckSignals;
 use super::ffi;
@@ -37,6 +37,7 @@ pub enum ErrorKind {
     KeyboardInterrupt,
     MemoryError,
     NotImplementedError,
+    TypeError,
     ValueError,
 }
 
@@ -146,6 +147,7 @@ impl<'a> From<&Error<'a>> for PyErr {
             ErrorKind::KeyboardInterrupt => PyErr::new::<PyKeyboardInterrupt, _>(msg),
             ErrorKind::MemoryError => PyErr::new::<PyMemoryError, _>(msg),
             ErrorKind::NotImplementedError => PyErr::new::<PyNotImplementedError, _>(msg),
+            ErrorKind::TypeError => PyErr::new::<PyTypeError, _>(msg),
             ErrorKind::ValueError => PyErr::new::<PyValueError, _>(msg),
         }
     }

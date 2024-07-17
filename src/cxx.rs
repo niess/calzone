@@ -304,7 +304,7 @@ pub mod ffi {
             self: &VolumeBorrow,
             point: &[f64; 3],
             transform: &G4AffineTransform,
-            exclude_daughters: bool
+            include_daughters: bool
         ) -> EInside;
 
         fn clear_roles(self: &VolumeBorrow);

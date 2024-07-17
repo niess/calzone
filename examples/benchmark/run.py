@@ -1,18 +1,22 @@
 #! /usr/bin/env python3
 import calzone
-import numpy
 from pathlib import Path
 
 PREFIX = Path(__file__).parent
 
-geometry = calzone.Geometry(PREFIX / "geometry.toml")
-geometry["Environment.Detector"].role = "catch_ingoing"
+# =============================================================================
+#
+# Run the Monte Carlo simulation.
+#
+# =============================================================================
 
-simulation = calzone.Simulation(geometry, sample_particles=True)
+simulation = calzone.Simulation(PREFIX / "geometry.toml")
+simulation.geometry["Environment.Detector"].role = "catch_ingoing"
+simulation.sample_particles = True
 simulation.secondaries = False
 
 N = 1000000
-spectrum = numpy.array((
+emission_lines = (
     # Pb-214 major emission lines.
     (0.242,  7.3),
     (0.295, 18.4),
@@ -26,29 +30,19 @@ spectrum = numpy.array((
     (1.378,  4.0),
     (1.764, 15.3),
     (2.204,  4.9),
-))
-particles = calzone.ParticlesGenerator(N) \
-    .spectral_lines(
-        energies = spectrum[:,0],
-        intensities = spectrum[:,1]
-    ) \
-    .inside(
-        geometry["Environment"],
-        exclude_daughters=True
-    ) \
-    .particles
-
-cos_theta = 2.0 * simulation.random.uniform01(N) - 1.0
-sin_theta = numpy.sqrt(1.0 - cos_theta**2)
-phi = 2.0 * numpy.pi * simulation.random.uniform01(N)
-
-particles["direction"][:,0] = numpy.cos(phi) * sin_theta
-particles["direction"][:,1] = numpy.sin(phi) * sin_theta
-particles["direction"][:,2] = cos_theta
+)
+particles = simulation.particles(N) \
+    .spectrum(emission_lines) \
+    .inside("Environment") \
+    .generate()
 
 result = simulation.run(particles)
 
-# Analyse simulation result.
+# =============================================================================
+#
+# Analyse the simulation results.
+#
+# =============================================================================
 
 collected = result.particles["Environment.Detector"]
 source_density = 1E-05 # Bq/cm^3

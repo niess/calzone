@@ -2,7 +2,7 @@ use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::io::{DictLike, PathString};
-use crate::utils::numpy::PyArray;
+use crate::utils::numpy::{PyArray, ShapeArg};
 use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
@@ -118,6 +118,20 @@ impl Simulation {
         };
         self.physics = physics;
         Ok(())
+    }
+
+    /// Generate Monte Carlo particles.
+    fn particles(
+        &self,
+        py: Python,
+        shape: ShapeArg,
+        weight: Option<bool>,
+    ) -> PyResult<source::ParticlesGenerator> {
+        let geometry = self.geometry
+            .as_ref()
+            .map(|geometry| geometry.bind(py));
+        let random = Some(self.random.bind(py).clone());
+        source::ParticlesGenerator::new(py, shape, geometry, random, weight)
     }
 
     /// Run a Geant4 Monte Carlo simulation.

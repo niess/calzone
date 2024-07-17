@@ -46,27 +46,7 @@ impl Geometry {
     }
 
     fn __getitem__(&self, path: &str) -> PyResult<Volume> {
-        let volume = self.0.borrow_volume(path);
-        if let Some(msg) = ffi::get_error().value() {
-            let err = Error::new(IndexError).what("volume").why(msg);
-            return Err(err.into())
-        }
-        let ffi::VolumeInfo { material, solid, mother, daughters } =
-            volume.describe();
-        let mother = if mother.is_empty() {
-            None
-        } else {
-            Some(mother)
-        };
-        let volume = Volume {
-            volume,
-            name: path.to_string(),
-            material,
-            solid,
-            mother,
-            daughters,
-        };
-        Ok(volume)
+        Volume::new(&self.0, path)
     }
 
     /// Check the geometry by looking for overlapping volumes.
@@ -478,6 +458,7 @@ impl GeometryDefinition {
 
 /// A volume of a Monte Carlo geometry.
 #[pyclass(frozen, module="calzone")]
+#[derive(Clone)]
 pub struct Volume {
     pub(crate) volume: SharedPtr<ffi::VolumeBorrow>,
     /// The volume absolute pathname.
@@ -571,5 +552,31 @@ impl Volume {
             return Err(err.into());
         }
         Ok((&origin).into())
+    }
+}
+
+impl Volume {
+    pub fn new(geometry: &SharedPtr<ffi::GeometryBorrow>, path: &str) -> PyResult<Self> {
+        let volume = geometry.borrow_volume(path);
+        if let Some(msg) = ffi::get_error().value() {
+            let err = Error::new(IndexError).what("volume").why(msg);
+            return Err(err.into())
+        }
+        let ffi::VolumeInfo { material, solid, mother, daughters } =
+            volume.describe();
+        let mother = if mother.is_empty() {
+            None
+        } else {
+            Some(mother)
+        };
+        let volume = Volume {
+            volume,
+            name: path.to_string(),
+            material,
+            solid,
+            mother,
+            daughters,
+        };
+        Ok(volume)
     }
 }

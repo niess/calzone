@@ -28,8 +28,8 @@ struct ArrayInterface {
     dtype_f64: PyObject,
     dtype_goupil_state: PyObject,
     dtype_line_deposit: PyObject,
+    dtype_particle: PyObject,
     dtype_point_deposit: PyObject,
-    dtype_primary: PyObject,
     dtype_sampled_particle: PyObject,
     dtype_total_deposit: PyObject,
     dtype_track: PyObject,
@@ -144,18 +144,7 @@ pub fn initialise(py: Python) -> PyResult<()> {
             .into_py(py)
     };
 
-    let dtype_point_deposit: PyObject = {
-        let arg: [PyObject; 3] = [
-            ("event", "u8").into_py(py),
-            ("value", "f8").into_py(py),
-            ("position", "f8", 3).into_py(py),
-        ];
-        dtype
-            .call1((arg, true))?
-            .into_py(py)
-    };
-
-    let dtype_primary: PyObject = {
+    let dtype_particle: PyObject = {
         let arg: [PyObject; 4] = [
             ("pid", "i4").into_py(py),
             ("energy", "f8").into_py(py),
@@ -167,10 +156,21 @@ pub fn initialise(py: Python) -> PyResult<()> {
             .into_py(py)
     };
 
+    let dtype_point_deposit: PyObject = {
+        let arg: [PyObject; 3] = [
+            ("event", "u8").into_py(py),
+            ("value", "f8").into_py(py),
+            ("position", "f8", 3).into_py(py),
+        ];
+        dtype
+            .call1((arg, true))?
+            .into_py(py)
+    };
+
     let dtype_sampled_particle: PyObject = {
         let arg: [PyObject; 2] = [
             ("event", "u8").into_py(py),
-            ("state", dtype_primary.clone()).into_py(py),
+            ("state", dtype_particle.clone()).into_py(py),
         ];
         dtype
             .call1((arg, true))?
@@ -243,8 +243,8 @@ pub fn initialise(py: Python) -> PyResult<()> {
         dtype_f64,
         dtype_goupil_state,
         dtype_line_deposit,
+        dtype_particle,
         dtype_point_deposit,
-        dtype_primary,
         dtype_sampled_particle,
         dtype_total_deposit,
         dtype_track,
@@ -719,7 +719,7 @@ impl Dtype for PointDeposit {
 impl Dtype for Particle {
     #[inline]
     fn dtype(py: Python) -> PyResult<PyObject> {
-        Ok(api(py).dtype_primary.clone_ref(py))
+        Ok(api(py).dtype_particle.clone_ref(py))
     }
 }
 
