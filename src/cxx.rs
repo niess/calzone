@@ -1,6 +1,6 @@
 use crate::geometry::volume::Volume;
 use crate::geometry::tessellation::{SortedTessels, sort_tessels};
-use crate::simulation::RunAgent;
+use crate::simulation::{RandomContext, RunAgent};
 use crate::utils::error::ctrlc_catched;
 
 
@@ -304,6 +304,7 @@ pub mod ffi {
         fn describe(self: &VolumeBorrow) -> VolumeInfo;
         fn generate_onto(
             self: &VolumeBorrow,
+            random: &mut RandomContext,
             transform: &G4AffineTransform,
             compute_normal: bool
         ) -> [f64; 6];
@@ -326,10 +327,18 @@ pub mod ffi {
 
         // Simulation interface.
         fn drop_simulation();
-        fn run_simulation(agent: &mut RunAgent, verbose: bool) -> SharedPtr<Error>;
+        fn run_simulation(
+            agent: &mut RunAgent,
+            random: &mut RandomContext,
+            verbose: bool
+        ) -> SharedPtr<Error>;
 
         type G4VPhysicalVolume;
         fn GetName(self: &G4VPhysicalVolume) -> &G4String;
+
+        // Random interface.
+        fn set_random_context(context: &mut RandomContext);
+        fn release_random_context();
 
         // Units interface.
         fn export_units(units: &mut Vec<UnitDefinition>);
@@ -410,10 +419,8 @@ pub mod ffi {
         fn is_particles(self: &RunAgent) -> bool;
         fn is_secondaries(self: &RunAgent) -> bool;
         fn is_tracker(self: &RunAgent) -> bool;
-        fn next_open01(self: &mut RunAgent) -> f64;
         unsafe fn next_primary(self: &mut RunAgent) -> Particle;
         unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
-        fn prng_name(self: &RunAgent) -> &'static str;
         unsafe fn push_deposit(
             self: &mut RunAgent,
             volume: *const G4VPhysicalVolume,
@@ -429,5 +436,11 @@ pub mod ffi {
         );
         fn push_track(self: &mut RunAgent, mut track: Track);
         fn push_vertex(self: &mut RunAgent, mut vertex: Vertex);
+
+        // Random interface.
+        type RandomContext<'a>;
+
+        fn next_open01(self: &mut RandomContext) -> f64;
+        fn prng_name(self: &RandomContext) -> &'static str;
     }
 }

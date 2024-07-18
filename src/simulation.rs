@@ -8,6 +8,7 @@ use cxx::SharedPtr;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 use std::ffi::c_char;
+use std::pin::Pin;
 
 mod physics;
 mod random;
@@ -16,7 +17,7 @@ pub mod source;
 pub mod tracker;
 
 pub use physics::Physics;
-pub use random::Random;
+pub use random::{Random, RandomContext};
 use sampler::{Deposits, ParticlesSampler, SamplerMode};
 use tracker::Tracker;
 pub use super::cxx::ffi;
@@ -145,13 +146,12 @@ impl Simulation {
         let verbose = verbose.unwrap_or(false);
 
         let mut agent = RunAgent::new(py, self, particles)?;
-        let result = ffi::run_simulation(&mut agent, verbose)
+        let mut binding = self.random.bind(py).borrow_mut();
+        let mut random = RandomContext::new(&mut binding);
+        let result = ffi::run_simulation(&mut agent, &mut random, verbose)
             .to_result();
 
-        // Synchronize back random stream.
-        let mut random = self.random.borrow_mut(py);
-        *random = agent.random.clone();
-
+        let agent = Pin::into_inner(agent);
         result.and_then(|_| agent.export(py))
     }
 }
@@ -219,7 +219,6 @@ pub struct RunAgent<'a> {
     geometry: SharedPtr<ffi::GeometryBorrow>,
     physics: ffi::Physics,
     primaries: Primaries<'a>,
-    random: Random,
     // Iterator.
     index: usize,
     // Energy deposits.
@@ -311,13 +310,12 @@ impl<'a> RunAgent<'a> {
         py: Python,
         simulation: &Simulation,
         primaries: Primaries<'a>,
-    ) -> PyResult<RunAgent<'a>> {
+    ) -> PyResult<Pin<Box<RunAgent<'a>>>> {
         let geometry = simulation.geometry
             .as_ref()
             .ok_or_else(|| Error::new(ValueError).what("geometry").why("undefined").to_err())?;
         let geometry = geometry.get().0.clone();
         let physics = simulation.physics.bind(py).borrow().0;
-        let random = simulation.random.bind(py).borrow().clone();
         let index = 0;
         let deposits = simulation.sample_deposits.map(|mode| Deposits::new(mode));
         let particles = if simulation.sample_particles {
@@ -328,13 +326,9 @@ impl<'a> RunAgent<'a> {
         let tracker = if simulation.tracking { Some(Tracker::new()) } else { None };
         let secondaries = simulation.secondaries;
         let agent = RunAgent {
-            geometry, physics, primaries, random, index, deposits, particles, tracker, secondaries
+            geometry, physics, primaries, index, deposits, particles, tracker, secondaries
         };
-        Ok(agent)
-    }
-
-    pub fn next_open01(&mut self) -> f64 {
-        self.random.open01()
+        Ok(Box::pin(agent))
     }
 
     pub fn next_primary(&mut self) -> ffi::Particle {
@@ -359,10 +353,6 @@ impl<'a> RunAgent<'a> {
 
     pub fn physics<'b>(&'b self) -> &'b ffi::Physics {
         &self.physics
-    }
-
-    pub fn prng_name(&self) -> &'static str {
-        "Pcg64Mcg"
     }
 
     pub fn push_deposit(

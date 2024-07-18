@@ -1,18 +1,17 @@
 #include "random.h"
 
-
 double RandomImpl::flat() {
-    return RUN_AGENT->next_open01();
+    return this->context->next_open01();
 }
 
 void RandomImpl::flatArray(const int n, double * v) {
     for (int i = 0; i < n; i++, v++) {
-        *v = RUN_AGENT->next_open01();
+        *v = this->context->next_open01();
     }
 }
 
 std::string RandomImpl::name() const {
-    return std::string(RUN_AGENT->prng_name());
+    return std::string(this->context->prng_name());
 }
 
 void RandomImpl::setSeed(long, int) {}
@@ -31,13 +30,27 @@ std::istream & RandomImpl::get (std::istream &) {
     exit(EXIT_FAILURE);
 }
 
-void RandomImpl::Switch() {
-    if (this->altEngine == nullptr) {
+void RandomImpl::SetContext(RandomContext & context_) {
+    if (this->context == nullptr) {
         // Enable.
+        this->context = &context_;
         this->altEngine = G4Random::getTheEngine();
         G4Random::setTheEngine(this);
     } else {
+        // This should be unreachable.
+        std::fputs("error: random context overlap", stderr);
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+void RandomImpl::ReleaseContext() {
+    if (this->context == nullptr) {
+        // This should be unreachable.
+        std::fputs("error: missing random context", stderr);
+        std::exit(EXIT_FAILURE);
+    } else {
         // Disable.
+        this->context = nullptr;
         G4Random::setTheEngine(this->altEngine);
         this->altEngine = nullptr;
     }
@@ -46,4 +59,12 @@ void RandomImpl::Switch() {
 RandomImpl * RandomImpl::Get() {
     static RandomImpl * instance = new RandomImpl();
     return instance;
+}
+
+void set_random_context(RandomContext & context) {
+    RandomImpl::Get()->SetContext(context);
+}
+
+void release_random_context() {
+    RandomImpl::Get()->ReleaseContext();
 }

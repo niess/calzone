@@ -6,7 +6,15 @@ use rand::Rng;
 use rand::distributions::Open01;
 use rand::SeedableRng;
 use rand_pcg::Pcg64Mcg;
+use std::pin::Pin;
+use super::ffi;
 
+
+// ===============================================================================================
+//
+// Generator interface.
+//
+// ===============================================================================================
 
 /// A Pseudo-Random Numbers Generator (PRNG).
 #[derive(Clone)]
@@ -94,5 +102,36 @@ impl Random {
     pub(super) fn open01(&mut self) -> f64 {
         self.index += 1;
         self.rng.sample::<f64, Open01>(Open01)
+    }
+}
+
+
+// ===============================================================================================
+//
+// Random context.
+//
+// ===============================================================================================
+
+pub struct RandomContext<'a> (&'a mut Random);
+
+impl<'a> RandomContext<'a> {
+    pub fn next_open01(&mut self) -> f64 {
+        self.0.open01()
+    }
+
+    pub fn new(prng: &'a mut Random) -> Pin<Box<Self>> {
+        let mut context = Box::pin(Self (prng)); // Pin memory location.
+        ffi::set_random_context(&mut context);
+        context
+    }
+
+    pub fn prng_name(&self) -> &'static str {
+        "Pcg64Mcg"
+    }
+}
+
+impl<'a> Drop for RandomContext<'a> {
+    fn drop(&mut self) {
+        ffi::release_random_context();
     }
 }

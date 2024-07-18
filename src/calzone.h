@@ -79,6 +79,7 @@ struct VolumeBorrow {
     double compute_volume(bool) const;
     VolumeInfo describe() const;
     std::array<double, 6> generate_onto(
+        RandomContext &,
         const G4AffineTransform &,
         bool
     ) const;
@@ -122,7 +123,17 @@ G4Material * get_material(const rust::String & name);
 extern RunAgent * RUN_AGENT;
 
 void drop_simulation();
-std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose);
+std::shared_ptr<Error> run_simulation(RunAgent &, RandomContext &, bool);
+
+
+// ============================================================================
+//
+// Random interface.
+//
+// ============================================================================
+
+void set_random_context(RandomContext &);
+void release_random_context();
 
 
 // ============================================================================

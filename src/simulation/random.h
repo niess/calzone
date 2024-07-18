@@ -22,12 +22,14 @@ struct RandomImpl: public CLHEP::HepRandomEngine {
     std::istream & get (std::istream & is);
 
     // User interface.
-    void Switch();
+    void SetContext(RandomContext &);
+    void ReleaseContext();
 
     static RandomImpl * Get();
 
 private:
     RandomImpl() = default;
 
+    RandomContext * context = nullptr;
     CLHEP::HepRandomEngine * altEngine = nullptr;
 };

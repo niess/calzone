@@ -943,10 +943,10 @@ VolumeInfo VolumeBorrow::describe() const {
 }
 
 std::array<double, 6> VolumeBorrow::generate_onto(
+    RandomContext &, // Implicit scope.
     const G4AffineTransform & transform,
     bool compute_normal
 ) const {
-    // XXX Use CalZone RNG (for reproductibility).
     auto && solid = this->volume->GetLogicalVolume()->GetSolid();
     auto && point = solid->GetPointOnSurface();
     G4ThreeVector normal;

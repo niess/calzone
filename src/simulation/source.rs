@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySlice, PyString};
 use std::borrow::Cow;
 use super::ffi;
-use super::random::Random;
+use super::random::{Random, RandomContext};
 
 
 // ===============================================================================================
@@ -332,10 +332,15 @@ impl ParticlesGenerator {
         } else {
             None
         };
-        let mut random = generator.random.bind(py).borrow_mut();
+        let mut binding = generator.random.bind(py).borrow_mut();
+        let mut random = RandomContext::new(&mut binding);
         let n = positions.size() / 3;
         for i in 0..n {
-            let data = volume.volume.generate_onto(&transform, direction.is_some());
+            let data = volume.volume.generate_onto(
+                &mut random,
+                &transform,
+                direction.is_some()
+            );
             for j in 0..3 {
                 positions.set(3 * i + j, data[j])?;
             }
@@ -344,8 +349,8 @@ impl ParticlesGenerator {
                     Direction::Ingoing => f64x3::new(-data[3], -data[4], -data[5]),
                     Direction::Outgoing => f64x3::new(data[3], data[4], data[5]),
                 };
-                let cos_theta = random.open01().sqrt(); // cosine distribution.
-                let phi = 2.0 * std::f64::consts::PI * random.open01();
+                let cos_theta = random.next_open01().sqrt(); // cosine distribution.
+                let phi = 2.0 * std::f64::consts::PI * random.next_open01();
                 direction.rotate(cos_theta, phi);
                 let direction: [f64; 3] = direction.into();
                 for j in 0..3 {

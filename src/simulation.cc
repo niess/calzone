@@ -24,7 +24,11 @@ void drop_simulation() {
     delete manager;
 }
 
-std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
+std::shared_ptr<Error> run_simulation(
+    RunAgent & agent,
+    RandomContext &, // Implicit scope.
+    bool verbose
+) {
     clear_error();
 
     // Configure the simulation.
@@ -70,10 +74,6 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
         ui->ApplyCommand("/tracking/verbose 1");
     }
 
-    // Enable the random engine.
-    auto && randomImpl = RandomImpl::Get();
-    randomImpl->Switch();
-
     // Process events in bunches (in order to check for Ctrl+C).
     constexpr int bunch_size = 100;
     const size_t n = agent.events();
@@ -86,10 +86,6 @@ std::shared_ptr<Error> run_simulation(RunAgent & agent, bool verbose) {
         }
         if (any_error()) break;
     }
-
-    // Restore the initial random engine etc.
-    RUN_AGENT = nullptr;
-    randomImpl->Switch();
 
     return get_error();
 }
