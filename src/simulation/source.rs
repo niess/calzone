@@ -78,10 +78,8 @@ pub struct ParticlesGenerator {
     is_direction: bool,
 }
 
-// XXX Surface generator / cos(theta).
 // XXX Power law generator.
 // XXX Pid / charge selector.
-// XXX PRNG context (for reproducibility).
 
 #[pymethods]
 impl ParticlesGenerator {

@@ -1,4 +1,5 @@
 #include "calzone.h"
+#include "geometry/solids.h"
 #include "geometry/tessellation.h"
 #include "simulation/sampler.h"
 // standard library.
@@ -6,17 +7,13 @@
 // fmt library.
 #include <fmt/core.h>
 // Geant4 interface.
-#include "G4Box.hh"
 #include "G4GDMLParser.hh"
 #include "G4NistManager.hh"
-#include "G4Orb.hh"
 #include "G4PVPlacement.hh"
-#include "G4Sphere.hh"
 #include "G4SmartVoxelHeader.hh"
 #include "G4SubtractionSolid.hh"
 #include "G4TessellatedSolid.hh"
 #include "G4TriangularFacet.hh"
-#include "G4Tubs.hh"
 #include "G4VisExtent.hh"
 #include "G4VoxelLimits.hh"
 // Goupil interface.
@@ -120,7 +117,7 @@ static G4VSolid * build_envelope(
     G4VSolid * solid;
     switch (envelope.shape) {
         case ShapeType::Box:
-            solid = new G4Box(
+            solid = new Box(
                 pathname,
                 0.5 * (max[0] - min[0]) + safety,
                 0.5 * (max[1] - min[1]) + safety,
@@ -131,7 +128,7 @@ static G4VSolid * build_envelope(
                 const double dx = max[0] - min[0];
                 const double dy = max[1] - min[1];
                 const double radius = 0.5 * std::sqrt(dx * dx + dy * dy);
-                solid = new G4Tubs(
+                solid = new Tubs(
                     pathname,
                     0.0,
                     radius + safety,
@@ -147,7 +144,7 @@ static G4VSolid * build_envelope(
                 const double dz = max[2] - min[2];
                 const double radius =
                     0.5 * std::sqrt(dx * dx + dy * dy + dz * dz);
-                solid = new G4Orb(
+                solid = new Orb(
                     pathname,
                     radius + safety
                 );
@@ -330,7 +327,7 @@ static G4VSolid * build_solids(
     switch (volume.shape()) {
         case ShapeType::Box: {
                 auto shape = volume.box_shape();
-                solid = new G4Box(
+                solid = new Box(
                     std::string(pathname),
                     0.5 * shape.size[0] * CLHEP::cm,
                     0.5 * shape.size[1] * CLHEP::cm,
@@ -345,7 +342,7 @@ static G4VSolid * build_solids(
                 double phi0 = (shape.section[0] / 360.0) * CLHEP::twopi;
                 double dphi = ((shape.section[1] - shape.section[0]) / 360.0)
                     * CLHEP::twopi;
-                solid = new G4Tubs(
+                solid = new Tubs(
                     std::string(pathname),
                     rmin * CLHEP::cm,
                     shape.radius * CLHEP::cm,
@@ -365,7 +362,7 @@ static G4VSolid * build_solids(
                     (shape.azimuth_section[1] == 360.0) &&
                     (shape.zenith_section[0] == 0.0) &&
                     (shape.zenith_section[1] == 180.0)) {
-                    solid = new G4Orb(
+                    solid = new Orb(
                         std::string(pathname),
                         shape.radius * CLHEP::cm
                     );
@@ -380,7 +377,7 @@ static G4VSolid * build_solids(
                         CLHEP::pi;
                     double dtheta = ((shape.zenith_section[1] -
                         shape.zenith_section[0]) / 180.0) * CLHEP::pi;
-                    solid = new G4Sphere(
+                    solid = new Sphere(
                         std::string(pathname),
                         shape.radius * CLHEP::cm,
                         rmin * CLHEP::cm,
