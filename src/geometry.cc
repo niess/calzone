@@ -11,8 +11,6 @@
 #include "G4NistManager.hh"
 #include "G4PVPlacement.hh"
 #include "G4SmartVoxelHeader.hh"
-#include "G4SubtractionSolid.hh"
-#include "G4TessellatedSolid.hh"
 #include "G4TriangularFacet.hh"
 #include "G4VisExtent.hh"
 #include "G4VoxelLimits.hh"
@@ -163,7 +161,7 @@ static G4VSolid * build_envelope(
     } else {
         orphans.push_back(solid);
         auto translation = G4ThreeVector(tx, ty, tz);
-        auto displaced = new G4DisplacedSolid(
+        auto displaced = new DisplacedSolid(
             pathname,
             solid,
             nullptr,
@@ -173,11 +171,11 @@ static G4VSolid * build_envelope(
     }
 }
 
-static G4TessellatedSolid * build_geant4_tessellation(
+static TessellatedSolid * build_geant4_tessellation(
     const std::string & pathname,
     const Volume & volume
 ) {
-    auto solid = new G4TessellatedSolid(pathname);
+    auto solid = new TessellatedSolid(pathname);
     if (solid == nullptr) {
         set_error(ErrorType::MemoryError, "");
         return nullptr;
@@ -220,7 +218,7 @@ static G4VSolid * build_tessellation(
     switch (algorithm) {
         case TSTAlgorithm::Bvh: {
             auto && shape = volume.tessellated_shape();
-            return new TessellatedSolid(pathname, shape);
+            return new Tessellation(pathname, shape);
         }
         case TSTAlgorithm::Geant4:
             return build_geant4_tessellation(pathname, volume);
@@ -276,17 +274,17 @@ static G4VSolid * build_solids(
         auto solid0 = solids[path0];
         auto && t0 = transforms[item[0]];
         auto && t1 = transforms[item[1]];
-        G4SubtractionSolid * boolean;
+        SubtractionSolid * boolean;
         if (t1.IsTranslated() || t1.IsRotated()) {
             if (t0.IsTranslated() || t0.IsRotated()) {
-                boolean = new G4SubtractionSolid(
+                boolean = new SubtractionSolid(
                     std::string(item[0]),
                     solid0,
                     solids[path1],
                     t0 * t1.Inverse() // XXX Check this.
                 );
             } else {
-                boolean = new G4SubtractionSolid(
+                boolean = new SubtractionSolid(
                     std::string(item[0]),
                     solid0,
                     solids[path1],
@@ -296,14 +294,14 @@ static G4VSolid * build_solids(
         } else {
             if (t0.IsTranslated() || t0.IsRotated()) {
                 auto t = t0 * t1.Inverse();
-                boolean = new G4SubtractionSolid(
+                boolean = new SubtractionSolid(
                     std::string(item[0]),
                     solid0,
                     solids[path1],
                     t0
                 );
             } else {
-                boolean = new G4SubtractionSolid(
+                boolean = new SubtractionSolid(
                     std::string(item[0]),
                     solid0,
                     solids[path1]
@@ -574,7 +572,7 @@ GeometryData::GeometryData(
         }
         this->orphans.push_back(top_solid);
         auto name = std::string(volume->name());
-        top_solid = new G4DisplacedSolid(
+        top_solid = new DisplacedSolid(
             name,
             top_solid,
             rotation,
@@ -922,7 +920,7 @@ VolumeInfo VolumeBorrow::describe() const {
     VolumeInfo info;
     auto logical = this->volume->GetLogicalVolume();
     info.material = rust::String(logical->GetMaterial()->GetName());
-    info.solid = rust::String(logical->GetSolid()->GetName());
+    info.solid = rust::String(logical->GetSolid()->GetEntityType());
     auto mother = this->geometry->mothers[this->volume];
     if (mother == nullptr) {
         info.mother = rust::String("");
@@ -932,9 +930,12 @@ VolumeInfo VolumeBorrow::describe() const {
     int n = logical->GetNoDaughters();
     for (int i = 0; i < n; i++) {
         auto daughter = logical->GetDaughter(i);
-        info.daughters.push_back(
-            std::move(std::string(daughter->GetName()
-        )));
+        info.daughters.push_back({
+            std::move(std::string(daughter->GetName())),
+            std::move(std::string(
+                daughter->GetLogicalVolume()->GetSolid()->GetEntityType()
+            )),
+        });
     }
     return info;
 }

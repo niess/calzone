@@ -57,6 +57,11 @@ pub mod ffi {
         safety: f64,
     }
 
+    struct DaughterInfo {
+        path: String,
+        solid: String,
+    }
+
     #[repr(i32)]
     enum ShapeType {
         Box,
@@ -87,7 +92,7 @@ pub mod ffi {
         material: String,
         solid: String,
         mother: String,
-        daughters: Vec<String>,
+        daughters: Vec<DaughterInfo>,
     }
 
     // ===========================================================================================

@@ -1,6 +1,6 @@
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::{Error, variant_explain};
-use crate::utils::error::ErrorKind::{IndexError, ValueError};
+use crate::utils::error::ErrorKind::{IndexError, NotImplementedError, ValueError};
 use crate::utils::float::f64x3;
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
@@ -465,17 +465,27 @@ pub struct Volume {
     pub(crate) volume: SharedPtr<ffi::VolumeBorrow>,
     /// The volume absolute pathname.
     #[pyo3(get)]
-    name: String,
+    name: String, // XXX Path and name properties.
     /// The volume constitutive material.
     #[pyo3(get)]
     material: String,
     /// The volume shape (according to Geant4).
     #[pyo3(get)]
-    solid: String,
+    pub(crate) solid: String,
     /// The mother of this volume, if any (i.e. directly containing this volume).
     #[pyo3(get)]
     mother: Option<String>,
     daughters: Vec<String>,
+
+    pub(crate) properties: SolidProperties,
+}
+
+#[derive(Clone)]
+pub struct SolidProperties {
+    pub has_cubic_volume: bool,
+    pub has_exclusive_volume: bool,
+    pub has_surface_area: bool,
+    pub has_surface_generation: bool,
 }
 
 unsafe impl Send for ffi::VolumeBorrow {}
@@ -491,12 +501,15 @@ impl Volume {
 
     #[getter]
     fn get_surface<'py>(&self) -> PyResult<f64> {
-        let surface = self.volume.compute_surface();
-        if let Some(why) = ffi::get_error().value() { // XXX Check implemented.
-            let err = Error::new(ValueError).what("surface operation").why(why);
-            return Err(err.into());
+        if self.properties.has_surface_area {
+            Ok(self.volume.compute_surface())
+        } else {
+            let why = format!("not implemented for '{}'", self.solid);
+            let err = Error::new(ValueError)
+                .what("'surface' attribute")
+                .why(&why);
+            Err(err.into())
         }
-        Ok(surface)
     }
 
     /// The volume role(s), if any.
@@ -567,13 +580,20 @@ impl Volume {
     /// Return the cubic volume of this volume.
     #[pyo3(name = "volume")]
     fn compute_volume(&self, include_daughters: Option<bool>) -> PyResult<f64> {
-        // XXX Check if implemented.
-        let include_daughters = include_daughters.unwrap_or(false);
-        let volume = self.volume.compute_volume(include_daughters);
-        if let Some(why) = ffi::get_error().value() {
-            let err = Error::new(ValueError).what("volume operation").why(why);
+        if !self.properties.has_cubic_volume {
+            let why = format!("not implemented for '{}'", self.solid);
+            let err = Error::new(NotImplementedError).what("volume operation").why(&why);
             return Err(err.into());
         }
+
+        let include_daughters = include_daughters.unwrap_or(false);
+        if !include_daughters && !self.properties.has_exclusive_volume {
+            let why = "not implemented for daughter volume(s)";
+            let err = Error::new(NotImplementedError).what("volume operation").why(why);
+            return Err(err.into());
+        }
+
+        let volume = self.volume.compute_volume(include_daughters);
         Ok(volume)
     }
 
@@ -587,13 +607,50 @@ impl Volume {
             let err = Error::new(IndexError).what("volume").why(msg);
             return Err(err.into())
         }
-        let ffi::VolumeInfo { material, solid, mother, daughters } =
+        let ffi::VolumeInfo { material, solid, mother, mut daughters } =
             volume.describe();
         let mother = if mother.is_empty() {
             None
         } else {
             Some(mother)
         };
+
+        let get_properties = |solid: &str| -> SolidProperties {
+            match solid {
+                "G4Box" | "G4DisplacedSolid" | "G4Orb" | "G4Sphere" | "G4Tubs" => {
+                    SolidProperties::everything()
+                },
+                "Tessellation" => {
+                    SolidProperties {
+                        has_cubic_volume: false,
+                        has_exclusive_volume: false,
+                        has_surface_area: true,
+                        has_surface_generation: true,
+                    }
+                },
+                "G4TessellatedSolid" => {
+                    SolidProperties {
+                        has_cubic_volume: false,
+                        has_exclusive_volume: false,
+                        has_surface_area: true,
+                        has_surface_generation: false,
+                    }
+                },
+                _ => SolidProperties::nothing(),
+            }
+        };
+
+        let mut properties = get_properties(solid.as_str());
+        properties.has_exclusive_volume = properties.has_cubic_volume && daughters.iter()
+            .map(|ffi::DaughterInfo { solid, .. }| {
+                let properties = get_properties(solid.as_str());
+                properties.has_cubic_volume
+            })
+            .fold(true, |acc, v| acc && v);
+        let daughters: Vec<_> = daughters.drain(..)
+            .map(|ffi::DaughterInfo { path, .. }| path)
+            .collect();
+
         let volume = Volume {
             volume,
             name: path.to_string(),
@@ -601,7 +658,28 @@ impl Volume {
             solid,
             mother,
             daughters,
+            properties,
         };
         Ok(volume)
+    }
+}
+
+impl SolidProperties {
+    pub const fn everything() -> Self {
+        Self {
+            has_cubic_volume: true,
+            has_exclusive_volume: true,
+            has_surface_area: true,
+            has_surface_generation: true,
+        }
+    }
+
+    pub const fn nothing() -> Self {
+        Self {
+            has_cubic_volume: false,
+            has_exclusive_volume: false,
+            has_surface_area: false,
+            has_surface_generation: false,
+        }
     }
 }

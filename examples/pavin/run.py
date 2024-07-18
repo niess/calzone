@@ -12,7 +12,6 @@ PREFIX = Path(__file__).parent
 
 simulation = calzone.Simulation(PREFIX / "geometry.toml")
 simulation.geometry["Environment.Source.Detector"].role = "record_deposits"
-simulation.physics.had_model = "FTFP_BERT"
 
 N = 100000
 particles = simulation.particles(N) \

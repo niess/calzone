@@ -4,9 +4,9 @@
 // Calzone interface.
 #include "calzone.h"
 
-struct TessellatedSolid: public G4VSolid {
-    TessellatedSolid(const G4String &, const TessellatedShape & shape);
-    TessellatedSolid(const TessellatedSolid &) = delete;
+struct Tessellation: public G4VSolid {
+    Tessellation(const G4String &, const TessellatedShape & shape);
+    Tessellation(const Tessellation &) = delete;
 
     void BoundingLimits(G4ThreeVector &, G4ThreeVector &) const;
     G4bool CalculateExtent(

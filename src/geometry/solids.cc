@@ -48,6 +48,17 @@ G4ThreeVector Box::GetPointOnSurface() const {
 
 // ============================================================================
 //
+// Displaced solid wrapper
+//
+// ============================================================================
+
+G4VSolid * DisplacedSolid::Clone() const {
+    return new DisplacedSolid(*this);
+}
+
+
+// ============================================================================
+//
 // Orb wrapper
 //
 // ============================================================================
@@ -125,6 +136,28 @@ G4ThreeVector Sphere::GetPointOnSurface() const {
         G4double rho   = std::sin(theta);
         return { r*rho*std::cos(phi), r*rho*std::sin(phi), r*z };
     }
+}
+
+
+// ============================================================================
+//
+// Subtraction solid wrapper
+//
+// ============================================================================
+
+G4VSolid * SubtractionSolid::Clone() const {
+    return new SubtractionSolid(*this);
+}
+
+
+// ============================================================================
+//
+// Tessellated solid wrapper
+//
+// ============================================================================
+
+G4VSolid * TessellatedSolid::Clone() const {
+    return new TessellatedSolid(*this);
 }
 
 

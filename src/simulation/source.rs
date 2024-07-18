@@ -1,6 +1,7 @@
 use crate::geometry::{Geometry, Volume};
 use crate::utils::error::{ctrlc_catched, Error, variant_explain};
-use crate::utils::error::ErrorKind::{KeyboardInterrupt, TypeError, ValueError};
+use crate::utils::error::ErrorKind::{KeyboardInterrupt, NotImplementedError, TypeError,
+                                     ValueError};
 use crate::utils::float::f64x3;
 use crate::utils::numpy::{PyArray, ShapeArg};
 use crate::utils::tuple::NamedTuple;
@@ -204,13 +205,19 @@ impl ParticlesGenerator {
 
         let volume = volume.resolve(slf.borrow().geometry.as_ref())?;
 
+        let include_daughters = include_daughters.unwrap_or(false);
+        let has_volume = if include_daughters {
+            volume.properties.has_cubic_volume
+        } else {
+            volume.properties.has_exclusive_volume
+        };
+
         let weight = weight.unwrap_or(is_weights);
         if weight && !is_weights {
             let mut generator = slf.borrow_mut();
             generator.initialise_weights(py)?;
         }
 
-        let include_daughters = include_daughters.unwrap_or(false);
         let [xmin, xmax, ymin, ymax, zmin, zmax] = volume.volume.compute_box("");
         let transform = volume.volume.compute_transform("");
         let generator = slf.borrow();
@@ -250,11 +257,17 @@ impl ParticlesGenerator {
             }
         }
         if let Some(weights) = weights {
-            // XXX Use exact volume, when available.
-            let p = (n as f64) / (trials as f64);
-            let volume = (xmax - xmin) * (ymax - ymin) * (zmax - zmin) * p;
+            let cubic_volume = match has_volume {
+                true => {
+                    volume.volume.compute_volume(include_daughters)
+                },
+                false => {
+                    let p = (n as f64) / (trials as f64);
+                    (xmax - xmin) * (ymax - ymin) * (zmax - zmin) * p
+                },
+            };
             for i in 0..n {
-                let weight = weights.get(i)? * volume;
+                let weight = weights.get(i)? * cubic_volume;
                 weights.set(i, weight)?;
             }
         }
@@ -298,10 +311,17 @@ impl ParticlesGenerator {
             generator.weights.is_some()
         };
 
-        let volume = volume.resolve(slf.borrow().geometry.as_ref())?;
-        // XXX Check G4TessellatedSolid.
-
         let weight = weight.unwrap_or(is_weights);
+        let volume = volume.resolve(slf.borrow().geometry.as_ref())?;
+        if !volume.properties.has_surface_generation ||
+            (weight && !volume.properties.has_surface_area) {
+            let why = format!("not implemented for '{}'", volume.solid);
+            let err = Error::new(NotImplementedError)
+                .what("onto operation")
+                .why(&why);
+            return Err(err.to_err());
+        }
+
         if weight && !is_weights {
             let mut generator = slf.borrow_mut();
             generator.initialise_weights(py)?;
@@ -357,7 +377,7 @@ impl ParticlesGenerator {
             }
         }
         if let Some(weights) = weights {
-            let surface = volume.volume.compute_surface(); // XXX Check implemented.
+            let surface = volume.volume.compute_surface();
             let solid_angle = if direction.is_some() {
                 std::f64::consts::PI
             } else {

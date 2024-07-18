@@ -1,8 +1,11 @@
 #pragma once
 // Geant4 interface.
 #include "G4Box.hh"
+#include "G4DisplacedSolid.hh"
 #include "G4Orb.hh"
 #include "G4Sphere.hh"
+#include "G4SubtractionSolid.hh"
+#include "G4TessellatedSolid.hh"
 #include "G4Tubs.hh"
 // Calzone interface.
 #include "calzone.h"
@@ -12,6 +15,12 @@ struct Box: public G4Box {
 
     G4VSolid * Clone() const override;
     G4ThreeVector GetPointOnSurface() const override;
+};
+
+struct DisplacedSolid: public G4DisplacedSolid {
+    using G4DisplacedSolid::G4DisplacedSolid;
+
+    G4VSolid * Clone() const override;
 };
 
 struct Orb: public G4Orb {
@@ -25,6 +34,18 @@ struct Sphere: public G4Sphere {
 
     G4VSolid * Clone() const override;
     G4ThreeVector GetPointOnSurface() const override;
+};
+
+struct SubtractionSolid: public G4SubtractionSolid {
+    using G4SubtractionSolid::G4SubtractionSolid;
+
+    G4VSolid * Clone() const override;
+};
+
+struct TessellatedSolid: public G4TessellatedSolid {
+    using G4TessellatedSolid::G4TessellatedSolid;
+
+    G4VSolid * Clone() const override;
 };
 
 struct Tubs: public G4Tubs {

@@ -5,7 +5,7 @@
 #include "Randomize.hh"
 
 
-TessellatedSolid::TessellatedSolid(
+Tessellation::Tessellation(
     const G4String & name,
     const TessellatedShape & shape
 ):
@@ -13,7 +13,7 @@ TessellatedSolid::TessellatedSolid(
     tessels(sort_tessels(shape))
 {}
 
-void TessellatedSolid::BoundingLimits(
+void Tessellation::BoundingLimits(
     G4ThreeVector & pMin,
     G4ThreeVector & pMax) const {
     auto && envelope = this->tessels->envelope();
@@ -25,7 +25,7 @@ void TessellatedSolid::BoundingLimits(
     pMax[2] = envelope[1][2];
 }
 
-G4bool TessellatedSolid::CalculateExtent(
+G4bool Tessellation::CalculateExtent(
     const EAxis axis,
     const G4VoxelLimits & limits,
     const G4AffineTransform & transform,
@@ -42,7 +42,7 @@ G4bool TessellatedSolid::CalculateExtent(
     return bbox.CalculateExtent(axis, limits, transform, min, max);
 }
 
-G4double TessellatedSolid::DistanceToIn(const G4ThreeVector & position) const {
+G4double Tessellation::DistanceToIn(const G4ThreeVector & position) const {
     auto && envelope = this->tessels->envelope();
     G4ThreeVector center(
         0.5 * (envelope[0][0] + envelope[1][0]),
@@ -70,7 +70,7 @@ G4double TessellatedSolid::DistanceToIn(const G4ThreeVector & position) const {
     }
 }
 
-G4double TessellatedSolid::DistanceToIn(
+G4double Tessellation::DistanceToIn(
     const G4ThreeVector & position, const G4ThreeVector & direction
 ) const {
     auto && distance = this->tessels->distance_to_in(position, direction);
@@ -82,11 +82,11 @@ G4double TessellatedSolid::DistanceToIn(
     }
 }
 
-G4double TessellatedSolid::DistanceToOut(const G4ThreeVector &) const {
+G4double Tessellation::DistanceToOut(const G4ThreeVector &) const {
     return 0.0;
 }
 
-G4double TessellatedSolid::DistanceToOut(
+G4double Tessellation::DistanceToOut(
     const G4ThreeVector & position,
     const G4ThreeVector & direction,
     G4bool calculateNormal,
@@ -116,11 +116,11 @@ G4double TessellatedSolid::DistanceToOut(
     }
 }
 
-G4GeometryType TessellatedSolid::GetEntityType() const {
-    return { "TessellatedSolid" };
+G4GeometryType Tessellation::GetEntityType() const {
+    return { "Tessellation" };
 }
 
-G4ThreeVector TessellatedSolid::GetPointOnSurface () const {
+G4ThreeVector Tessellation::GetPointOnSurface () const {
     auto && point = this->tessels->surface_point(
         G4UniformRand(),
         G4UniformRand(),
@@ -129,16 +129,16 @@ G4ThreeVector TessellatedSolid::GetPointOnSurface () const {
     return G4ThreeVector(point[0], point[1], point[2]);
 }
 
-G4double TessellatedSolid::GetSurfaceArea() {
+G4double Tessellation::GetSurfaceArea() {
     return this->tessels->area();
 }
 
-EInside TessellatedSolid::Inside(const G4ThreeVector & position) const {
+EInside Tessellation::Inside(const G4ThreeVector & position) const {
     const double delta = 0.5 * kCarTolerance;
     return this->tessels->inside(position, delta);
 }
 
-G4ThreeVector TessellatedSolid::SurfaceNormal(
+G4ThreeVector Tessellation::SurfaceNormal(
     const G4ThreeVector & position
 ) const {
     const double delta = 0.5 * kCarTolerance;
@@ -146,8 +146,8 @@ G4ThreeVector TessellatedSolid::SurfaceNormal(
     return G4ThreeVector(normal[0], normal[1], normal[2]);
 }
 
-void TessellatedSolid::DescribeYourselfTo(G4VGraphicsScene &) const {}
+void Tessellation::DescribeYourselfTo(G4VGraphicsScene &) const {}
 
-std::ostream & TessellatedSolid::StreamInfo(std::ostream & stream) const {
+std::ostream & Tessellation::StreamInfo(std::ostream & stream) const {
     return stream;
 }
