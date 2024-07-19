@@ -79,7 +79,6 @@ pub struct ParticlesGenerator {
     is_direction: bool,
 }
 
-// XXX Power law generator.
 // XXX Pid / charge selector.
 
 #[pymethods]
@@ -435,6 +434,89 @@ impl ParticlesGenerator {
             .bind(py)
             .set_item("position", value)?;
         generator.is_position = true;
+        Ok(slf)
+    }
+
+    fn powerlaw<'py>( // XXX Document all these methods (+docstring)
+        slf: Bound<'py, Self>,
+        energy_min: f64,
+        energy_max: f64,
+        exponent: Option<f64>,
+        weight: Option<bool>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let exponent = exponent.unwrap_or(-1.0);
+        if energy_min >= energy_max || energy_min <= 0.0 {
+            let why = "expected energy_max > energy_min > 0.0";
+            let err = Error::new(ValueError).what("powerlaw").why(why);
+            return Err(err.to_err());
+        }
+
+        let py = slf.py();
+        let is_weights = {
+            let generator = slf.borrow();
+            if generator.is_energy {
+                let err = Error::new(ValueError)
+                    .what("powerlaw")
+                    .why("energy already defined");
+                return Err(err.to_err())
+            }
+            generator.weights.is_some()
+        };
+
+        let weight = weight.unwrap_or(is_weights);
+        if weight && !is_weights {
+            let mut generator = slf.borrow_mut();
+            generator.initialise_weights(py)?;
+        }
+
+        let generator = slf.borrow();
+        let particles_energy: &PyArray<f64> = generator
+            .particles
+            .bind(py)
+            .get_item("energy")?
+            .extract()?;
+        let weights: Option<&PyArray<f64>> = if weight {
+            generator
+                .weights
+                .as_ref()
+                .map(|weights| weights.bind(py).extract())
+                .transpose()?
+        } else {
+            None
+        };
+        let mut random = generator.random.bind(py).borrow_mut();
+        for i in 0..particles_energy.size() {
+            let (energy, energy_weight) = match exponent {
+                -1.0 => {
+                    let lne = (energy_max / energy_min).ln();
+                    let energy = energy_min * (random.open01() * lne).exp();
+                    (energy, energy * lne)
+                },
+                0.0 => {
+                    let de = energy_max - energy_min;
+                    let energy = de * random.open01() + energy_min;
+                    (energy, de)
+                },
+                exponent => {
+                    let a = exponent + 1.0;
+                    let b = energy_min.powf(a);
+                    let de = energy_max.powf(a) - b;
+                    let energy = (de * random.open01() + b).powf(1.0 / a);
+                    let weight = de / (a * energy.powf(exponent));
+                    (energy, weight) // XXX Test all 3 cases.
+                },
+            };
+            particles_energy.set(i, energy)?; // XXX clip.
+            if let Some(weights) = weights {
+                let weight = weights.get(i)? * energy_weight;
+                weights.set(i, weight)?;
+            }
+        }
+
+        drop(generator);
+        let mut generator = slf.borrow_mut();
+        generator.is_energy = true;
+
         Ok(slf)
     }
 
