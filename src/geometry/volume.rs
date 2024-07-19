@@ -13,7 +13,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
 use std::path::Path;
-use super::ffi;
+use super::{ffi, MaterialsDefinition};
 use super::map::Map;
 
 
@@ -36,6 +36,7 @@ pub struct Volume {
     pub(super) overlaps: Vec<[String; 2]>,
     pub(super) roles: ffi::Roles,
     pub(super) subtract: Vec<String>,
+    pub(super) materials: Option<MaterialsDefinition>,
 }
 
 pub enum Shape {
@@ -264,20 +265,20 @@ impl TryFromBound for Volume {
             .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
 
         // Extract base properties.
-        const EXTRACTOR: Extractor<6> = Extractor::new([
+        const EXTRACTOR: Extractor<7> = Extractor::new([
             Property::required_str("material"),
             Property::optional_strs("role"),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
             Property::optional_dict("overlaps"),
             Property::optional_strs("subtract"),
+            Property::optional_any("materials"),
         ]);
 
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, role, position, rotation, overlaps, subtract] = EXTRACTOR.extract(
-            &tag, value, Some(&mut remainder)
-        )?;
+        let [material, role, position, rotation, overlaps, subtract, materials] =
+            EXTRACTOR.extract(&tag, value, Some(&mut remainder))?;
 
         let name = tag.name().to_string();
         let material: String = material.into();
@@ -350,8 +351,16 @@ impl TryFromBound for Volume {
             Some(overlaps) => Self::flatten_overlaps(&tag, &overlaps, volumes.as_slice())?,
         };
 
+        // Extract materials.
+        let materials: Option<Bound<PyAny>> = materials.into();
+        let materials: PyResult<Option<MaterialsDefinition>> = materials
+            .map(|materials| MaterialsDefinition::try_from_any(&tag, &materials))
+            .transpose();
+        let materials = materials?;
+
         let volume = Self {
-            name, material, roles, shape, position, rotation, volumes, overlaps, subtract
+            name, material, roles, shape, position, rotation, volumes, overlaps, subtract,
+            materials
         };
         Ok(volume)
     }

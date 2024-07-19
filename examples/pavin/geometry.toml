@@ -6,6 +6,4 @@ material = "G4_WATER"
 sphere = 1E+02
 material = "G4_WATER"
 
-[Environment.Source.Detector]
-cylinder = { length = 5.08, radius = 2.54 }
-material = "G4_SODIUM_IODIDE"
+Detector = "detector.toml"

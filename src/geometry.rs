@@ -40,7 +40,7 @@ impl Geometry {
     #[new]
     pub fn new(volume: DictLike) -> PyResult<Self> {
         // XXX from GDML (manage memory by diffing G4SolidStore etc.).
-        let builder = GeometryBuilder::new(volume)?;
+        let mut builder = GeometryBuilder::new(volume)?;
         let geometry = builder.build()?;
         Ok(geometry)
     }
@@ -149,14 +149,18 @@ impl GeometryBuilder {
     }
 
     /// Build the Monte Carlo `Geometry`.
-    fn build(&self) -> PyResult<Geometry> {
-        // build materials.
+    fn build(&mut self) -> PyResult<Geometry> {
+        // Validate volumes.
+        self.definition.volume.validate()?;
+
+        // Build materials.
+        self.definition.materials = MaterialsDefinition::drain(
+            self.definition.materials.take(),
+            &mut self.definition.volume,
+        ); // XXX Document materials in volume.
         if let Some(materials) = self.definition.materials.as_ref() {
             materials.build()?;
         }
-
-        // Validate volumes.
-        self.definition.volume.validate()?;
 
         // Build volumes.
         let algorithm: ffi::TSTAlgorithm = self.algorithm.into();

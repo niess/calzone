@@ -1,0 +1,31 @@
+cylinder = { length = 82.500, radius = 10.000 }
+material = "G4_POLYVINYLIDENE_FLUORIDE"
+
+[Inside]
+cylinder = { length = 81.310, radius = 9.405 }
+material = "G4_AIR"
+
+[Inside.PMT]
+cylinder = { length = 12.540, radius = 2.935 }
+position = [0.0, 0.0, 0.0]
+material = "PMTBulk"
+
+[materials.mixtures.PMTBulk]
+density = 0.09
+state = "solid"
+composition = { O = 0.599, Si = 0.248, Na = 0.102, Ca = 0.051 }
+
+[Inside.Protection]
+cylinder = { length = 81.310, radius = 2.340 }
+position = [0.0, 0.0, 0.0]
+material = "G4_Al"
+
+[Inside.Protection.Reflector]
+cylinder = { length = 81.310, radius = 2.340 }
+position = [0.0, 0.0, 0.0]
+material = "G4_ALUMINUM_OXIDE"
+
+[Inside.Protection.Scintillator]
+cylinder = { length = 5.100, radius = 2.550 }
+position = [0.0, 0.0, 0.0]
+material = "G4_SODIUM_IODIDE"

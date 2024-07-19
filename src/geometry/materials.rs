@@ -5,6 +5,7 @@ use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use super::ffi;
+use super::volume::Volume;
 
 pub mod gate;
 mod hash;
@@ -50,6 +51,19 @@ impl MaterialsDefinition {
                 .to_result()?;
         }
         Ok(())
+    }
+
+    pub fn drain(mut slf: Option<Self>, volume: &mut Volume) -> Option<Self> {
+        if let Some(materials) = volume.materials.take() {
+            match slf.as_mut() {
+                None => slf = Some(materials),
+                Some(m) => m.extend(materials),
+            }
+        }
+        for daughter in volume.volumes.iter_mut() {
+            slf = Self::drain(slf, daughter);
+        }
+        slf
     }
 
     pub fn extend(&mut self, mut other: Self) {
