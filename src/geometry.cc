@@ -762,14 +762,21 @@ std::shared_ptr<Error> GeometryBorrow::check(int resolution) const {
     return get_error();
 }
 
-std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {
+static std::shared_ptr<Error> dump_gdml(
+    rust::Str path,
+    const G4VPhysicalVolume * volume
+) {
     clear_error();
     G4GDMLParser parser;
     auto buffer = std::cout.rdbuf();
     std::cout.rdbuf(nullptr); // Disable cout temporarly.
-    parser.Write(std::string(path), this->data->world);
+    parser.Write(std::string(path), volume);
     std::cout.rdbuf(buffer);
     return get_error();
+}
+
+std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {
+    return dump_gdml(path, this->data->world);
 }
 
 size_t GeometryBorrow::id() const {
@@ -977,6 +984,10 @@ VolumeInfo VolumeBorrow::describe() const {
         });
     }
     return info;
+}
+
+std::shared_ptr<Error> VolumeBorrow::dump(rust::Str path) const {
+    return dump_gdml(path, this->volume);
 }
 
 std::array<double, 6> VolumeBorrow::generate_onto(

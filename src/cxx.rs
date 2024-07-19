@@ -309,6 +309,7 @@ pub mod ffi {
         fn compute_surface(self: &VolumeBorrow) -> f64;
         fn compute_volume(self: &VolumeBorrow, include_daughters: bool) -> f64;
         fn describe(self: &VolumeBorrow) -> VolumeInfo;
+        fn dump(self: &VolumeBorrow, path: &str) -> SharedPtr<Error>;
         fn generate_onto(
             self: &VolumeBorrow,
             random: &mut RandomContext,

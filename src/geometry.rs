@@ -1,3 +1,4 @@
+use convert_case::{Case, Casing};
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::{Error, variant_explain};
 use crate::utils::error::ErrorKind::{IndexError, NotImplementedError, TypeError, ValueError};
@@ -21,8 +22,6 @@ pub mod tessellation;
 pub use map:: Map;
 pub use materials::MaterialsDefinition;
 
-
-// XXX Dump subvolumes?
 
 // ===============================================================================================
 //
@@ -510,7 +509,7 @@ impl Volume {
 
     /// The volume (local) name.
     #[getter]
-    fn get_name<'py>(&self) -> &str {
+    fn get_name<'py>(&self) -> &str { // XXX Document this.
         match self.path.rsplit_once('.') {
             None => self.path.as_str(),
             Some((_, name)) => name,
@@ -615,8 +614,26 @@ impl Volume {
         Ok(volume)
     }
 
+    /// Dump the volume geometry to a GDML file.
+    fn dump(&self, path: Option<String>) -> PyResult<()> { // XXX Document this.
+        let tmp = TempDir::new()?;
+        let path = path.unwrap_or_else(|| {
+            let name = self.get_name().to_case(Case::Snake);
+            format!("{}.gdml", name)
+        });
+        let tmp_path = tmp
+            .child("volume.gdml")
+            .display()
+            .to_string();
+        self.volume
+            .dump(tmp_path.as_str())
+            .to_result()?;
+        std::fs::copy(&tmp_path, path)?;
+        Ok(())
+    }
+
     /// Return the side of elements w.r.t. this volume.
-    fn side<'py>(
+    fn side<'py>( // XXX Document this.
         &self,
         elements: &Bound<'py, PyAny>,
         include_daughters: Option<bool>

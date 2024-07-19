@@ -79,6 +79,7 @@ struct VolumeBorrow {
     double compute_surface() const;
     double compute_volume(bool) const;
     VolumeInfo describe() const;
+    std::shared_ptr<Error> dump(rust::Str) const;
     std::array<double, 6> generate_onto(
         RandomContext &,
         const G4AffineTransform &,
