@@ -1,6 +1,6 @@
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::{Error, variant_explain};
-use crate::utils::error::ErrorKind::{IndexError, NotImplementedError, ValueError};
+use crate::utils::error::ErrorKind::{IndexError, NotImplementedError, TypeError, ValueError};
 use crate::utils::float::f64x3;
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
@@ -21,6 +21,8 @@ pub mod tessellation;
 pub use map:: Map;
 pub use materials::MaterialsDefinition;
 
+
+// XXX Dump subvolumes?
 
 // ===============================================================================================
 //
@@ -613,7 +615,64 @@ impl Volume {
         Ok(volume)
     }
 
-    // XXX Add "inside" method?
+    /// Return the side of elements w.r.t. this volume.
+    fn side<'py>(
+        &self,
+        elements: &Bound<'py, PyAny>,
+        include_daughters: Option<bool>
+    ) -> PyResult<PyObject> {
+        let py = elements.py();
+        let points: &PyArray<f64> = elements.get_item("position")
+            .unwrap_or(elements.clone())
+            .extract()
+            .map_err(|_| {
+                let why = format!("expected 'particles' or 'positions', found '{:?}'", elements);
+                Error::new(TypeError).what("elements").why(&why).to_err()
+            })?;
+        let mut shape = points.shape();
+        let dim = shape.pop().unwrap_or(0);
+        if dim != 3 {
+            let why = format!("expected 3-d elements, found {}-d values", dim);
+            let err = Error::new(TypeError).what("elements").why(&why);
+            return Err(err.to_err());
+        }
+        let include_daughters = include_daughters.unwrap_or(false);
+        let transform = self.volume.compute_transform("");
+        let result: PyObject = if shape.len() == 0 {
+            let point = [
+                points.get(0)?,
+                points.get(1)?,
+                points.get(2)?,
+            ];
+            let v: i32 = self.volume.inside(&point, &transform, include_daughters).into();
+            v.into_py(py)
+        } else {
+            let result = PyArray::<i32>::empty(py, &shape)?;
+            for i in 0..result.size() {
+                let point = [
+                    points.get(3 * i + 0)?,
+                    points.get(3 * i + 1)?,
+                    points.get(3 * i + 2)?,
+                ];
+                let v: i32 = self.volume.inside(&point, &transform, include_daughters).into();
+                result.set(i, v)?;
+            }
+            let result: &PyAny = result;
+            result.into_py(py)
+        };
+        Ok(result)
+    }
+}
+
+impl From<ffi::EInside> for i32 {
+    fn from(value: ffi::EInside) -> Self {
+        match value {
+            ffi::EInside::kInside => 1,
+            ffi::EInside::kSurface => 0,
+            ffi::EInside::kOutside => -1,
+            _ => 0,
+        }
+    }
 }
 
 impl Volume {

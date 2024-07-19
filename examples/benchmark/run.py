@@ -11,7 +11,8 @@ PREFIX = Path(__file__).parent
 # =============================================================================
 
 simulation = calzone.Simulation(PREFIX / "geometry.toml")
-simulation.geometry["Environment.Detector"].role = "catch_ingoing"
+detector = simulation.geometry.find("Detector")
+detector.role = "catch_ingoing"
 simulation.sample_particles = True
 simulation.secondaries = False
 
@@ -44,7 +45,7 @@ result = simulation.run(particles)
 #
 # =============================================================================
 
-collected = result.particles["Environment.Detector"]
+collected = result.particles[detector.path]
 source_density = 1E-05 # Bq/cm^3
 source_volume = simulation.geometry["Environment"].volume()
 total_activity = source_density * source_volume
