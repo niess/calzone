@@ -89,6 +89,7 @@ pub mod ffi {
     }
 
     struct VolumeInfo { // From Geant4.
+        path: String,
         material: String,
         solid: String,
         mother: String,
@@ -298,6 +299,7 @@ pub mod ffi {
         fn borrow_volume(self: &GeometryBorrow, name: &str) -> SharedPtr<VolumeBorrow>;
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
+        fn find_volume(self: &GeometryBorrow, stem: &str) -> SharedPtr<VolumeBorrow>;
         fn set_goupil(self: &GeometryBorrow);
 
         type VolumeBorrow;

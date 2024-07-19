@@ -571,7 +571,7 @@ impl<'py> VolumeArg<'py> {
                             .why("expected a 'Volume', found a 'str'");
                         err.to_err()
                     })?;
-                let volume = Volume::new(geometry, &path)?;
+                let volume = Volume::new(geometry, &path, true)?;
                 Cow::Owned(volume)
             },
             Self::Volume(volume) => Cow::Borrowed(volume.get()),

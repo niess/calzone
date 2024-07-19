@@ -46,10 +46,8 @@ impl Geometry {
     }
 
     fn __getitem__(&self, path: &str) -> PyResult<Volume> {
-        Volume::new(&self.0, path)
+        Volume::new(&self.0, path, true)
     }
-
-    // XXX Add a "find" (by name / stem) method.
 
     /// Check the geometry by looking for overlapping volumes.
     fn check(&self, resolution: Option<i32>) -> PyResult<()> {
@@ -85,6 +83,11 @@ impl Geometry {
         self.0.set_goupil();
         let args = (file,);
         external_geometry.call1(args)
+    }
+
+    /// Find a geometry volume matching the given stem.
+    fn find(&self, stem: &str) -> PyResult<Volume> {
+        Volume::new(&self.0, stem, false)
     }
 }
 
@@ -469,7 +472,7 @@ pub struct Volume {
     pub(crate) volume: SharedPtr<ffi::VolumeBorrow>,
     /// The volume absolute pathname.
     #[pyo3(get)]
-    name: String, // XXX Path and name properties.
+    path: String,
     /// The volume constitutive material.
     #[pyo3(get)]
     material: String,
@@ -501,6 +504,15 @@ impl Volume {
     #[getter]
     fn get_daughters<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {
         PyTuple::new_bound(py, &self.daughters)
+    }
+
+    /// The volume (local) name.
+    #[getter]
+    fn get_name<'py>(&self) -> &str {
+        match self.path.rsplit_once('.') {
+            None => self.path.as_str(),
+            Some((_, name)) => name,
+        }
     }
 
     #[getter]
@@ -605,13 +617,20 @@ impl Volume {
 }
 
 impl Volume {
-    pub fn new(geometry: &SharedPtr<ffi::GeometryBorrow>, path: &str) -> PyResult<Self> {
-        let volume = geometry.borrow_volume(path);
+    pub fn new(
+        geometry: &SharedPtr<ffi::GeometryBorrow>,
+        name: &str,
+        exact: bool
+    ) -> PyResult<Self> {
+        let volume = match exact {
+            true => geometry.borrow_volume(name),
+            false => geometry.find_volume(name),
+        };
         if let Some(msg) = ffi::get_error().value() {
             let err = Error::new(IndexError).what("volume").why(msg);
             return Err(err.into())
         }
-        let ffi::VolumeInfo { material, solid, mother, mut daughters } =
+        let ffi::VolumeInfo { path, material, solid, mother, mut daughters } =
             volume.describe();
         let mother = if mother.is_empty() {
             None
@@ -657,7 +676,7 @@ impl Volume {
 
         let volume = Volume {
             volume,
-            name: path.to_string(),
+            path,
             material,
             solid,
             mother,

@@ -11,12 +11,14 @@ PREFIX = Path(__file__).parent
 # =============================================================================
 
 simulation = calzone.Simulation(PREFIX / "geometry.toml")
-simulation.geometry["Environment.Source.Detector"].role = "record_deposits"
+scintillator = simulation.geometry.find("Scintillator")
+scintillator.role = "record_deposits"
 
 N = 100000
+source = simulation.geometry.find("Source")
 particles = simulation.particles(N) \
     .energy(1.0) \
-    .inside("Environment.Source") \
+    .inside(source) \
     .generate()
 
 deposits = simulation.run(particles)
@@ -27,8 +29,8 @@ deposits = simulation.run(particles)
 #
 # =============================================================================
 
-n = deposits["Environment.Source.Detector"].size
-source_volume = simulation.geometry["Environment.Source"].volume()
+n = deposits[scintillator.path].size
+source_volume = source.volume()
 
 litre = 1E-03 # cm3 to litre
 veff = source_volume * n / N * litre

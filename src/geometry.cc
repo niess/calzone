@@ -698,6 +698,44 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::borrow_volume(
     }
 }
 
+std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
+    rust::Str stem_
+) const {
+    auto stem = std::string(stem_);
+
+    std::function<G4VPhysicalVolume * (G4VPhysicalVolume *)> inspect;
+    inspect = [&](G4VPhysicalVolume * volume) -> G4VPhysicalVolume * {
+        auto && name = volume->GetName();
+        if (name.length() >= stem.length()) {
+            auto endswith = name.compare(
+                name.length() - stem.length(),
+                stem.length(),
+                stem
+            );
+            if (endswith == 0) return volume;
+        }
+        auto && logical = volume->GetLogicalVolume();
+        size_t n = logical->GetNoDaughters();
+        for (size_t i = 0; i < n; i++) {
+            auto && daughter = logical->GetDaughter(i);
+            auto result = inspect(daughter);
+            if (result != nullptr) {
+                return result;
+            }
+        }
+        return nullptr;
+    };
+
+    auto volume = inspect(this->data->world);
+    if (volume == nullptr) {
+        auto msg = fmt::format("unknown volume '*{}'", stem);
+        set_error(ErrorType::ValueError, msg.c_str());
+        return nullptr;
+    } else {
+        return std::make_shared<VolumeBorrow>(this->data, volume);
+    }
+}
+
 
 // ============================================================================
 //
@@ -918,6 +956,7 @@ double VolumeBorrow::compute_volume(bool include_daughters) const {
 
 VolumeInfo VolumeBorrow::describe() const {
     VolumeInfo info;
+    info.path = this->volume->GetName();
     auto logical = this->volume->GetLogicalVolume();
     info.material = rust::String(logical->GetMaterial()->GetName());
     info.solid = rust::String(logical->GetSolid()->GetEntityType());
