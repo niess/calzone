@@ -1,10 +1,10 @@
-CalZone
+Calzone
 =======
 *(CALorimeter ZONE)*
 
 ----
 
-CalZone is a `Geant4`_ Python wrapper for simulating the energy deposition by
+Calzone is a `Geant4`_ Python wrapper for simulating the energy deposition by
 high-energy particles in a calorimeter. The interface has been designed with
 simplicity in mind. Primary :py:func:`particles <calzone.particles>` are
 :py:meth:`injected <calzone.Simulation.run>` into the simulation
@@ -28,7 +28,7 @@ System of units
 
 .. note::
 
-   CalZone uses the Centimetre-Gram-Second (CGS) system of units (e.g.
+   Calzone uses the Centimetre-Gram-Second (CGS) system of units (e.g.
    g/cm\ :sup:`3` for a density), except for energies and momenta
    which are expressed in MeV and MeV/c respectively.
 

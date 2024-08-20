@@ -1,4 +1,4 @@
-project = "CalZone"
+project = "Calzone"
 copyright = "Université Clermont Auvergne, CNRS/IN2P3, LPCA"
 author = "Valentin Niess"
 release = "0.1.0"

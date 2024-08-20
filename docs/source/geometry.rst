@@ -2,7 +2,7 @@ Geometry definition
 ===================
 
 A `Geant4`_ Monte Carlo geometry consists of a hierarchy of nested
-`G4VPhysicalVolume`_\ s, starting from a single root ("world") volume. CalZone
+`G4VPhysicalVolume`_\ s, starting from a single root ("world") volume. Calzone
 represents this structure using base Python objects
 (:external:py:class:`bool`, :external:py:class:`dict`,
 :external:py:class:`float`, :external:py:class:`int`, :external:py:class:`list`
