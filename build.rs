@@ -1,32 +1,35 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 
 fn main() {
-    let geant4_prefix = {
-        let command = Command::new("geant4-config")
-            .arg("--prefix")
-            .output()
-            .expect("could not locate Geant4");
-        String::from_utf8(command.stdout)
-            .expect("could not parse Geant4 prefix")
-            .trim()
-            .to_string()
+    let command = Command::new("geant4-config")
+        .arg("--prefix")
+        .output();
+    let geant4_prefix = match command {
+        Ok(output) => {
+            String::from_utf8(output.stdout)
+                .expect("could not parse Geant4 prefix")
+                .trim()
+                .to_string()
+        },
+        Err(_) => {
+            let prefix = "geant4";
+            if !Path::new(prefix).is_dir() {
+                panic!("could not locate Geant4");
+            }
+            prefix.to_string()
+        },
     };
-    let geant4_include = Path::new(&geant4_prefix)
-        .join("include/Geant4");
-    let geant4_lib = Path::new(&geant4_prefix)
-        .join("lib"); // XXX might be lib64 on some systems.
-                      //
-    let goupil_prefix = "deps/goupil/src"; // XXX relative to this file?
-    let goupil_include = Path::new(&goupil_prefix)
-        .join("interfaces/geant4");
-    let goupil_source = Path::new(&goupil_prefix)
-        .join("interfaces/geant4/G4Goupil.cc");
+    let geant4_include = make_path(&geant4_prefix, &["include/Geant4"]);
+    let geant4_lib = make_path(&geant4_prefix, &["lib", "lib64"]);
 
-    let fmt_prefix = "deps/fmt"; // XXX relative to this file?
-    let fmt_include = Path::new(&fmt_prefix)
-        .join("include");
+    let goupil_prefix = "deps/goupil/src";
+    let goupil_include = make_path(&goupil_prefix, &["interfaces/geant4"]);
+    let goupil_source = make_path(&goupil_prefix, &["interfaces/geant4/G4Goupil.cc"]);
+
+    let fmt_prefix = "deps/fmt";
+    let fmt_include = make_path(&fmt_prefix, &["include"]);
 
     let sources = [
         "src/geometry.cc",
@@ -82,4 +85,15 @@ fn main() {
     println!("cargo:rustc-link-search={}", geant4_lib.display());
     println!("cargo:rustc-link-lib=G4gdml");
     println!("cargo:rustc-link-lib=G4physicslists");
+}
+
+fn make_path(prefix: &str, locations: &[&str]) -> PathBuf {
+    for location in locations {
+        let path = Path::new(prefix).join(location);
+        if path.exists() {
+            return path;
+        }
+    }
+    let path = Path::new(prefix).join(locations[0]);
+    panic!("missing {}", path.display())
 }
