@@ -1,15 +1,13 @@
 use process_path::get_dylib_path;
-
 use pyo3::prelude::*;
 use pyo3::exceptions::PySystemError;
 use pyo3::sync::GILOnceCell;
+use std::env;
 
 mod cxx;
 mod geometry;
 mod simulation;
 mod utils;
-
-// XXX Particles generator?
 
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
@@ -19,7 +17,7 @@ static FILE: GILOnceCell<String> = GILOnceCell::new();
 #[pymodule]
 fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
 
-    // Set module path.
+    // Set __file__.
     let py = module.py();
     {
         let filename = match get_dylib_path() {
@@ -31,6 +29,12 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
         FILE
             .set(py, filename)
             .unwrap();
+    }
+
+    // Set data path.
+    const DATA_KEY: &str = "GEANT4_DATA_DIR";
+    if let Err(_) = env::var(DATA_KEY) {
+        env::set_var(DATA_KEY, utils::data::default_path());
     }
 
     // Initialise interfaces.
@@ -52,6 +56,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add("Geant4Exception", py.get_type_bound::<utils::error::Geant4Exception>())?;
 
     // Register function(s).
+    module.add_function(wrap_pyfunction!(utils::data::download, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::materials::import, module)?)?;
     module.add_function(wrap_pyfunction!(simulation::source::particles, module)?)?;
 

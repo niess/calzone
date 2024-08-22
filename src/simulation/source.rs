@@ -80,6 +80,7 @@ pub struct ParticlesGenerator {
 }
 
 // XXX Pid / charge selector.
+// XXX Bufferize generator?
 
 #[pymethods]
 impl ParticlesGenerator {

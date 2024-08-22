@@ -1,6 +1,7 @@
 /Cargo.lock
 /docs/build
+/src/python/calzone/data
 /target
+/wheelhouse
 *.pyc
 *.so
-/wheelhouse
