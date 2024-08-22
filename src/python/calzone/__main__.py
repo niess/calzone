@@ -23,6 +23,11 @@ def main():
         help = "print configuration data."
     )
 
+    config.add_argument("-g", "--geant4-version",
+        help = "Geant4 version.",
+        action = "store_true",
+    )
+
     config.add_argument("-p", "--prefix",
         help = "Calzone installation prefix.",
         action = "store_true",
@@ -51,6 +56,8 @@ def main():
 
     if args.command == "config":
         result = []
+        if args.geant4_version:
+            result.append(calzone.GEANT4_VERSION)
         if args.prefix:
             result.append(os.path.dirname(__file__))
         if args.version:

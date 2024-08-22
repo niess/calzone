@@ -1,3 +1,4 @@
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -8,16 +9,20 @@ fn main() {
         .output();
     let geant4_prefix = match command {
         Ok(output) => {
-            String::from_utf8(output.stdout)
+            let geant4_prefix = String::from_utf8(output.stdout)
                 .expect("could not parse Geant4 prefix")
                 .trim()
-                .to_string()
+                .to_string();
+            export_geant4_version("geant4-config");
+            geant4_prefix
         },
         Err(_) => {
             let prefix = "geant4";
             if !Path::new(prefix).is_dir() {
                 panic!("could not locate Geant4");
             }
+            let geant4_config = format!("{prefix}/bin/geant4-config");
+            export_geant4_version(&geant4_config);
             prefix.to_string()
         },
     };
@@ -96,4 +101,27 @@ fn make_path(prefix: &str, locations: &[&str]) -> PathBuf {
     }
     let path = Path::new(prefix).join(locations[0]);
     panic!("missing {}", path.display())
+}
+
+fn export_geant4_version(geant4_config: &str) {
+    let output = Command::new(geant4_config)
+        .arg("--version")
+        .output()
+        .expect("could not fetch Geant4 version");
+    let geant4_version = String::from_utf8(output.stdout)
+        .expect("could not parse Geant4 version")
+        .trim()
+        .to_string();
+
+    let out_dir = env::var_os("OUT_DIR")
+        .unwrap();
+    let path = Path::new(&out_dir)
+        .join("geant4_version.rs");
+    std::fs::write(
+        &path,
+        format!(
+            "const GEANT4_VERSION: &str = \"{}\";",
+            geant4_version,
+        ),
+    ).unwrap();
 }

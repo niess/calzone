@@ -12,6 +12,9 @@ mod utils;
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
+// Fetch the Geant4 version (exported by the build script).
+include!(concat!(env!("OUT_DIR"), "/geant4_version.rs"));
+
 
 /// CALorimeter ZONE (CalZone)
 #[pymodule]
@@ -59,6 +62,9 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(utils::data::download, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::materials::import, module)?)?;
     module.add_function(wrap_pyfunction!(simulation::source::particles, module)?)?;
+
+    // Register constant(s).
+    module.add("GEANT4_VERSION", GEANT4_VERSION)?;
 
     // Register Geant4 finalisation.
     let dropper = wrap_pyfunction!(simulation::drop_simulation, module)?;
