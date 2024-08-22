@@ -1,0 +1,4 @@
+calzone
+numpy
+sphinx
+sphinx-book-theme
