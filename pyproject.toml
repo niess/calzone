@@ -21,6 +21,9 @@ dependencies = [
     "numpy >= 1.6.0",
 ]
 
+[project.scripts]
+calzone = "calzone.__main__:main"
+
 [project.urls]
 source = "https://github.com/niess/calzone"
 
