@@ -2,12 +2,11 @@ use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::io::{DictLike, PathString};
-use crate::utils::numpy::{PyArray, ShapeArg};
+use crate::utils::numpy::ShapeArg;
 use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
-use std::ffi::c_char;
 use std::pin::Pin;
 
 mod physics;
@@ -49,10 +48,10 @@ pub struct Simulation {
     sample_particles: bool,
     /// Flag controlling the production of secondary Monte Carlo particles.
     #[pyo3(get, set)]
-    secondaries: bool,
+    secondaries: bool, // XXX Rename to kill_secondaries?
     /// Flag controlling the recording of Monte Carlo tracks.
     #[pyo3(get, set)]
-    tracking: bool,
+    tracking: bool, // XXX Rename as well (record steps, maybe)?
 }
 
 #[pymethods]
@@ -137,14 +136,14 @@ impl Simulation {
 
     /// Run a Geant4 Monte Carlo simulation.
     #[pyo3(signature = (particles, /, verbose=false), text_signature="(particles, /)")]
-    fn run(
+    fn run<'py>(
         &self,
-        py: Python,
-        particles: Primaries<'_>,
+        particles: &Bound<'py, PyAny>,
         verbose: Option<bool>, // Hidden argument.
     ) -> PyResult<PyObject> {
+        let py = particles.py();
         let verbose = verbose.unwrap_or(false);
-
+        let particles = source::ParticlesIterator::new(particles)?;
         let mut agent = RunAgent::new(py, self, particles)?;
         let mut binding = self.random.bind(py).borrow_mut();
         let mut random = RandomContext::new(&mut binding);
@@ -218,7 +217,7 @@ pub fn drop_simulation() {
 pub struct RunAgent<'a> {
     geometry: SharedPtr<ffi::GeometryBorrow>,
     physics: ffi::Physics,
-    primaries: Primaries<'a>,
+    primaries: source::ParticlesIterator<'a>,
     // Iterator.
     index: usize,
     // Energy deposits.
@@ -233,7 +232,7 @@ pub struct RunAgent<'a> {
 
 impl<'a> RunAgent<'a> {
     pub fn events(&self) -> usize {
-        self.primaries.len()
+        self.primaries.size()
     }
 
     fn export(self, py: Python) -> PyResult<PyObject> {
@@ -309,7 +308,7 @@ impl<'a> RunAgent<'a> {
     fn new(
         py: Python,
         simulation: &Simulation,
-        primaries: Primaries<'a>,
+        primaries: source::ParticlesIterator<'a>,
     ) -> PyResult<Pin<Box<RunAgent<'a>>>> {
         let geometry = simulation.geometry
             .as_ref()
@@ -332,23 +331,7 @@ impl<'a> RunAgent<'a> {
     }
 
     pub fn next_primary(&mut self) -> ffi::Particle {
-        let primary = self.primaries.data(self.index).unwrap();
-        self.index += 1;
-        match self.primaries {
-            Primaries::Calzone(_) => {
-                let primary = unsafe { (primary as *const ffi::Particle).as_ref().unwrap() };
-                primary.clone()
-            },
-            Primaries::Goupil(_) => {
-                let state = unsafe { (primary as *const ffi::GoupilState).as_ref().unwrap() };
-                ffi::Particle {
-                    pid: 22,
-                    energy: state.energy,
-                    position: state.position,
-                    direction: state.direction,
-                }
-            },
-        }
+        self.primaries.next().unwrap().unwrap()
     }
 
     pub fn physics<'b>(&'b self) -> &'b ffi::Physics {
@@ -389,28 +372,6 @@ impl<'a> RunAgent<'a> {
         if let Some(tracker) = self.tracker.as_mut() {
             vertex.event = self.index;
             tracker.push_vertex(vertex)
-        }
-    }
-}
-
-#[derive(FromPyObject)] // XXX Any structured array with ("energy", "position", "direction") keys.
-enum Primaries<'a> {
-    Calzone(&'a PyArray<ffi::Particle>),
-    Goupil(&'a PyArray<ffi::GoupilState>),
-}
-
-impl<'a> Primaries<'a> {
-    fn data(&self, index: usize) -> PyResult<*mut c_char> {
-        match self {
-            Self::Calzone(v) => v.data(index),
-            Self::Goupil(v) => v.data(index),
-        }
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            Self::Calzone(v) => v.len().unwrap(),
-            Self::Goupil(v) => v.len().unwrap(),
         }
     }
 }

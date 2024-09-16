@@ -1,9 +1,9 @@
 use crate::geometry::{Geometry, Volume};
 use crate::utils::error::{ctrlc_catched, Error, variant_explain};
-use crate::utils::error::ErrorKind::{KeyboardInterrupt, NotImplementedError, TypeError,
+use crate::utils::error::ErrorKind::{KeyboardInterrupt, KeyError, NotImplementedError, TypeError,
                                      ValueError};
 use crate::utils::float::f64x3;
-use crate::utils::numpy::{PyArray, ShapeArg};
+use crate::utils::numpy::{Dtype, PyArray, ShapeArg};
 use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
 use enum_variants_strings::EnumVariantsStrings;
@@ -59,6 +59,119 @@ pub fn particles(
     Ok(array.into())
 }
 
+
+// ===============================================================================================
+//
+// Primaries iterator.
+//
+// ===============================================================================================
+
+pub struct ParticlesIterator<'a> {
+    energy: &'a PyArray<f64>,
+    position: &'a PyArray<f64>,
+    direction: &'a PyArray<f64>,
+    pid: Option<&'a PyArray<i32>>,
+    size: usize,
+    index: usize,
+}
+
+impl<'a> ParticlesIterator<'a> {
+    pub fn new<'py: 'a>(elements: &'a Bound<'py, PyAny>) -> PyResult<Self> {
+        let energy = extract(elements, "energy")?;
+        let position = extract(elements, "position")?;
+        let direction = extract(elements, "direction")?;
+        let pid = extract(elements, "pid").ok();
+        if *position.shape().last().unwrap_or(&0) != 3 {
+            let why = format!("expected a shape '[..,3]' array, found '{:?}'", position.shape());
+            let err = Error::new(ValueError)
+                .what("particles position")
+                .why(&why)
+                .to_err();
+            return Err(err);
+        }
+        if *direction.shape().last().unwrap_or(&0) != 3 {
+            let why = format!("expected a shape '[..,3]' array, found '{:?}'", direction.shape());
+            let err = Error::new(ValueError)
+                .what("particles direction")
+                .why(&why)
+                .to_err();
+            return Err(err);
+        }
+        let size = energy.size();
+        let others = [
+            position.size() / 3,
+            direction.size() / 3,
+            pid.map(|a| a.size()).unwrap_or(size),
+        ];
+        if others.iter().any(|x| *x != size) {
+            let err = Error::new(ValueError)
+                .what("particles")
+                .why("differing arrays sizes")
+                .to_err();
+            return Err(err);
+        }
+        let index = 0;
+        let iter = Self {
+            energy, position, direction, pid, size, index
+        };
+        Ok(iter)
+    }
+
+    fn get(&self, index: usize) -> PyResult<ffi::Particle> {
+        let pid = match self.pid {
+            None => 21, // Default to photon.
+            Some(pid) => pid.get(index)?,
+        };
+        let particle = ffi::Particle {
+            pid,
+            energy: self.energy.get(index)?,
+            position: [
+                self.position.get(3 * index)?,
+                self.position.get(3 * index + 1)?,
+                self.position.get(3 * index + 2)?,
+            ],
+            direction: [
+                self.direction.get(3 * index)?,
+                self.direction.get(3 * index + 1)?,
+                self.direction.get(3 * index + 2)?,
+            ],
+        };
+        Ok(particle)
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+}
+
+pub fn extract<'a, 'py, T>(elements: &'a Bound<'py, PyAny>, key: &str) -> PyResult<&'a PyArray<T>>
+where
+    'py: 'a,
+    T: Dtype,
+{
+    let py = elements.py();
+    elements.get_item(key)
+        .map_err(|err| {
+            Error::new(KeyError)
+                .what("particles")
+                .why(&err.value_bound(py).to_string()).to_err()
+        })?
+        .extract()
+}
+
+impl<'a> Iterator for ParticlesIterator<'a> {
+    type Item = PyResult<ffi::Particle>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.size {
+            let item = Some(self.get(self.index));
+            self.index += 1;
+            item
+        } else {
+            None
+        }
+    }
+}
 
 // ===============================================================================================
 //
@@ -487,27 +600,23 @@ impl ParticlesGenerator {
         };
         let mut random = generator.random.bind(py).borrow_mut();
         for i in 0..particles_energy.size() {
-            let (energy, energy_weight) = match exponent {
-                -1.0 => {
-                    let lne = (energy_max / energy_min).ln();
-                    let energy = energy_min * (random.open01() * lne).exp();
-                    (energy, energy * lne)
-                },
-                0.0 => {
-                    let de = energy_max - energy_min;
-                    let energy = de * random.open01() + energy_min;
-                    (energy, de)
-                },
-                exponent => {
-                    let a = exponent + 1.0;
-                    let b = energy_min.powf(a);
-                    let de = energy_max.powf(a) - b;
-                    let energy = (de * random.open01() + b).powf(1.0 / a);
-                    let weight = de / (a * energy.powf(exponent));
-                    (energy, weight) // XXX Test all 3 cases.
-                },
+            let (energy, energy_weight) = if exponent == -1.0 {
+                let lne = (energy_max / energy_min).ln();
+                let energy = energy_min * (random.open01() * lne).exp();
+                (energy, energy * lne)
+            } else if exponent == 0.0 {
+                let de = energy_max - energy_min;
+                let energy = de * random.open01() + energy_min;
+                (energy, de)
+            } else {
+                let a = exponent + 1.0;
+                let b = energy_min.powf(a);
+                let de = energy_max.powf(a) - b;
+                let energy = (de * random.open01() + b).powf(1.0 / a);
+                let weight = de / (a * energy.powf(exponent));
+                (energy, weight)
             };
-            particles_energy.set(i, energy)?; // XXX clip.
+            particles_energy.set(i, energy)?;
             if let Some(weights) = weights {
                 let weight = weights.get(i)? * energy_weight;
                 weights.set(i, weight)?;

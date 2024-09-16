@@ -218,15 +218,6 @@ pub mod ffi {
     // ===========================================================================================
 
     #[derive(Clone, Copy)]
-    struct GoupilState {
-        energy: f64,
-        position: [f64; 3],
-        direction: [f64; 3],
-        length: f64,
-        weight: f64,
-    }
-
-    #[derive(Clone, Copy)]
     struct Particle {
         pid: i32,
         energy: f64,

@@ -1,5 +1,5 @@
 // Calzone interface.
-use crate::cxx::ffi::{GoupilState, Particle, SampledParticle, Track, Vertex};
+use crate::cxx::ffi::{Particle, SampledParticle, Track, Vertex};
 use crate::simulation::sampler::{LineDeposit, PointDeposit, TotalDeposit};
 // PyO3 interface.
 use pyo3::prelude::*;
@@ -26,7 +26,6 @@ struct ArrayInterface {
     // Type objects.
     dtype_f32: PyObject,
     dtype_f64: PyObject,
-    dtype_goupil_state: PyObject,
     dtype_i32: PyObject,
     dtype_line_deposit: PyObject,
     dtype_particle: PyObject,
@@ -119,19 +118,6 @@ pub fn initialise(py: Python) -> PyResult<()> {
     let dtype_f64: PyObject = dtype
         .call1(("f8",))?
         .into_py(py);
-
-    let dtype_goupil_state: PyObject = {
-        let arg: [PyObject; 5] = [
-            ("energy", "f8").into_py(py),
-            ("position", "f8", 3).into_py(py),
-            ("direction", "f8", 3).into_py(py),
-            ("length", "f8").into_py(py),
-            ("weight", "f8").into_py(py),
-        ];
-        dtype
-            .call1((arg,))?
-            .into_py(py)
-    };
 
     let dtype_i32: PyObject = dtype
         .call1(("i4",))?
@@ -246,7 +232,6 @@ pub fn initialise(py: Python) -> PyResult<()> {
         // Type objects.
         dtype_f32,
         dtype_f64,
-        dtype_goupil_state,
         dtype_i32,
         dtype_line_deposit,
         dtype_particle,
@@ -698,13 +683,6 @@ impl Dtype for f64 {
     #[inline]
     fn dtype(py: Python) -> PyResult<PyObject> {
         Ok(api(py).dtype_f64.clone_ref(py))
-    }
-}
-
-impl Dtype for GoupilState {
-    #[inline]
-    fn dtype(py: Python) -> PyResult<PyObject> {
-        Ok(api(py).dtype_goupil_state.clone_ref(py))
     }
 }
 
