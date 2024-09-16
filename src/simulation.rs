@@ -2,7 +2,6 @@ use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::io::{DictLike, PathString};
-use crate::utils::numpy::ShapeArg;
 use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
@@ -124,14 +123,13 @@ impl Simulation {
     fn particles(
         &self,
         py: Python,
-        shape: ShapeArg,
         weight: Option<bool>,
     ) -> PyResult<source::ParticlesGenerator> {
         let geometry = self.geometry
             .as_ref()
             .map(|geometry| geometry.bind(py));
         let random = Some(self.random.bind(py).clone());
-        source::ParticlesGenerator::new(py, shape, geometry, random, weight)
+        source::ParticlesGenerator::new(py, geometry, random, weight)
     }
 
     /// Run a Geant4 Monte Carlo simulation.
@@ -331,6 +329,7 @@ impl<'a> RunAgent<'a> {
     }
 
     pub fn next_primary(&mut self) -> ffi::Particle {
+        self.index += 1;
         self.primaries.next().unwrap().unwrap()
     }
 

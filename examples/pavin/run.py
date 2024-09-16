@@ -16,10 +16,10 @@ scintillator.role = "record_deposits"
 
 N = 100000
 source = simulation.geometry.find("Source")
-particles = simulation.particles(N) \
+particles = simulation.particles() \
     .energy(1.0) \
     .inside(source) \
-    .generate()
+    .generate(N)
 
 deposits = simulation.run(particles)
 

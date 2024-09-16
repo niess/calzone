@@ -99,9 +99,15 @@ impl Random {
         Ok(())
     }
 
+    #[inline]
     pub(super) fn open01(&mut self) -> f64 {
         self.index += 1;
         self.rng.sample::<f64, Open01>(Open01)
+    }
+
+    #[inline]
+    pub(super) fn uniform(&mut self, a: f64, b: f64) -> f64 {
+        (b - a) * self.open01() + a
     }
 }
 
@@ -115,6 +121,10 @@ impl Random {
 pub struct RandomContext<'a> (&'a mut Random);
 
 impl<'a> RandomContext<'a> {
+    pub fn get(&mut self) -> &mut Random {
+        &mut self.0
+    }
+
     pub fn next_open01(&mut self) -> f64 {
         self.0.open01()
     }

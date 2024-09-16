@@ -32,10 +32,10 @@ emission_lines = (
     (1.764, 15.3),
     (2.204,  4.9),
 )
-particles = simulation.particles(N) \
+particles = simulation.particles() \
     .spectrum(emission_lines) \
     .inside("Environment") \
-    .generate()
+    .generate(N)
 
 result = simulation.run(particles)
 

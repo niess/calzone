@@ -5,13 +5,15 @@ use crate::utils::error::ErrorKind::{KeyboardInterrupt, KeyError, NotImplemented
 use crate::utils::float::f64x3;
 use crate::utils::numpy::{Dtype, PyArray, ShapeArg};
 use crate::utils::tuple::NamedTuple;
-use cxx::SharedPtr;
+use cxx::{SharedPtr, UniquePtr};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySlice, PyString};
-use std::borrow::Cow;
+use pyo3::types::{PyDict, PyString};
 use super::ffi;
 use super::random::{Random, RandomContext};
+
+
+const DEFAULT_PID: i32 = 22; // A photon.
 
 
 // ===============================================================================================
@@ -119,7 +121,7 @@ impl<'a> ParticlesIterator<'a> {
 
     fn get(&self, index: usize) -> PyResult<ffi::Particle> {
         let pid = match self.pid {
-            None => 21, // Default to photon.
+            None => DEFAULT_PID,
             Some(pid) => pid.get(index)?,
         };
         let particle = ffi::Particle {
@@ -181,464 +183,367 @@ impl<'a> Iterator for ParticlesIterator<'a> {
 
 #[pyclass(module="calzone")]
 pub struct ParticlesGenerator {
-    particles: PyObject,
     random: Py<Random>,
     geometry: Option<SharedPtr<ffi::GeometryBorrow>>,
-    weights: Option<PyObject>,
-    // Status flags.
-    is_pid: bool,
-    is_energy: bool,
-    is_position: bool,
-    is_direction: bool,
+    // Configuration.
+    direction: Direction,
+    energy: Energy,
+    pid: Option<i32>,
+    position: Position,
+    // Weight flags.
+    weight: bool,
+    weight_direction: Option<bool>,
+    weight_energy: Option<bool>,
+    weight_position: Option<bool>,
 }
 
-// XXX Pid / charge selector.
-// XXX Bufferize generator?
+#[derive(Default)]
+enum Direction {
+    #[default]
+    None,
+    Point([f64; 3]),
+    SolidAngle { phi: [f64; 2], cos_theta: [f64; 2] },
+}
+
+#[derive(Default)]
+enum Energy {
+    #[default]
+    None,
+    Point(f64),
+    PowerLaw { energy_min: f64, energy_max: f64, exponent: f64 },
+    Spectrum { lines: Vec<EmissionLine>, total_intensity: f64 },
+}
+
+struct EmissionLine {
+    energy: f64,
+    intensity: f64,
+}
+
+#[derive(Default)]
+enum Position {
+    Inside { volume: Volume, include_daughters: bool },
+    #[default]
+    None,
+    Onto { volume: Volume, direction: Option<DirectionArg> },
+    Point([f64; 3]),
+}
 
 #[pymethods]
 impl ParticlesGenerator {
     #[new]
+    #[pyo3(signature=(*, geometry=None, random=None, weight=None))]
     pub fn new<'py>(
         py: Python<'py>,
-        shape: ShapeArg,
         geometry: Option<&Bound<'py, Geometry>>,
         random: Option<Bound<'py, Random>>,
         weight: Option<bool>,
     ) -> PyResult<Self> {
-        let shape: Vec<usize> = shape.into();
-        let particles = {
-            let particles: &PyAny = PyArray::<ffi::Particle>::zeros(py, &shape)?;
-            let particles: PyObject = particles.into();
-            particles
-        };
-        let weights = match weight.unwrap_or(false) {
-            false => None,
-            true => Some(Self::new_weights(py, &shape)?),
-        };
+        let weight = weight.unwrap_or(false);
         let random = match random {
             None => Py::new(py, Random::new(None)?)?,
             Some(random) => random.unbind(),
         };
         let geometry = geometry.map(|geometry| geometry.borrow().0.clone());
         let generator = Self {
-            particles, random, geometry, weights,
-            is_pid: false,
-            is_energy: false,
-            is_position: false,
-            is_direction: false,
+            random,
+            geometry,
+            direction: Direction::default(),
+            energy: Energy::default(),
+            pid: None,
+            position: Position::default(),
+            weight,
+            weight_direction: None,
+            weight_energy: None,
+            weight_position: None,
         };
         Ok(generator)
     }
 
+    /// Fix the Monte Carlo particles direction.
+    #[pyo3(signature=(value, /))]
     fn direction<'py>(
         slf: Bound<'py, Self>,
-        value: &Bound<'py, PyAny>,
+        value: [f64; 3],
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
         let mut generator = slf.borrow_mut();
-        if generator.is_direction {
-            let err = Error::new(ValueError)
-                .what("direction")
-                .why("direction already defined");
-            return Err(err.to_err())
-        }
-        generator.particles
-            .bind(py)
-            .set_item("direction", value)?;
-        generator.is_direction = true;
+        generator.direction = Direction::Point(value);
+        generator.weight_direction = Some(false);
         Ok(slf)
     }
 
+    /// Fix the Monte Carlo particles energy.
+    #[pyo3(signature=(value, /))]
     fn energy<'py>(
         slf: Bound<'py, Self>,
-        value: &Bound<'py, PyAny>,
+        value: f64,
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
         let mut generator = slf.borrow_mut();
-        if generator.is_energy {
-            let err = Error::new(ValueError)
-                .what("energy")
-                .why("energy already defined");
-            return Err(err.to_err())
-        }
-        generator.particles
-            .bind(py)
-            .set_item("energy", value)?;
-        generator.is_energy = true;
+        generator.energy = Energy::Point(value);
+        generator.weight_energy = Some(false);
         Ok(slf)
     }
 
-    fn generate<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        if !self.is_pid {
-            self.particles.bind(py).set_item("pid", 22)?;
-            self.is_pid = true;
+    /// Generate Monte Carlo particles according to the current settings.
+    #[pyo3(signature=(shape=None, /))]
+    fn generate<'py>(&self, py: Python<'py>, shape: Option<ShapeArg>) -> PyResult<PyObject> {
+        // Check configuration.
+        if let Position::Onto { direction, .. } = self.position {
+            if let Some(direction) = direction {
+                match &self.direction {
+                    Direction::None => (),
+                    _ => {
+                        let why = format!(
+                            "'{}' conflicts with 'onto/{}'",
+                            self.direction.display(),
+                            direction.to_str(),
+                        );
+                        let err = Error::new(ValueError)
+                            .what("configuration")
+                            .why(&why);
+                        return Err(err.to_err())
+                    },
+                }
+            }
         }
 
-        if !self.is_energy {
-            self.particles.bind(py).set_item("energy", 1.0)?;
-            self.is_energy = true;
+        // Create particles container.
+        let shape: Vec<usize> = match shape {
+            Some(shape) => shape.into(),
+            None => Vec::new(),
+        };
+        let array = PyArray::<ffi::Particle>::zeros(py, &shape)?;
+        let particles = unsafe { array.slice_mut()? };
+        let weights = {
+            let direction = self.weight_direction.unwrap_or(self.weight);
+            let energy = self.weight_energy.unwrap_or(self.weight);
+            let position = self.weight_position.unwrap_or(self.weight);
+            direction || energy || position
+        };
+        let weights = if weights {
+            let weights = PyArray::<f64>::zeros(py, &shape)?;
+            Some(weights)
+        } else {
+            None
+        };
+
+        // Prepare specific generators.
+        let (mut inside, onto) = match &self.position {
+            Position::Inside { volume, include_daughters } => {
+                let inside = InsideGenerator::new(volume, *include_daughters);
+                (Some(inside), None)
+            },
+            Position::Onto { volume, direction } => {
+                let weight = self.weight_position.unwrap_or(self.weight);
+                let onto = OntoGenerator::new(volume, *direction, weight);
+                (None, Some(onto))
+            },
+            _ => (None, None),
+        };
+
+        // Bind PRNG.
+        let mut binding = self.random.bind(py).borrow_mut();
+        let mut random = RandomContext::new(&mut binding);
+
+        // Loop over events.
+        for (event, particle) in particles.iter_mut().enumerate() {
+            if (event % 1000) == 0 && ctrlc_catched() {
+                return Err(Error::new(KeyboardInterrupt).to_err())
+            }
+            particle.pid = match self.pid {
+                None => DEFAULT_PID,
+                Some(pid) => pid,
+            };
+
+            let mut weight = 1.0;
+
+            let direction = match self.position {
+                Position::Inside { .. } => {
+                    particle.position = inside.as_mut().unwrap().generate(random.get())?;
+                    false
+                },
+                Position::None => false,
+                Position::Point(position) => {
+                    particle.position = position;
+                    false
+                },
+                Position::Onto { .. } => onto.as_ref().unwrap().generate(
+                    &mut random,
+                    particle,
+                    &mut weight,
+                ),
+            };
+
+            if !direction {
+                self.generate_direction(random.get(), particle, &mut weight);
+            }
+            self.generate_energy(random.get(), particle, &mut weight);
+
+            if let Some(weights) = weights {
+                weights.set(event, weight)?;
+            }
         }
 
-        if !self.is_position {
-            // Positions are already initialised to 0.
-            self.is_position = true;
+        // Apply volume weight, if needed.
+        if let Some(weights) = weights {
+            if self.weight_position.unwrap_or(self.weight) {
+                if let Position::Inside { volume, include_daughters } = &self.position {
+                    let has_volume = if *include_daughters {
+                        volume.properties.has_cubic_volume
+                    } else {
+                        volume.properties.has_exclusive_volume
+                    };
+                    let cubic_volume = match has_volume {
+                        true => volume.volume.compute_volume(*include_daughters),
+                        false => inside.as_ref().unwrap().compute_volume(),
+                    };
+                    for i in 0..weights.size() {
+                        let weight = weights.get(i)? * cubic_volume;
+                        weights.set(i, weight)?;
+                    }
+                }
+            }
         }
 
-        if !self.is_direction {
-            self.generate_solid_angle(py, None, None, None)?;
-        }
-
-        match self.weights.as_ref() {
-            None => Ok(self.particles.bind(py).clone().into_any()),
+        // Return result.
+        let array: &PyAny = array;
+        let array: PyObject = array.into();
+        let result = match weights {
             Some(weights) => {
                 static RESULT: NamedTuple<2> = NamedTuple::new(
                     "Result", ["particles", "weights"]);
-                RESULT.instance(py, (&self.particles, weights))
+                let weights: &PyAny = weights;
+                let weights: PyObject = weights.into();
+                RESULT.instance(py, (array, weights))?.unbind()
             },
-        }
+            None => array,
+        };
+        Ok(result)
     }
 
+    /// Set particles positions to be distributed inside a volume.
+    #[pyo3(signature=(volume, /, *, include_daughters=None, weight=None))]
+    #[pyo3(text_signature="(volume, /, *, include_daughters=False, weight=None)")]
     fn inside<'py>(
         slf: Bound<'py, Self>,
         volume: VolumeArg,
         include_daughters: Option<bool>,
         weight: Option<bool>,
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
-        let is_weights = {
-            let generator = slf.borrow();
-            if generator.is_position {
-                let err = Error::new(ValueError)
-                    .what("inside")
-                    .why("position already defined");
-                return Err(err.to_err())
-            }
-            generator.weights.is_some()
-        };
-
-        let volume = volume.resolve(slf.borrow().geometry.as_ref())?;
-
         let include_daughters = include_daughters.unwrap_or(false);
-        let has_volume = if include_daughters {
-            volume.properties.has_cubic_volume
-        } else {
-            volume.properties.has_exclusive_volume
-        };
-
-        let weight = weight.unwrap_or(is_weights);
-        if weight && !is_weights {
-            let mut generator = slf.borrow_mut();
-            generator.initialise_weights(py)?;
-        }
-
-        let [xmin, xmax, ymin, ymax, zmin, zmax] = volume.volume.compute_box("");
-        let transform = volume.volume.compute_transform("");
-        let generator = slf.borrow();
-        let positions: &PyArray<f64> = generator
-            .particles
-            .bind(py)
-            .get_item("position")?
-            .extract()?;
-        let weights: Option<&PyArray<f64>> = if weight {
-            generator
-                .weights
-                .as_ref()
-                .map(|weights| weights.bind(py).extract())
-                .transpose()?
-        } else {
-            None
-        };
-        let mut random = generator.random.bind(py).borrow_mut();
-        let n = positions.size() / 3;
-        let mut trials = 0;
-        let mut i = 0_usize;
-        while i < n {
-            let r = [
-                (xmax - xmin) * random.open01() + xmin,
-                (ymax - ymin) * random.open01() + ymin,
-                (zmax - zmin) * random.open01() + zmin,
-            ];
-            if volume.volume.inside(&r, &transform, include_daughters) == ffi::EInside::kInside {
-                for j in 0..3 {
-                    positions.set(3 * i + j, r[j])?;
-                }
-                i += 1;
-            }
-            trials += 1;
-            if ((trials % 1000) == 0) && ctrlc_catched() {
-                return Err(Error::new(KeyboardInterrupt).to_err())
-            }
-        }
-        if let Some(weights) = weights {
-            let cubic_volume = match has_volume {
-                true => {
-                    volume.volume.compute_volume(include_daughters)
-                },
-                false => {
-                    let p = (n as f64) / (trials as f64);
-                    (xmax - xmin) * (ymax - ymin) * (zmax - zmin) * p
-                },
-            };
-            for i in 0..n {
-                let weight = weights.get(i)? * cubic_volume;
-                weights.set(i, weight)?;
-            }
-        }
-
-        drop(generator);
         let mut generator = slf.borrow_mut();
-        generator.is_position = true;
-
+        let volume = volume.resolve(generator.geometry.as_ref())?;
+        generator.weight_position = weight;
+        generator.position = Position::Inside { volume, include_daughters };
         Ok(slf)
     }
 
+    /// Set particles positions to be distributed onto a volume surface.
     fn onto<'py>(
         slf: Bound<'py, Self>,
         volume: VolumeArg,
         direction: Option<String>,
         weight: Option<bool>,
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
         let direction = direction
-            .map(|direction| Direction::from_str(direction.as_str())
+            .map(|direction| DirectionArg::from_str(direction.as_str())
                 .map_err(|options| {
                     let why = variant_explain(direction.as_str(), options);
                     Error::new(ValueError).what("direction").why(&why).to_err()
                 })
             )
             .transpose()?;
-        let is_weights = {
-            let generator = slf.borrow();
-            if generator.is_position {
-                let err = Error::new(ValueError)
-                    .what("onto")
-                    .why("position already defined");
-                return Err(err.to_err())
-            }
-            if direction.is_some() && generator.is_direction {
-                let err = Error::new(ValueError)
-                    .what("onto")
-                    .why("direction already defined");
-                return Err(err.to_err())
-            }
-            generator.weights.is_some()
-        };
-
-        let weight = weight.unwrap_or(is_weights);
-        let volume = volume.resolve(slf.borrow().geometry.as_ref())?;
+        let mut generator = slf.borrow_mut();
+        let volume = volume.resolve(generator.geometry.as_ref())?;
+        let weight_position = generator.weight_position.unwrap_or(generator.weight);
         if !volume.properties.has_surface_generation ||
-            (weight && !volume.properties.has_surface_area) {
+            (weight_position && !volume.properties.has_surface_area) {
             let why = format!("not implemented for '{}'", volume.solid);
             let err = Error::new(NotImplementedError)
                 .what("onto operation")
                 .why(&why);
             return Err(err.to_err());
         }
-
-        if weight && !is_weights {
-            let mut generator = slf.borrow_mut();
-            generator.initialise_weights(py)?;
-        }
-
-        let transform = volume.volume.compute_transform("");
-        let generator = slf.borrow();
-        let particles = generator.particles.bind(py);
-        let positions: &PyArray<f64> = particles
-            .get_item("position")?
-            .extract()?;
-        let directions: Option<&PyArray<f64>> = if direction.is_some() {
-            Some(particles
-                .get_item("direction")?
-                .extract()?
-            )
-        } else {
-            None
-        };
-        let weights: Option<&PyArray<f64>> = if weight {
-            generator
-                .weights
-                .as_ref()
-                .map(|weights| weights.bind(py).extract())
-                .transpose()?
-        } else {
-            None
-        };
-        let mut binding = generator.random.bind(py).borrow_mut();
-        let mut random = RandomContext::new(&mut binding);
-        let n = positions.size() / 3;
-        for i in 0..n {
-            let data = volume.volume.generate_onto(
-                &mut random,
-                &transform,
-                direction.is_some()
-            );
-            for j in 0..3 {
-                positions.set(3 * i + j, data[j])?;
-            }
-            if let Some(directions) = directions {
-                let mut direction = match direction.as_ref().unwrap() {
-                    Direction::Ingoing => f64x3::new(-data[3], -data[4], -data[5]),
-                    Direction::Outgoing => f64x3::new(data[3], data[4], data[5]),
-                };
-                let cos_theta = random.next_open01().sqrt(); // cosine distribution.
-                let phi = 2.0 * std::f64::consts::PI * random.next_open01();
-                direction.rotate(cos_theta, phi);
-                let direction: [f64; 3] = direction.into();
-                for j in 0..3 {
-                    directions.set(3 * i + j, direction[j])?;
-                }
-            }
-        }
-        if let Some(weights) = weights {
-            let surface = volume.volume.compute_surface();
-            let solid_angle = if direction.is_some() {
-                std::f64::consts::PI
-            } else {
-                1.0
-            };
-            let generation_weight = surface * solid_angle;
-            for i in 0..n {
-                let weight = weights.get(i)? * generation_weight;
-                weights.set(i, weight)?;
-            }
-        }
-
-        drop(generator);
-        let mut generator = slf.borrow_mut();
-        generator.is_position = true;
-        if direction.is_some() {
-            generator.is_direction = true;
-        }
-
+        generator.weight_position = weight;
+        generator.position = Position::Onto { volume, direction };
         Ok(slf)
     }
 
+    /// Fix the Monte Carlo particles type.
+    #[pyo3(signature=(value, /))]
     fn pid<'py>(
         slf: Bound<'py, Self>,
-        value: &Bound<'py, PyAny>,
+        value: i32,
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
         let mut generator = slf.borrow_mut();
-        if generator.is_pid {
-            let err = Error::new(ValueError)
-                .what("pid")
-                .why("pid already defined");
-            return Err(err.to_err())
-        }
-        generator.particles
-            .bind(py)
-            .set_item("pid", value)?;
-        generator.is_pid = true;
+        generator.pid = Some(value);
         Ok(slf)
     }
 
+    /// Fix the Monte Carlo particles position.
     fn position<'py>(
         slf: Bound<'py, Self>,
-        value: &Bound<'py, PyAny>,
+        value: [f64; 3],
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
         let mut generator = slf.borrow_mut();
-        if generator.is_position {
-            let err = Error::new(ValueError)
-                .what("position")
-                .why("position already defined");
-            return Err(err.to_err())
-        }
-        generator.particles
-            .bind(py)
-            .set_item("position", value)?;
-        generator.is_position = true;
+        generator.position = Position::Point(value);
+        generator.weight_position = Some(false);
         Ok(slf)
     }
 
-    fn powerlaw<'py>( // XXX Document all these methods (+docstring)
+    /// Set particles energy to follow a power-law.
+    #[pyo3(signature=(energy_min, energy_max, /, *, exponent=None, weight=None))]
+    fn powerlaw<'py>(
         slf: Bound<'py, Self>,
         energy_min: f64,
         energy_max: f64,
         exponent: Option<f64>,
         weight: Option<bool>,
     ) -> PyResult<Bound<'py, Self>> {
-        let exponent = exponent.unwrap_or(-1.0);
         if energy_min >= energy_max || energy_min <= 0.0 {
             let why = "expected energy_max > energy_min > 0.0";
             let err = Error::new(ValueError).what("powerlaw").why(why);
             return Err(err.to_err());
         }
-
-        let py = slf.py();
-        let is_weights = {
-            let generator = slf.borrow();
-            if generator.is_energy {
-                let err = Error::new(ValueError)
-                    .what("powerlaw")
-                    .why("energy already defined");
-                return Err(err.to_err())
-            }
-            generator.weights.is_some()
-        };
-
-        let weight = weight.unwrap_or(is_weights);
-        if weight && !is_weights {
-            let mut generator = slf.borrow_mut();
-            generator.initialise_weights(py)?;
-        }
-
-        let generator = slf.borrow();
-        let particles_energy: &PyArray<f64> = generator
-            .particles
-            .bind(py)
-            .get_item("energy")?
-            .extract()?;
-        let weights: Option<&PyArray<f64>> = if weight {
-            generator
-                .weights
-                .as_ref()
-                .map(|weights| weights.bind(py).extract())
-                .transpose()?
-        } else {
-            None
-        };
-        let mut random = generator.random.bind(py).borrow_mut();
-        for i in 0..particles_energy.size() {
-            let (energy, energy_weight) = if exponent == -1.0 {
-                let lne = (energy_max / energy_min).ln();
-                let energy = energy_min * (random.open01() * lne).exp();
-                (energy, energy * lne)
-            } else if exponent == 0.0 {
-                let de = energy_max - energy_min;
-                let energy = de * random.open01() + energy_min;
-                (energy, de)
-            } else {
-                let a = exponent + 1.0;
-                let b = energy_min.powf(a);
-                let de = energy_max.powf(a) - b;
-                let energy = (de * random.open01() + b).powf(1.0 / a);
-                let weight = de / (a * energy.powf(exponent));
-                (energy, weight)
-            };
-            particles_energy.set(i, energy)?;
-            if let Some(weights) = weights {
-                let weight = weights.get(i)? * energy_weight;
-                weights.set(i, weight)?;
-            }
-        }
-
-        drop(generator);
+        let exponent = exponent.unwrap_or(-1.0);
         let mut generator = slf.borrow_mut();
-        generator.is_energy = true;
-
+        generator.weight_energy = weight;
+        generator.energy = Energy::PowerLaw { energy_min, energy_max, exponent };
         Ok(slf)
     }
 
+    /// Set particles direction to be distributed over a solid-angle.
+    #[pyo3(signature=(theta=None, phi=None, *, weight=None))]
     fn solid_angle<'py>(
         slf: Bound<'py, Self>,
         theta: Option<[f64; 2]>,
         phi: Option<[f64; 2]>,
         weight: Option<bool>,
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
+        let ascending = |[a, b]: [f64; 2]| if a <= b { [ a, b ] } else { [ b, a ] };
+        let theta = theta.map(ascending);
+        let phi = phi.map(ascending);
+        let cos_theta = match theta {
+            None => [-1.0, 1.0],
+            Some([th0, th1]) => {
+                check_angle(th0, 0.0, 180.0, "theta")?;
+                check_angle(th1, 0.0, 180.0, "theta")?;
+                let th0 = th0 * Self::RAD;
+                let th1 = th1 * Self::RAD;
+                [th1.cos(), th0.cos()]
+            },
+        };
+        let phi = match phi {
+            None => [-180.0, 180.0],
+            Some([ph0, ph1]) => {
+                check_angle(ph0, -180.0, 180.0, "phi")?;
+                check_angle(ph1, -180.0, 180.0, "phi")?;
+                [ph0, ph1]
+            },
+        };
+
         let mut generator = slf.borrow_mut();
-        generator.generate_solid_angle(py, theta, phi, weight)?;
+        generator.weight_direction = weight;
+        generator.direction = Direction::SolidAngle { phi, cos_theta };
         Ok(slf)
     }
 
@@ -647,37 +552,14 @@ impl ParticlesGenerator {
         data: Vec<[f64; 2]>,
         weight: Option<bool>,
     ) -> PyResult<Bound<'py, Self>> {
-        let py = slf.py();
-        let is_weights = {
-            let generator = slf.borrow();
-            if generator.is_energy {
-                let err = Error::new(ValueError)
-                    .what("spectrum")
-                    .why("energy already defined");
-                return Err(err.to_err())
-            }
-            generator.weights.is_some()
-        };
-
-        let weight = weight.unwrap_or(is_weights);
-        if weight && !is_weights {
-            let mut generator = slf.borrow_mut();
-            generator.initialise_weights(py)?;
-        }
-
-        struct EmissionLine {
-            energy: f64,
-            intensity: f64,
-        }
-
-        let spectrum: Vec<EmissionLine> = data.iter()
+        let lines: Vec<EmissionLine> = data.iter()
             .filter_map(|[energy, intensity]| if *intensity > 0.0 {
                 Some(EmissionLine { energy: *energy, intensity: *intensity })
             } else {
                 None
             })
             .collect();
-        let total_intensity: f64 = spectrum.iter()
+        let total_intensity: f64 = lines.iter()
             .map(|line| line.intensity)
             .sum();
         if total_intensity <= 0.0 {
@@ -687,55 +569,33 @@ impl ParticlesGenerator {
             return Err(err.to_err());
         }
 
-        let generator = slf.borrow();
-        let particles_energy: &PyArray<f64> = generator
-            .particles
-            .bind(py)
-            .get_item("energy")?
-            .extract()?;
-        let weights: Option<&PyArray<f64>> = if weight {
-            generator
-                .weights
-                .as_ref()
-                .map(|weights| weights.bind(py).extract())
-                .transpose()?
-        } else {
-            None
-        };
-        let mut random = generator.random.bind(py).borrow_mut();
-        for i in 0..particles_energy.size() {
-            let energy = {
-                let target = random.open01() * total_intensity;
-                let mut acc = 0.0;
-                let mut j = 0_usize;
-                loop {
-                    let EmissionLine { energy, intensity } = spectrum[j];
-                    acc += intensity;
-                    if (acc >= target) || (j == spectrum.len() - 1) {
-                        if let Some(weights) = weights {
-                            let weight = weights.get(i)? * (total_intensity / intensity);
-                            weights.set(i, weight)?;
-                        }
-                        break energy
-                    } else {
-                        j += 1;
-                    }
-                }
-            };
-            particles_energy.set(i, energy)?;
-        }
-
-        drop(generator);
         let mut generator = slf.borrow_mut();
-        generator.is_energy = true;
-
+        generator.weight_energy = weight;
+        generator.energy = Energy::Spectrum { lines, total_intensity };
         Ok(slf)
     }
 }
 
-#[derive(EnumVariantsStrings)]
+fn check_angle(value: f64, min: f64, max: f64, what: &str) -> PyResult<()> {
+    if (value < min) || (value > max) {
+        let why = format!(
+            "expected a value in [{}, {}], found {}",
+            min,
+            max,
+            value,
+        );
+        let err = Error::new(ValueError)
+            .what(what)
+            .why(&why);
+        Err(err.to_err())
+    } else {
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, EnumVariantsStrings)]
 #[enum_variants_strings_transform(transform="lower_case")]
-enum Direction {
+enum DirectionArg {
     Ingoing,
     Outgoing,
 }
@@ -752,7 +612,7 @@ impl<'py> VolumeArg<'py> {
     fn resolve(
         &self,
         geometry: Option<&SharedPtr<ffi::GeometryBorrow>>
-    ) -> PyResult<Cow<'_, Volume>> {
+    ) -> PyResult<Volume> {
         let volume = match self {
             Self::Path(path) => {
                 let path = path.to_cow()?;
@@ -763,107 +623,240 @@ impl<'py> VolumeArg<'py> {
                             .why("expected a 'Volume', found a 'str'");
                         err.to_err()
                     })?;
-                let volume = Volume::new(geometry, &path, true)?;
-                Cow::Owned(volume)
+                Volume::new(geometry, &path, true)?
             },
-            Self::Volume(volume) => Cow::Borrowed(volume.get()),
+            Self::Volume(volume) => volume.get().clone(),
         };
         Ok(volume)
     }
 }
 
 impl ParticlesGenerator {
-    fn generate_solid_angle(
-        &mut self,
-        py: Python,
-        theta: Option<[f64; 2]>,
-        phi: Option<[f64; 2]>,
-        weight: Option<bool>,
-    ) -> PyResult<()> {
-        let is_weights = {
-            if self.is_direction {
-                let err = Error::new(ValueError)
-                    .what("solid_angle")
-                    .why("direction already defined");
-                return Err(err.to_err())
-            }
-            self.weights.is_some()
-        };
+    const RAD: f64 = std::f64::consts::PI / 180.0;
 
-        let weight = weight.unwrap_or(is_weights);
-        if weight && !is_weights {
-            self.initialise_weights(py)?;
+    fn generate_direction(
+        &self,
+        random: &mut Random,
+        particle: &mut ffi::Particle,
+        weight: &mut f64,
+    ) {
+        let (direction, w) = self.direction.generate(random);
+        particle.direction = direction;
+        if self.weight_direction.unwrap_or(self.weight) {
+            *weight *= w;
         }
+    }
 
-        let (cos_theta0, cos_theta1) = match theta {
-            None => (-1.0, 1.0),
-            Some([theta0, theta1]) => {
-                let theta0 = ((theta0 % 180.0) / 180.0) * std::f64::consts::PI;
-                let theta1 = ((theta1 % 180.0) / 180.0) * std::f64::consts::PI;
-                (theta0.cos(), theta1.cos())
-            },
+    fn generate_energy(
+        &self,
+        random: &mut Random,
+        particle: &mut ffi::Particle,
+        weight: &mut f64,
+    ) {
+        let (energy, w) = self.energy.generate(random);
+        particle.energy = energy;
+        if self.weight_energy.unwrap_or(self.weight) {
+            *weight *= w;
+        }
+    }
+}
+
+impl Direction {
+    const RAD: f64 = std::f64::consts::PI / 180.0;
+
+    fn display(&self) -> &'static str {
+        match self {
+            Self::None => unreachable!(),
+            Self::Point(_) => "direction",
+            Self::SolidAngle { .. } => "solid_angle",
+        }
+    }
+
+    fn generate(&self, random: &mut Random) -> ([f64; 3], f64) {
+        match self {
+            Self::Point(direction) => (*direction, 1.0),
+            _ => self.generate_solid_angle(random),
+        }
+    }
+
+    fn generate_solid_angle(&self, random: &mut Random) -> ([f64; 3], f64) {
+        let (phi, cos_theta) = match self {
+            Direction::SolidAngle { phi, cos_theta, .. } => (*phi, *cos_theta),
+            _ => ([-180.0, 180.0], [-1.0, 1.0]),
         };
+        let [ph0, ph1] = phi;
+        let [cos_th0, cos_th1] = cos_theta;
+        let cos_theta = random.uniform(cos_th0, cos_th1);
+        let phi = random.uniform(ph0, ph1) * Self::RAD;
+        let solid_angle = (cos_th1 - cos_th0).abs() * (ph1 - ph0).abs() * Self::RAD;
+        let sin_theta = (1.0 - cos_theta * cos_theta)
+            .max(0.0)
+            .sqrt();
+        let direction = [
+            sin_theta * phi.cos(),
+            sin_theta * phi.sin(),
+            cos_theta,
+        ];
+        (direction, solid_angle)
+    }
+}
 
-        const TWO_PI: f64 = 2.0 * std::f64::consts::PI;
-        let (phi0, phi1) = match phi {
-            None => (0.0, TWO_PI),
-            Some([phi0, phi1]) => {
-                let phi0 = ((phi0 % 360.0) / 360.0) * TWO_PI;
-                let phi1 = ((phi1 % 360.0) / 360.0) * TWO_PI;
-                (phi0, phi1)
-            },
+impl Energy {
+    fn generate(&self, random: &mut Random) -> (f64, f64) {
+        match self {
+            Self::None => (1E+00, 1.0),
+            Self::Point(value) => (*value, 1.0),
+            Self::PowerLaw { .. } => self.generate_powerlaw(random),
+            Self::Spectrum { .. } => self.generate_spectrum(random),
+        }
+    }
+
+    fn generate_powerlaw(&self, random: &mut Random) -> (f64, f64) {
+        let Energy::PowerLaw { energy_min, energy_max, exponent } = *self else { unreachable!() };
+        let (energy, weight) = if exponent == -1.0 {
+            let lne = (energy_max / energy_min).ln();
+            let energy = energy_min * (random.open01() * lne).exp();
+            (energy, energy * lne)
+        } else if exponent == 0.0 {
+            let de = energy_max - energy_min;
+            let energy = de * random.open01() + energy_min;
+            (energy, de)
+        } else {
+            let a = exponent + 1.0;
+            let b = energy_min.powf(a);
+            let de = energy_max.powf(a) - b;
+            let energy = (de * random.open01() + b).powf(1.0 / a);
+            let weight = de / (a * energy.powf(exponent));
+            (energy, weight)
         };
+        let energy = energy.clamp(energy_min, energy_max);
+        (energy, weight)
+    }
 
-        let directions: &PyArray<f64> = self
-            .particles
-            .bind(py)
-            .get_item("direction")?
-            .extract()?;
-        let weights: Option<&PyArray<f64>> = if weight {
-            self
-                .weights
-                .as_ref()
-                .map(|weights| weights.bind(py).extract())
-                .transpose()?
+    fn generate_spectrum(&self, random: &mut Random) -> (f64, f64) {
+        let Energy::Spectrum { lines, total_intensity } = self else { unreachable!() };
+        let target = random.open01() * total_intensity;
+        let mut acc = 0.0;
+        let mut j = 0_usize;
+        loop {
+            let EmissionLine { energy, intensity } = lines[j];
+            acc += intensity;
+            if (acc >= target) || (j == lines.len() - 1) {
+                let weight = total_intensity / intensity;
+                return (energy, weight);
+            } else {
+                j += 1;
+            }
+        }
+    }
+}
+
+struct InsideGenerator<'a> {
+    volume: &'a Volume,
+    include_daughters: bool,
+    transform: UniquePtr<ffi::G4AffineTransform>,
+    xmin: f64,
+    xmax: f64,
+    ymin: f64,
+    ymax: f64,
+    zmin: f64,
+    zmax: f64,
+    n: usize,
+    trials: usize,
+}
+
+impl <'a> InsideGenerator<'a> {
+    fn new(volume: &'a Volume, include_daughters: bool) -> Self {
+        let [xmin, xmax, ymin, ymax, zmin, zmax] = volume.volume.compute_box("");
+        let transform = volume.volume.compute_transform("");
+        let n = 0;
+        let trials = 0;
+        Self {
+            volume, include_daughters, transform, xmin, xmax, ymin, ymax, zmin, zmax, n, trials
+        }
+    }
+
+    fn compute_volume(&self) -> f64 {
+        let p = (self.n as f64) / (self.trials as f64);
+        (self.xmax - self.xmin) * (self.ymax - self.ymin) * (self.zmax - self.zmin) * p
+    }
+
+    fn generate(&mut self, random: &mut Random) -> PyResult<[f64; 3]>  {
+        self.n += 1;
+        loop {
+            self.trials += 1;
+            let r = [
+                random.uniform(self.xmin, self.xmax),
+                random.uniform(self.ymin, self.ymax),
+                random.uniform(self.zmin, self.zmax),
+            ];
+            if self.volume.volume.inside(
+                &r,
+                &self.transform,
+                self.include_daughters
+            ) == ffi::EInside::kInside {
+                return Ok(r);
+            } else if ((self.trials % 1000) == 0) && ctrlc_catched() {
+                return Err(Error::new(KeyboardInterrupt).to_err());
+            }
+        }
+    }
+}
+
+struct OntoGenerator<'a> {
+    volume: &'a Volume,
+    transform: UniquePtr<ffi::G4AffineTransform>,
+    direction: Option<DirectionArg>,
+    weight: Option<f64>,
+}
+
+impl <'a> OntoGenerator<'a> {
+    fn new(volume: &'a Volume, direction: Option<DirectionArg>, weight: bool) -> Self {
+        let transform = volume.volume.compute_transform("");
+        let weight = if weight {
+            let surface = volume.volume.compute_surface();
+            let solid_angle = if direction.is_some() {
+                std::f64::consts::PI
+            } else {
+                1.0
+            };
+            let weight = surface * solid_angle;
+            Some(weight)
         } else {
             None
         };
-        let mut random = self.random.bind(py).borrow_mut();
-        let n = directions.size() / 3;
-        for i in 0..n {
-            let cos_theta = (cos_theta1 - cos_theta0) * random.open01() + cos_theta0;
-            let sin_theta = (1.0 - cos_theta * cos_theta).max(0.0).sqrt();
-            let phi = (phi1 - phi0) * random.open01() + phi0;
-            let u = [
-                sin_theta * phi.cos(),
-                sin_theta * phi.sin(),
-                cos_theta,
-            ];
-            for j in 0..3 {
-                directions.set(3 * i + j, u[j])?;
-            }
-        }
-        if let Some(weights) = weights {
-            let solid_angle = (cos_theta1 - cos_theta0).abs() * (phi1 - phi0).abs();
-            for i in 0..n {
-                let weight = weights.get(i)? * solid_angle;
-                weights.set(i, weight)?;
-            }
-        }
-
-        self.is_direction = true;
-        Ok(())
+        Self { volume, transform, direction, weight }
     }
 
-    fn initialise_weights(&mut self, py: Python) -> PyResult<()> {
-        let particles: &PyArray<ffi::Particle> = self.particles.bind(py).extract()?;
-        self.weights = Some(Self::new_weights(py, &particles.shape())?);
-        Ok(())
-    }
+    fn generate(
+        &self,
+        random: &mut RandomContext,
+        particle: &mut ffi::Particle,
+        weight: &mut f64,
+    ) -> bool {
+        let data = self.volume.volume.generate_onto(
+            random,
+            &self.transform,
+            self.direction.is_some()
+        );
+        for j in 0..3 {
+            particle.position[j] = data[j];
+        }
+        if let Some(direction) = self.direction.as_ref() {
+            let mut direction = match direction {
+                DirectionArg::Ingoing => f64x3::new(-data[3], -data[4], -data[5]),
+                DirectionArg::Outgoing => f64x3::new(data[3], data[4], data[5]),
+            };
+            let cos_theta = random.next_open01().sqrt();
+            let phi = 2.0 * std::f64::consts::PI * random.next_open01();
+            direction.rotate(cos_theta, phi);
+            particle.direction = direction.into();
 
-    fn new_weights(py: Python, shape: &[usize]) -> PyResult<PyObject> {
-        let weights: &PyAny = PyArray::<f64>::zeros(py, shape)?;
-        weights.set_item(PySlice::full_bound(py), 1.0_f64)?;
-        Ok(weights.into())
+            if let Some(w) = self.weight {
+                *weight *= w;
+            }
+        }
+
+        self.direction.is_some()
     }
 }
