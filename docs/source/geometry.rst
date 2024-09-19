@@ -70,7 +70,7 @@ box shape simplifies as,
      - E.g., :python:`"Detector" -> [ "Detector" ]`.
    * - :python:`[[float; 3]; 3]`
      - :python:`[float; 3]`
-     - Rotation vector (with :underline:`angle in deg`).
+     - Rotation vector (with :underline:`angles in deg`).
 
 
 Geometry structure

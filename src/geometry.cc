@@ -281,24 +281,23 @@ static G4VSolid * build_solids(
                     std::string(item[0]),
                     solid0,
                     solids[path1],
-                    t0 * t1.Inverse() // XXX Check this.
+                    t1 * t0.Inverse()
                 );
             } else {
                 boolean = new SubtractionSolid(
                     std::string(item[0]),
                     solid0,
                     solids[path1],
-                    t1.Inverse()
+                    t1
                 );
             }
         } else {
             if (t0.IsTranslated() || t0.IsRotated()) {
-                auto t = t0 * t1.Inverse();
                 boolean = new SubtractionSolid(
                     std::string(item[0]),
                     solid0,
                     solids[path1],
-                    t0
+                    t0.Inverse()
                 );
             } else {
                 boolean = new SubtractionSolid(
