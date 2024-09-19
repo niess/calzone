@@ -191,7 +191,11 @@ impl SortedTessels {
         let ray = Ray::new(point, direction);
         let (hits, distance) = self.intersect(&ray, Side::Back);
         if hits == 0 {
-            0.0 // XXX This should not happen.
+            panic!(
+                "interior point {:?} does not intersect along {:?}",
+                point,
+                direction,
+            );
         } else {
             distance
         }
