@@ -2,6 +2,25 @@ Python interface
 ================
 
 
+.. autofunction:: calzone.download
+
+   `Geant4`_  requires 2 |nbsp| GB of materials data in order to operate. These
+   data are not distributed with Calzone, but are available for download from
+   the `Geant4`_ website. This method automates the process of downloading these
+   data.
+
+   The *destination* argument specifies where the downloaded data should be
+   stored. If :python:`None`, the data are stored under
+   :bash:`$HOME/.local/share/calzone/data`.
+
+   .. note::
+
+      In order to use (already available) `Geant4`_ data but located under a
+      different path than :bash:`$HOME/.local/share/calzone/data`, the
+      :bash:`$GEANT4_DATA_DIR` must be set accordingly.
+
+----
+
 .. autoclass:: calzone.Geant4Exception
    :members:
 
@@ -55,10 +74,16 @@ Python interface
       :python:`"geometry.gdml"`. Note that contrary to Geant4, this method
       erases any existing `GDML`_ file with the same name.
 
-   .. method:: export()
+   .. automethod:: export()
 
       Export the Geant4 geometry as a `goupil.ExternalGeometry
       <ExternalGeometry_>`_.
+
+   .. automethod:: find
+
+      The *stem* argument might specify a volume :py:attr:`name
+      <calzone.Volume.name>` or the tail of an incomplete :py:attr:`pathname
+      <calzone.Volume.path>`.
 
 ----
 
@@ -518,6 +543,9 @@ Python interface
       This is the Geant4 type (as a :external:py:class:`str`) of the underlying
       `G4VSolid`_.
 
+   .. autoattribute:: surface_area
+
+
 .. ============================================================================
 .. 
 .. URL links.
@@ -526,6 +554,7 @@ Python interface
 
 .. _EMConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/electromagnetic/index.html
 .. _GDML: https://gdml.web.cern.ch/GDML/
+.. _Geant4: https://geant4.web.cern.ch/docs/
 .. _JSON: https://www.json.org/json-en.html
 .. _HadConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/reference_PL/index.html
 .. _ExternalGeometry: https://goupil.readthedocs.io/en/latest/py/external_geometry.html

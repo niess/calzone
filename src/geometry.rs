@@ -515,6 +515,7 @@ impl Volume {
         }
     }
 
+    /// The volume surface area, in cm\ :sup:`2`.
     #[getter]
     fn get_surface_area<'py>(&self) -> PyResult<f64> {
         if self.properties.has_surface_area {

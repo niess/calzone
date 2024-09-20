@@ -12,7 +12,9 @@ use tar::Archive;
 use temp_dir::TempDir;
 
 
+/// Download Geant4 data.
 #[pyfunction]
+#[pyo3(signature=(destination=None, *, verbose=None))]
 pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()> {
     const DATASETS: [DataSet; 11] = [
         DataSet { name: "G4ABLA", version: "3.3", patch: None },

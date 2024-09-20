@@ -27,6 +27,10 @@ rst_prolog = """
 .. |nbsp| unicode:: 0xA0
    :trim:
 
+.. role:: bash(code)
+    :language: bash
+    :class: highlight
+
 .. role:: python(code)
     :language: python
     :class: highlight
