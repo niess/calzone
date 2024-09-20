@@ -119,7 +119,7 @@ impl Simulation {
         Ok(())
     }
 
-    /// Generate Monte Carlo particles.
+    /// Create a Monte Carlo particles generator.
     fn particles(
         &self,
         py: Python,

@@ -2,6 +2,27 @@ Python interface
 ================
 
 
+.. autofunction:: calzone.define
+
+   The material(s) *definition* can be provided directly as a Python
+   :python:`dict` object, or loaded from a *definition* file (in Gate DB, JSON
+   or TOML format). For instance, the following defines materials from a Gate DB
+   file.
+
+   >>> calzone.define("materials.db")
+
+   See the :ref:`Materials definition <geometry:Materials definition>` section
+   for further information.
+
+   .. important::
+
+      Materials are uniquely identified by their name. However, once loaded to
+      Geant4, a material cannot be unloaded, nor modified. If a different
+      definition is provided for an existing (already loaded) material, then a
+      :external:py:class:`ValueError` is raised.
+
+----
+
 .. autofunction:: calzone.download
 
    `Geant4`_  requires 2 |nbsp| GB of materials data in order to operate. These
@@ -10,14 +31,14 @@ Python interface
    data.
 
    The *destination* argument specifies where the downloaded data should be
-   stored. If :python:`None`, the data are stored under
-   :bash:`$HOME/.local/share/calzone/data`.
+   stored. If :python:`None`, the data are stored under Calzone's user data
+   (i.e. :bash:`$HOME/.local/share/calzone/data`).
 
    .. note::
 
-      In order to use (already available) `Geant4`_ data but located under a
-      different path than :bash:`$HOME/.local/share/calzone/data`, the
-      :bash:`$GEANT4_DATA_DIR` must be set accordingly.
+      In order to use (already available) `Geant4`_ data but located outside of
+      Calzone's user space, the :bash:`$GEANT4_DATA_DIR` must be set
+      accordingly.
 
 ----
 
@@ -157,24 +178,6 @@ Python interface
 
 ----
 
-.. autofunction:: calzone.import_materials
-
-   The material(s) *definition* can be provided directly as a Python
-   :python:`dict` object, or loaded from a *definition* file (in Gate DB, JSON
-   or TOML format). For instance, the following imports materials from a Gate DB
-   file.
-
-   >>> calzone.import_materials("materials.db")
-
-   .. important::
-
-      Materials are uniquely identified by their name. However, once loaded to
-      Geant4, a material cannot be unloaded, nor modified. If a different
-      definition is provided for an existing (already loaded) material, then a
-      :external:py:class:`ValueError` is raised.
-
-----
-
 .. autoclass:: calzone.Map
 
    This class manages a regular grid of topography elevation values, e.g. from a
@@ -242,6 +245,155 @@ Python interface
 
 ----
 
+.. autofunction:: calzone.particles
+
+   This function returns a `structured numpy array <StructuredArray_>`_ with the
+   given *shape*. Primary particles are initialised with default properties, if
+   not overriden by specifying *kwargs*. For instance, the following creates an
+   array of 100 primary particles (photons, by default) with a kinetic energy of
+   0.5 MeV, starting from the origin (by default), and going downwards.
+
+   >>> particles = calzone.particles(100, energy=0.5, direction=(0, 0, -1))
+
+   The data structure (:external:py:class:`numpy.dtype`) of a primary particle
+   is the following (the corresponding physical units are also indicated).
+
+   .. list-table:: Primaries array structure.
+      :width: 50%
+      :widths: auto
+      :header-rows: 1
+
+      * - Field
+        - Format
+        - Units
+      * - :python:`"pid"`
+        - :python:`"i4"`
+        - 
+      * - :python:`"energy"`
+        - :python:`"f8"`
+        - MeV
+      * - :python:`"position"`
+        - :python:`"(f8, 3)"`
+        - cm
+      * - :python:`"direction"`
+        - :python:`"(f8, 3)"`
+        - 
+
+   .. topic:: Particle ID
+
+      The type of a Monte Carlo particle (:python:`"pid"`) is encoded according
+      to the Particle Data Group (PDG) `numbering scheme <PdgScheme_>`_.
+
+----
+
+.. autoclass:: calzone.ParticlesGenerator
+
+   This class provides a utility for the generation of Monte Carlo particles
+   from configurable distributions. This tool is typically used to seed the
+   Monte Carlo simulation with an initial set of particles.
+
+   Once initialised, the generator can be further configured using the methods
+   detailed below (i.e. following a `builder`_ pattern). The :py:func:`generate`
+   method then triggers the actual sampling of Monte Carlo particles. As an
+   example, the following generates N particles entering a specific *volume*,
+   with a power-law energy distribution (between 10 |nbsp| keV and 10 |nbsp|
+   MeV).
+
+   >>> particles = simulation.particles()      \
+   ...     .on(volume, direction="ingoing")    \
+   ...     .powerlaw(1E-02, 1E+01)             \
+   ...     .generate(N)
+
+   .. method:: __new__(*, geometry=None, random=None, weight=True)
+
+      Create a new particles generator.
+
+      The *weight* argument specifies whether generation weights should be
+      computed (i.e. the inverse of the generation likelihoods (:math:`\omega =
+      1 / \text{pdf}(\text{S})`, for a Monte Carlo state :math:`\text{S}`) or
+      not. Note that this can be overridden by individual distributions (using
+      the :python:`weight` flag of other methods).
+
+   .. automethod:: direction
+
+      The direction is specified using Cartesian coordinates in the frame of the
+      geometry root volume. For instance, the following sets the particles
+      direction as upgoing along the (Oz) axis.
+
+      >>> generator.direction([0, 0, 1])
+
+   .. automethod:: energy
+
+      For instance, the following sets the kinetic energy of Monte Carlo
+      particles to 1 |nbsp| MeV.
+
+      >>> generator.energy(1)
+
+   .. automethod:: generate
+
+      The *shape* argument defines the number of particles requested (as a
+      :external:py:class:`ndarray <numpy.ndarray>` shape).
+
+      The outcome of this method is dependent on the *weight* configuration. If
+      weights are computed, there are returned as a second separated array.
+      Otherwise, only the generated particles are returned.
+
+   .. automethod:: inside
+
+      By default, the daughters volumes are excluded when generating the
+      particles positions. Set the *include_daughters* flag to :python:`True` if
+      this is not the desired behaviour.
+
+   .. automethod:: on
+
+      The optional *direction* argument is required to be one of
+      :python:`"ingoing"` or :python:`"outgoing"`, if a value is provided. In
+      this case, in addition to the position, the particle direction is also
+      generated with respect to the surface normal, employing a cosine
+      distribution over the half solid angle.
+
+   .. automethod:: pid
+
+      Monte Carlo particles are indentified by their Particle ID (PID), which
+      follows the Particle Data Group (`PDG <PdgScheme_>`_) numbering scheme.
+
+   .. automethod:: position
+
+      The position is specified using Cartesian coordinates in the frame of the
+      geometry root volume. For instance, the following sets the particles
+      position 1 |nbsp| m above the origin.
+
+      >>> generator.position([0, 0, 1E+02])
+
+   .. automethod:: powerlaw
+
+      The *energy_min* and *energy_max* arguments define the support of the
+      power-law, as an interval.
+
+      The default setting is a :math:`1 / E` power-lawx, corresponding to
+      :python:`exponent=-1`. Note that setting the exponent value to zero
+      results in a uniform distribution being used.
+
+   .. automethod:: solid_angle
+
+      The default settings is to consider the entire solid angle. The optional
+      *theta* and *phi* arguments may be used to restrict the solid angle by
+      specifying an interval of acceptable angular values, in deg.
+
+   .. automethod:: spectrum
+
+      The *data* argument specifies the spectral lines as a sequence of
+      :python:`(energy, intensity)` tuples. For instance, the following defines
+      a spectrum with two spectral lines (at 0.5 and 1 |nbsp| MeV) of equal
+      intensities.
+
+      >>> generator.spectrum([
+      ...     (0.5, 1), # First line, at 0.5 MeV.
+      ...     (1.0, 1), # Second line, at 1.0 MeV.
+      ... ])
+
+----
+
 .. autoclass:: calzone.Physics
 
    .. method:: __new__(default_cut=None, em_model=None, had_model=None)
@@ -285,47 +437,6 @@ Python interface
 
       Setting :py:attr:`had_model` to :python:`None`, which is the default,
       disables the simulation of hadronic interactions.
-
-----
-
-.. autofunction:: calzone.particles
-
-   This function returns a `structured numpy array <StructuredArray_>`_ with the
-   given *shape*. Primary particles are initialised with default properties, if
-   not overriden by specifying *kwargs*. For instance, the following creates an
-   array of 100 primary particles (photons, by default) with a kinetic energy of
-   0.5 MeV, starting from the origin (by default), and going downwards.
-
-   >>> particles = calzone.particles(100, energy=0.5, direction=(0, 0, -1))
-
-   The data structure (:external:py:class:`numpy.dtype`) of a primary particle
-   is the following (the corresponding physical units are also indicated).
-
-   .. list-table:: Primaries array structure.
-      :width: 50%
-      :widths: auto
-      :header-rows: 1
-
-      * - Field
-        - Format
-        - Units
-      * - :python:`"pid"`
-        - :python:`"i4"`
-        - 
-      * - :python:`"energy"`
-        - :python:`"f8"`
-        - MeV
-      * - :python:`"position"`
-        - :python:`"(f8, 3)"`
-        - cm
-      * - :python:`"direction"`
-        - :python:`"(f8, 3)"`
-        - 
-
-   .. topic:: Particle ID
-
-      The type of a Monte Carlo particle (:python:`"pid"`) is encoded according
-      to the Particle Data Group (PDG) `numbering scheme <PdgScheme_>`_.
 
 ----
 
@@ -389,6 +500,12 @@ Python interface
       simulation interface with :py:attr:`tracking` enabled.
 
       >>> Simulation = calzone.simulation("geometry.toml", tracking=True)
+
+   .. automethod:: particles
+
+      The returned :py:class:`ParticlesGenerator` object is configured according
+      to the simulation settings. Refer to the constructor of this object for
+      further information.
 
    .. method:: run(particles, /)
 
@@ -552,6 +669,7 @@ Python interface
 .. 
 .. ============================================================================
 
+.. _builder: https://en.wikipedia.org/wiki/Builder_pattern
 .. _EMConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/electromagnetic/index.html
 .. _GDML: https://gdml.web.cern.ch/GDML/
 .. _Geant4: https://geant4.web.cern.ch/docs/

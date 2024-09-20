@@ -60,7 +60,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
 
     // Register function(s).
     module.add_function(wrap_pyfunction!(utils::data::download, module)?)?;
-    module.add_function(wrap_pyfunction!(geometry::materials::import, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::materials::define, module)?)?;
     module.add_function(wrap_pyfunction!(simulation::source::particles, module)?)?;
 
     // Register constant(s).

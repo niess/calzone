@@ -271,7 +271,7 @@ impl ParticlesGenerator {
         Ok(slf)
     }
 
-    /// Fix the Monte Carlo particles energy.
+    /// Fix the Monte Carlo particles kinetic energy.
     #[pyo3(signature=(value, /))]
     fn energy<'py>(
         slf: Bound<'py, Self>,
@@ -437,8 +437,9 @@ impl ParticlesGenerator {
         Ok(slf)
     }
 
-    /// Set particles positions to be distributed onto a volume surface.
-    fn onto<'py>(
+    /// Set particles positions to be distributed on a volume surface.
+    #[pyo3(signature=(volume, /, direction=None, *, weight=None))]
+    fn on<'py>(
         slf: Bound<'py, Self>,
         volume: VolumeArg,
         direction: Option<String>,
@@ -480,6 +481,7 @@ impl ParticlesGenerator {
     }
 
     /// Fix the Monte Carlo particles position.
+    #[pyo3(signature=(value, /))]
     fn position<'py>(
         slf: Bound<'py, Self>,
         value: [f64; 3],
@@ -490,7 +492,7 @@ impl ParticlesGenerator {
         Ok(slf)
     }
 
-    /// Set particles energy to follow a power-law.
+    /// Set particles kinetic energy to follow a power-law.
     #[pyo3(signature=(energy_min, energy_max, /, *, exponent=None, weight=None))]
     fn powerlaw<'py>(
         slf: Bound<'py, Self>,
@@ -547,6 +549,8 @@ impl ParticlesGenerator {
         Ok(slf)
     }
 
+    /// Set particles kinetic energy to be distributed according to spectral lines.
+    #[pyo3(signature=(data, /, *, weight=None))]
     fn spectrum<'py>(
         slf: Bound<'py, Self>,
         data: Vec<[f64; 2]>,

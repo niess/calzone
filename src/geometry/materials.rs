@@ -11,10 +11,9 @@ use std::collections::{HashMap, HashSet};
 pub mod gate;
 mod hash;
 
-/// Load Geant4 material(s).
+/// Define Geant4 material(s).
 #[pyfunction]
-#[pyo3(name="import_materials")]
-pub fn import(definition: DictLike) -> PyResult<()> {
+pub fn define(definition: DictLike) -> PyResult<()> {
     let tag = Tag::new("", "materials", None);
     let materials = MaterialsDefinition::try_from_dict(&tag, &definition)?;
     materials.build()?;
