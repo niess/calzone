@@ -40,7 +40,6 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 impl Geometry {
     #[new]
     pub fn new(volume: DictLike) -> PyResult<Self> {
-        // XXX from GDML (manage memory by diffing G4SolidStore etc.).
         let mut builder = GeometryBuilder::new(volume)?;
         let geometry = builder.build()?;
         Ok(geometry)

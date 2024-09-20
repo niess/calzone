@@ -17,9 +17,6 @@ use super::{ffi, MaterialsDefinition};
 use super::map::Map;
 
 
-// XXX Add other shapes, & booleans, & displaced.
-
-
 // ===============================================================================================
 //
 // Geometry volume.

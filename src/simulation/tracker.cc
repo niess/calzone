@@ -165,15 +165,13 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
         }
     }
 
-    // XXX Flag killed particles for the tracker?
-
     if (!RUN_AGENT->is_tracker()) {
         return;
     }
 
     auto && track = step->GetTrack();
     auto && tid = track->GetTrackID();
-    auto push_vertex = [&](const G4StepPoint * p) {
+    auto push_vertex = [&](const G4StepPoint * p, bool pre=false) {
         auto && r = p->GetPosition() / CLHEP::cm;
         auto && u = p->GetMomentumDirection();
         Vertex vertex = {
@@ -206,12 +204,19 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
                 name.c_str(),
                 sizeof(vertex.process) - 1
             );
+        } else if ((track->GetTrackStatus() == fStopAndKill) && !pre) {
+            auto dst = (char *)(&vertex.process);
+            std::strncpy(
+                dst,
+                "Kill",
+                sizeof(vertex.process) - 1
+            );
         }
         RUN_AGENT->push_vertex(std::move(vertex));
     };
 
     if (track->GetCurrentStepNumber() == 1) {
-        push_vertex(step->GetPreStepPoint());
+        push_vertex(step->GetPreStepPoint(), true);
     }
     push_vertex(step->GetPostStepPoint());
 }
