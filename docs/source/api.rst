@@ -84,7 +84,7 @@ Python interface
       >>> geometry = builder.build()
 
       Note that the returned geometry is immutable. That is, subsequent
-      *builder* operations do not modify any previously built geometry.
+      *builder* operations do not modify the returned geometry.
 
    .. automethod:: delete
 

@@ -216,7 +216,7 @@ pub struct Property {
     default: PropertyDefault,
 }
 
-#[allow(dead_code)] // XXX needed?
+#[allow(dead_code)]
 enum PropertyDefault {
     Bool(bool),
     F64(f64),
@@ -326,7 +326,7 @@ impl<const N: usize> Extractor<N> {
     }
 }
 
-#[allow(dead_code)] // XXX needed?
+#[allow(dead_code)]
 impl Property {
     #[inline]
     const fn new(name: &'static str, tp: PropertyType, default: PropertyDefault) -> Self {

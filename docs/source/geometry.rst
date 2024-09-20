@@ -163,6 +163,9 @@ see :ref:`geometry:Shape definition`.
    * - :python:`DaughterName`
      - :python:`dict` (:numref:`tab-volume-items`)
      - :python:`None`
+   * - :python:`"materials"`
+     - :python:`dict` (:numref:`tab-materials-items`)
+     - :python:`None`
 
 .. topic:: Positioning properties.
 
@@ -174,6 +177,14 @@ see :ref:`geometry:Shape definition`.
 
    The daughter volumes are included directly with the volume properties. They
    are identified by their `CamelCase` syntax.
+
+.. topic:: Materials definitions.
+
+   Materials can be defined together with the volume properties, should this be
+   required. It should be noted, however, that materials exist on a global level
+   within `Geant4`_, regardless of their definition scope (see the `Materials
+   definition`_ section for further information).
+
 
 Roles
 ~~~~~
@@ -475,6 +486,13 @@ or as a :ref:`Mixture <geometry:Mixtures>` of other materials.
    from the Geant4 `NIST`_ database. For example, :python:`"G4_H"`,
    :python:`"G4_AIR"`, etc. Depending on your application, you may not need to
    define your own materials.
+
+.. topic:: Materials scope
+
+   `Geant4`_ materials are defined on a global scale and are applicable to all
+   geometries and physics. Each material is identified by a unique name. Once
+   instanciated by `Geant4`_, a material cannot be deleted or modified.
+
 
 Materials table
 ~~~~~~~~~~~~~~~

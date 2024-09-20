@@ -42,15 +42,15 @@ pub struct Simulation {
     /// Sampling mode for energy deposits.
     #[pyo3(get, set)]
     sample_deposits: Option<SamplerMode>,
-    /// Flag controlling the sampling of Monte Carlo particles.
+    /// Flag controlling the sampling of particles at volume boundaries.
     #[pyo3(get, set)]
     sample_particles: bool,
-    /// Flag controlling the production of secondary Monte Carlo particles.
+    /// Flag controlling the production of secondary particles.
     #[pyo3(get, set)]
-    secondaries: bool, // XXX Rename to kill_secondaries?
+    secondaries: bool,
     /// Flag controlling the recording of Monte Carlo tracks.
     #[pyo3(get, set)]
-    tracking: bool, // XXX Rename as well (record steps, maybe)?
+    tracking: bool,
 }
 
 #[pymethods]

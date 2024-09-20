@@ -160,7 +160,7 @@ impl GeometryBuilder {
         self.definition.materials = MaterialsDefinition::drain(
             self.definition.materials.take(),
             &mut self.definition.volume,
-        ); // XXX Document materials in volume.
+        );
         if let Some(materials) = self.definition.materials.as_ref() {
             materials.build()?;
         }
