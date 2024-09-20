@@ -1,17 +1,19 @@
 use crate::utils::error::ErrorKind::ValueError;
-use crate::utils::error::variant_error;
+use crate::utils::error::{Error, variant_error};
 use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use super::ffi;
 use super::volume::Volume;
+use std::collections::{HashMap, HashSet};
 
 pub mod gate;
 mod hash;
 
 /// Load Geant4 material(s).
 #[pyfunction]
+#[pyo3(name="import_materials")]
 pub fn import(definition: DictLike) -> PyResult<()> {
     let tag = Tag::new("", "materials", None);
     let materials = MaterialsDefinition::try_from_dict(&tag, &definition)?;
@@ -45,9 +47,9 @@ impl MaterialsDefinition {
             ffi::add_molecule(&molecule)
                 .to_result()?;
         }
-        // XXX Sort mixtures before processing them?
-        for mixtures in &self.mixtures {
-            ffi::add_mixture(&mixtures)
+        let mixtures = self.sorted_mixtures()?;
+        for mixture in mixtures {
+            ffi::add_mixture(mixture)
                 .to_result()?;
         }
         Ok(())
@@ -76,6 +78,80 @@ impl MaterialsDefinition {
         for m in other.mixtures.drain(..) {
             self.mixtures.push(m);
         }
+    }
+
+    fn sorted_mixtures<'a>(&'a self) -> PyResult<Vec<&'a ffi::Mixture>> {
+        if self.mixtures.len() <= 1 {
+            let mixtures: Vec<_> = self.mixtures.iter().collect();
+            return Ok(mixtures)
+        }
+
+        let map: HashMap<&str, &ffi::Mixture> = self.mixtures.iter()
+            .map(|mixture| (mixture.properties.name.as_str(), mixture))
+            .collect();
+
+        // Find dependencies and look for cycles.
+        type Dependencies<'a> = HashSet<&'a str>;
+
+        fn find_deps<'a>(
+            root: &str,
+            mixture: &ffi::Mixture,
+            map: &'a HashMap<&str, &ffi::Mixture>,
+            mut deps: Dependencies<'a>,
+        ) -> PyResult<Dependencies<'a>> {
+            for component in mixture.components.iter() {
+                if &component.name == root {
+                    let why = format!(
+                        "cycle between '{}' and '{}'",
+                        root,
+                        mixture.properties.name
+                    );
+                    let err = Error::new(ValueError)
+                        .what("mixture")
+                        .why(&why);
+                    return Err(err.into())
+                } else {
+                    if let Some((name, mixture)) = map.get_key_value(component.name.as_str()) {
+                        deps = find_deps(root, mixture, map, deps)?;
+                        deps.insert(name);
+                    }
+                }
+            }
+            Ok(deps)
+        }
+
+        let mut deps: HashMap<&str, Dependencies> = HashMap::new();
+        for mixture in &self.mixtures {
+            let name = mixture.properties.name.as_str();
+            let mut dep = Dependencies::new();
+            dep = find_deps(name, mixture, &map, dep)?;
+            deps.insert(name, dep);
+        }
+
+        // Sort mixtures.
+        let mut mixtures: Vec<_> = self.mixtures.iter().collect();
+        let n = mixtures.len();
+        let mut i = 0;
+        loop {
+            let mut j = i;
+            let deps = &deps[mixtures[i].properties.name.as_str()];
+            for k in (i + 1)..n {
+                if deps.contains(mixtures[k].properties.name.as_str()) {
+                    j = k
+                }
+            }
+            if j > i {
+                mixtures.insert(j + 1, mixtures[i]);
+                mixtures.remove(i);
+            } else {
+                i += 1;
+                if i == n - 1 {
+                    break;
+                }
+            }
+        }
+
+        Ok(mixtures)
     }
 }
 

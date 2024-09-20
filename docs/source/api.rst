@@ -132,14 +132,14 @@ Python interface
 
 ----
 
-.. autofunction:: calzone.import
+.. autofunction:: calzone.import_materials
 
    The material(s) *definition* can be provided directly as a Python
    :python:`dict` object, or loaded from a *definition* file (in Gate DB, JSON
    or TOML format). For instance, the following imports materials from a Gate DB
    file.
 
-   >>> calzone.import("materials.db")
+   >>> calzone.import_materials("materials.db")
 
    .. important::
 

@@ -578,10 +578,10 @@ Molecules
 ~~~~~~~~~
 
 Molecules are specified by their *density* (in g/cm\ :sup:`3`) and their
-composition (in atomic elements). Optionaly, a *state* can be specified (
+*composition* (in atomic elements). Optionaly, a *state* can be specified (
 :python:`"gas"`, :python:`"liquid"` or :python:`"solid"`). For instance,
 
->>> { "H": 2, "O": 1, "density": 1.0, "state": "liquid" }
+>>> { "density": 1.0, "state": "liquid", "composition": { "H": 2, "O": 1 }}
 
 .. _tab-molecule-items:
 
@@ -596,9 +596,23 @@ composition (in atomic elements). Optionaly, a *state* can be specified (
    * - :python:`"density"`
      - :python:`float`
      - 
+   * - :python:`"composition"`
+     - :python:`dict` (:numref:`tab-molecule-component`)
+     - 
    * - :python:`"state"`
      - :python:`str`
      - :python:`None`
+
+.. _tab-molecule-component:
+
+.. list-table:: Molecule component.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default value
    * - :python:`ElementName`
      - :python:`int`
      - 
@@ -607,10 +621,14 @@ Mixtures
 ~~~~~~~~
 
 Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
-composition. Optionaly, a *state* can be specified ( :python:`"gas"`,
+*composition*. Optionaly, a *state* can be specified ( :python:`"gas"`,
 :python:`"liquid"` or :python:`"solid"`). For instance,
 
->>> { "N": 0.76, "O": 0.23, "Ar": 0.01, "density": 1.205E-03, "state": "gas" }
+>>> {
+...     "density": 1.205E-03,
+...     "state": "gas",
+...     "composition": { "N": 0.76, "O": 0.23, "Ar": 0.01 }
+... }
 
 .. _tab-mixture-items:
 
@@ -625,9 +643,26 @@ composition. Optionaly, a *state* can be specified ( :python:`"gas"`,
    * - :python:`"density"`
      - :python:`float`
      - 
+   * - :python:`"composition"`
+     - :python:`dict` (:numref:`tab-mixture-component`)
+     - 
    * - :python:`"state"`
      - :python:`str`
      - :python:`None`
+
+.. _tab-mixture-component:
+
+.. list-table:: Mixture component.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default value
+   * - :python:`ElementName`
+     - :python:`float`
+     - 
    * - :python:`MaterialName`
      - :python:`float`
      - 
