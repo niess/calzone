@@ -447,13 +447,33 @@ Python interface
       the simulation. For instance, the following computes the volume AABB in
       its own frame (thus, the AABB of the underlying `G4VSolid`_, actually).
 
-      >>> aabb = volume.aabb(volume.name)
+      >>> aabb = volume.aabb(volume.path)
+
+   .. method:: dump(path=None)
+
+      Dump the volume geometry to a `GDML`_ file.
+
+      If *path* is :python:`None`, then the geometry is dumped to
+      :python:`"volume.gdml"`. Note that contrary to Geant4, this method erases
+      any existing `GDML`_ file with the same name.
 
    .. automethod:: origin
 
       As previously (see the :py:meth:`aabb` method), the *frame* argument
       specifies the reference volume. Note that depending on the underlying
       `G4VSolid`_, the origin might or might not be at the volume centre.
+
+   .. automethod:: side
+
+      The *element* argument can be a `structured numpy array
+      <StructuredArray_>`_ containing the :python:`"position"` key (e.g. Monte
+      Carlo :py:func:`particles <calzone.particles>`), or directy a
+      :external:py:class:`numpy.ndarray` of cartesian coordinates.
+
+      By default, points located inside daughter volumes are considered to be
+      outside of the mother volume, when checking the side. Set
+      *include_daughters* to :python:`True` if this is not the desired
+      behaviour.
 
    .. autoattribute:: daughters
 
@@ -466,7 +486,22 @@ Python interface
       This is the name of the underlying `G4Material`_, as registered to Geant4.
 
    .. autoattribute:: mother
+
    .. autoattribute:: name
+
+      .. caution::
+
+         The volume name **is not** guaranteed to be unique within a given
+         geometry (see the :ref:`Geometry <geometry:Geometry structure>`
+         section).
+
+   .. autoattribute:: path
+
+      .. tip::
+
+         The volume pathname **is** guaranteed to be unique within a given
+         geometry (see the :ref:`Geometry <geometry:Geometry structure>`
+         section).
 
    .. autoattribute:: role
 

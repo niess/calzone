@@ -506,9 +506,9 @@ impl Volume {
         PyTuple::new_bound(py, &self.daughters)
     }
 
-    /// The volume (local) name.
+    /// The volume name.
     #[getter]
-    fn get_name<'py>(&self) -> &str { // XXX Document this.
+    fn get_name<'py>(&self) -> &str {
         match self.path.rsplit_once('.') {
             None => self.path.as_str(),
             Some((_, name)) => name,
@@ -516,7 +516,7 @@ impl Volume {
     }
 
     #[getter]
-    fn get_surface<'py>(&self) -> PyResult<f64> {
+    fn get_surface_area<'py>(&self) -> PyResult<f64> {
         if self.properties.has_surface_area {
             Ok(self.volume.compute_surface())
         } else {
@@ -614,7 +614,7 @@ impl Volume {
     }
 
     /// Dump the volume geometry to a GDML file.
-    fn dump(&self, path: Option<String>) -> PyResult<()> { // XXX Document this.
+    fn dump(&self, path: Option<String>) -> PyResult<()> {
         let tmp = TempDir::new()?;
         let path = path.unwrap_or_else(|| {
             let name = self.get_name().to_case(Case::Snake);
@@ -632,7 +632,8 @@ impl Volume {
     }
 
     /// Return the side of elements w.r.t. this volume.
-    fn side<'py>( // XXX Document this.
+    #[pyo3(signature=(elements, /, *, include_daughters=None))]
+    fn side<'py>(
         &self,
         elements: &Bound<'py, PyAny>,
         include_daughters: Option<bool>
