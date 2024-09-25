@@ -1,7 +1,8 @@
 use convert_case::{Case, Casing};
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::{Error, variant_explain};
-use crate::utils::error::ErrorKind::{IndexError, NotImplementedError, TypeError, ValueError};
+use crate::utils::error::ErrorKind::{Exception, IndexError, NotImplementedError, TypeError,
+    ValueError};
 use crate::utils::float::f64x3;
 use crate::utils::io::DictLike;
 use crate::utils::numpy::PyArray;
@@ -9,7 +10,9 @@ use cxx::SharedPtr;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
-use pyo3::types::PyTuple;
+use pyo3::types::{PyBytes, PyTuple};
+use rmp_serde::{Deserializer, Serializer};
+use serde::{Deserialize, Serialize};
 use super::cxx::ffi;
 use temp_dir::TempDir;
 
@@ -40,7 +43,7 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 impl Geometry {
     #[new]
     pub fn new(volume: DictLike) -> PyResult<Self> {
-        let mut builder = GeometryBuilder::new(volume)?;
+        let mut builder = GeometryBuilder::new(Some(volume))?;
         let geometry = builder.build()?;
         Ok(geometry)
     }
@@ -99,6 +102,7 @@ impl Geometry {
 
 /// A Monte Carlo geometry builder.
 #[pyclass(module="calzone")]
+#[derive(Deserialize, Serialize)]
 pub struct GeometryBuilder {
     definition: GeometryDefinition,
     /// Traversal algorithm for tessellated shapes.
@@ -106,7 +110,7 @@ pub struct GeometryBuilder {
     algorithm: Algorithm,
 }
 
-#[derive(Clone, Copy, Default, EnumVariantsStrings)]
+#[derive(Clone, Copy, Default, EnumVariantsStrings, Deserialize, Serialize)]
 #[enum_variants_strings_transform(transform="lower_case")]
 enum Algorithm {
     #[default]
@@ -144,8 +148,11 @@ impl IntoPy<PyObject> for Algorithm {
 #[pymethods]
 impl GeometryBuilder {
     #[new]
-    fn new(definition: DictLike) -> PyResult<Self> {
-        let definition = GeometryDefinition::new(definition)?;
+    fn new(definition: Option<DictLike>) -> PyResult<Self> {
+        let definition = match definition {
+            Some(definition) => GeometryDefinition::new(definition)?,
+            None => GeometryDefinition::default(),
+        };
         let algorithm = Algorithm::default();
         let builder = Self { definition, algorithm };
         Ok(builder)
@@ -354,6 +361,33 @@ impl GeometryBuilder {
         }
         Ok(slf)
     }
+
+    fn __getstate__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let mut buffer = Vec::new();
+        let mut serializer = Serializer::new(&mut buffer);
+        self.serialize(&mut serializer)
+            .map_err(|err| {
+                let why = format!("{}", err);
+                Error::new(Exception)
+                    .what("serialisation")
+                    .why(&why)
+                    .to_err()
+            })?;
+        Ok(PyBytes::new_bound(py, &buffer))
+    }
+
+    fn __setstate__(&mut self, state: &Bound<PyBytes>) -> PyResult<()> {
+        let mut deserializer = Deserializer::new(state.as_bytes());
+        *self = Deserialize::deserialize(&mut deserializer)
+            .map_err(|err| {
+                let why = format!("{}", err);
+                Error::new(Exception)
+                    .what("serialisation")
+                    .why(&why)
+                    .to_err()
+            })?;
+        Ok(())
+    }
 }
 
 impl GeometryBuilder {
@@ -416,6 +450,7 @@ impl GeometryBuilder {
 //
 // ===============================================================================================
 
+#[derive(Default, Deserialize, Serialize)]
 struct GeometryDefinition {
     volume: Box<volume::Volume>,
     materials: Option<MaterialsDefinition>,

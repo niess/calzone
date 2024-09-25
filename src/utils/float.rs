@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::mem::transmute;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use super::numpy::PyArray;
@@ -11,8 +12,9 @@ use super::numpy::PyArray;
 // ===============================================================================================
 
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, Default, FromPyObject, PartialEq)]
+#[derive(Copy, Clone, Default, FromPyObject, PartialEq, Deserialize, Serialize)]
 #[repr(transparent)]
+#[serde(transparent)]
 pub struct f64x3 ([f64; 3]);
 
 impl f64x3 {
@@ -218,8 +220,9 @@ impl IntoPy<PyObject> for f64x3 {
 //
 // ===============================================================================================
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, Default, FromPyObject, PartialEq)]
+#[derive(Copy, Clone, Default, FromPyObject, PartialEq, Deserialize, Serialize)]
 #[repr(transparent)]
+#[serde(transparent)]
 pub struct f64x3x3 ([[f64; 3]; 3]);
 
 impl f64x3x3 {

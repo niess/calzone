@@ -9,6 +9,7 @@ use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyNotImplementedError};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
@@ -23,6 +24,7 @@ use super::map::Map;
 //
 // ===============================================================================================
 
+#[derive(Default, Deserialize, Serialize)]
 pub struct Volume {
     pub(super) name: String,
     pub(super) material: String,
@@ -36,6 +38,7 @@ pub struct Volume {
     pub(super) materials: Option<MaterialsDefinition>,
 }
 
+#[derive(Deserialize, Serialize)]
 pub enum Shape {
     Box(ffi::BoxShape),
     Cylinder(ffi::CylinderShape),

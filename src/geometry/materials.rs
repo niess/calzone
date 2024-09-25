@@ -4,6 +4,7 @@ use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use super::ffi;
 use super::volume::Volume;
 use std::collections::{HashMap, HashSet};
@@ -30,6 +31,7 @@ pub fn define(definition: DictLike) -> PyResult<()> {
 //
 // ===============================================================================================
 
+#[derive(Deserialize, Serialize)]
 pub struct MaterialsDefinition {
     elements: Vec<ffi::Element>,
     molecules: Vec<ffi::Molecule>,

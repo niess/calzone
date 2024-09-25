@@ -34,10 +34,12 @@ pub mod ffi {
     //
     // ===========================================================================================
 
+    #[derive(Deserialize, Serialize)]
     struct BoxShape {
         size: [f64; 3],
     }
 
+    #[derive(Deserialize, Serialize)]
     struct CylinderShape {
         radius: f64,
         length: f64,
@@ -52,6 +54,7 @@ pub mod ffi {
       kInside,
     }
 
+    #[derive(Deserialize, Serialize)]
     struct EnvelopeShape {
         shape: ShapeType,
         safety: f64,
@@ -62,7 +65,9 @@ pub mod ffi {
         solid: String,
     }
 
+    #[derive(Deserialize, Serialize)]
     #[repr(i32)]
+    #[serde(transparent)]
     enum ShapeType {
         Box,
         Cylinder,
@@ -71,6 +76,7 @@ pub mod ffi {
         Tessellation,
     }
 
+    #[derive(Deserialize, Serialize)]
     struct SphereShape {
         radius: f64,
         thickness: f64,
@@ -78,6 +84,7 @@ pub mod ffi {
         zenith_section: [f64; 2],
     }
 
+    #[derive(Deserialize, Serialize)]
     struct TessellatedShape {
         facets: Vec<f32>,
     }
@@ -102,6 +109,7 @@ pub mod ffi {
     //
     // ===========================================================================================
 
+    #[derive(Deserialize, Serialize)]
     struct Element {
         name: String,
         symbol: String,
@@ -109,7 +117,9 @@ pub mod ffi {
         A: f64,
     }
 
+    #[derive(Deserialize, Serialize)]
     #[repr(u32)]
+    #[serde(transparent)]
     enum G4State {
       kStateUndefined = 0,
       kStateSolid,
@@ -117,31 +127,32 @@ pub mod ffi {
       kStateGas
     }
 
+    #[derive(Deserialize, Serialize)]
     struct MaterialProperties {
         name: String,
         density: f64,
         state: G4State,
     }
 
-    #[derive(Hash)]
+    #[derive(Hash, Deserialize, Serialize)]
     struct Mixture {
         properties: MaterialProperties,
         components: Vec<MixtureComponent>,
     }
 
-    #[derive(PartialEq, PartialOrd)]
+    #[derive(PartialEq, PartialOrd, Deserialize, Serialize)]
     struct MixtureComponent {
         name: String,
         weight: f64,
     }
 
-    #[derive(Hash)]
+    #[derive(Hash, Deserialize, Serialize)]
     struct Molecule {
         properties: MaterialProperties,
         components: Vec<MoleculeComponent>,
     }
 
-    #[derive(Hash, PartialEq, PartialOrd)]
+    #[derive(Hash, PartialEq, PartialOrd, Deserialize, Serialize)]
     struct MoleculeComponent {
         name: String,
         weight: u32,
@@ -190,7 +201,9 @@ pub mod ffi {
     //
     // ===========================================================================================
 
+    #[derive(Deserialize, Serialize)]
     #[repr(u32)]
+    #[serde(transparent)]
     enum Action {
         None = 0,
         Catch,
@@ -198,7 +211,7 @@ pub mod ffi {
         Record,
     }
 
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Deserialize, Serialize)]
     struct Roles {
         ingoing: Action,
         outgoing: Action,
