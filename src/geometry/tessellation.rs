@@ -412,3 +412,21 @@ pub fn sort_tessels(shape: &ffi::TessellatedShape) -> Box<SortedTessels> {
     let tree = Bvh::build(&mut facets);
     Box::new(SortedTessels { envelope, facets, tree, area })
 }
+
+impl From<&SortedTessels> for Vec<f32> {
+    fn from(value: &SortedTessels) -> Self {
+        let mut data = Vec::<f32>::with_capacity(9 * value.facets.len());
+        for facet in value.facets.iter() {
+            data.push(facet.v0[0] as f32);
+            data.push(facet.v0[1] as f32);
+            data.push(facet.v0[2] as f32);
+            data.push(facet.v1[0] as f32);
+            data.push(facet.v1[1] as f32);
+            data.push(facet.v1[2] as f32);
+            data.push(facet.v2[0] as f32);
+            data.push(facet.v2[1] as f32);
+            data.push(facet.v2[2] as f32);
+        }
+        data
+    }
+}

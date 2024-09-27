@@ -103,6 +103,44 @@ pub mod ffi {
         daughters: Vec<DaughterInfo>,
     }
 
+    #[derive(Serialize)]
+    #[serde(transparent)]
+    struct BoxInfo {
+        size: [f64; 3]
+    }
+
+    #[derive(Serialize)]
+    #[serde(transparent)]
+    struct OrbInfo {
+        radius: f64,
+    }
+
+    #[derive(Serialize)]
+    struct SphereInfo {
+        inner_radius: f64,
+        outer_radius: f64,
+        start_phi_angle: f64,
+        delta_phi_angle: f64,
+        start_theta_angle: f64,
+        delta_theta_angle: f64,
+    }
+
+    #[derive(Serialize)]
+    struct TransformInfo {
+        translation: [f64; 3],
+        rotation: [[f64; 3]; 3],
+    }
+
+    #[derive(Serialize)]
+    struct TubsInfo {
+        inner_radius: f64,
+        outer_radius: f64,
+        length: f64,
+        start_phi_angle: f64,
+        delta_phi_angle: f64,
+    }
+
+
     // ===========================================================================================
     //
     // Materials interface.
@@ -313,6 +351,13 @@ pub mod ffi {
         fn compute_surface(self: &VolumeBorrow) -> f64;
         fn compute_volume(self: &VolumeBorrow, include_daughters: bool) -> f64;
         fn describe(self: &VolumeBorrow) -> VolumeInfo;
+        fn describe_box(self: &VolumeBorrow) -> BoxInfo;
+        fn describe_orb(self: &VolumeBorrow) -> OrbInfo;
+        fn describe_sphere(self: &VolumeBorrow) -> SphereInfo;
+        fn describe_tessellated_solid(self: &VolumeBorrow, vertices: &mut Vec<f32>);
+        fn describe_tessellation(self: &VolumeBorrow) -> &Box<SortedTessels>;
+        fn describe_transform(self: &VolumeBorrow) -> TransformInfo;
+        fn describe_tubs(self: &VolumeBorrow) -> TubsInfo;
         fn dump(self: &VolumeBorrow, path: &str) -> SharedPtr<Error>;
         fn generate_onto(
             self: &VolumeBorrow,

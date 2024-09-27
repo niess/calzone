@@ -79,6 +79,13 @@ struct VolumeBorrow {
     double compute_surface() const;
     double compute_volume(bool) const;
     VolumeInfo describe() const;
+    BoxInfo describe_box() const;
+    OrbInfo describe_orb() const;
+    SphereInfo describe_sphere() const;
+    void describe_tessellated_solid(rust::Vec<float> &) const;
+    const rust::Box<SortedTessels> & describe_tessellation() const;
+    TransformInfo describe_transform() const;
+    TubsInfo describe_tubs() const;
     std::shared_ptr<Error> dump(rust::Str) const;
     std::array<double, 6> generate_onto(
         RandomContext &,

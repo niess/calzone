@@ -151,3 +151,7 @@ void Tessellation::DescribeYourselfTo(G4VGraphicsScene &) const {}
 std::ostream & Tessellation::StreamInfo(std::ostream & stream) const {
     return stream;
 }
+
+const rust::Box<SortedTessels> & Tessellation::Describe() const {
+    return this->tessels;
+}

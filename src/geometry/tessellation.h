@@ -37,6 +37,8 @@ struct Tessellation: public G4VSolid {
     void DescribeYourselfTo(G4VGraphicsScene &) const;
     std::ostream & StreamInfo(std::ostream &) const;
 
+    const rust::Box<SortedTessels> & Describe() const;
+
 private:
     rust::Box<SortedTessels> tessels;
 };

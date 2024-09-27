@@ -960,12 +960,35 @@ double VolumeBorrow::compute_volume(bool include_daughters) const {
     return std::max(volume, 0.0) / CLHEP::cm3;
 }
 
+static G4VSolid * get_unsubtracted_solid(G4VSolid * solid) {
+    for (;;) {
+        auto constituent = solid->GetConstituentSolid(0);
+        if (constituent == nullptr) {
+            break;
+        } else {
+            solid = constituent;
+        }
+    }
+    return solid;
+}
+
+static G4VSolid * get_base_solid(G4VSolid * solid) {
+    solid = get_unsubtracted_solid(solid);
+    if (solid->GetDisplacedSolidPtr() != nullptr) {
+        return solid->GetDisplacedSolidPtr()->GetConstituentMovedSolid();
+    } else {
+        return solid;
+    }
+}
+
 VolumeInfo VolumeBorrow::describe() const {
     VolumeInfo info;
     info.path = this->volume->GetName();
     auto logical = this->volume->GetLogicalVolume();
     info.material = rust::String(logical->GetMaterial()->GetName());
-    info.solid = rust::String(logical->GetSolid()->GetEntityType());
+    G4VSolid * solid = get_base_solid(logical->GetSolid());
+    info.solid = rust::String(solid->GetEntityType());
+    // XXX Resolve displaced / boolean.
     auto mother = this->geometry->mothers[this->volume];
     if (mother == nullptr) {
         info.mother = rust::String("");
@@ -983,6 +1006,105 @@ VolumeInfo VolumeBorrow::describe() const {
         });
     }
     return info;
+}
+
+BoxInfo VolumeBorrow::describe_box() const {
+    auto solid = static_cast<Box *>(
+        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    );
+    return {
+        2.0 * solid->GetXHalfLength(),
+        2.0 * solid->GetYHalfLength(),
+        2.0 * solid->GetZHalfLength()
+    };
+}
+
+OrbInfo VolumeBorrow::describe_orb() const {
+    auto solid = static_cast<Orb *>(
+        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    );
+    return { solid->GetRadius() };
+}
+
+SphereInfo VolumeBorrow::describe_sphere() const {
+    auto solid = static_cast<Sphere *>(
+        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    );
+    return {
+        solid->GetInnerRadius(),
+        solid->GetOuterRadius(),
+        solid->GetStartPhiAngle(),
+        solid->GetDeltaPhiAngle(),
+        solid->GetStartThetaAngle(),
+        solid->GetDeltaThetaAngle(),
+    };
+}
+
+void VolumeBorrow::describe_tessellated_solid(rust::Vec<float> & data) const {
+    auto solid = static_cast<TessellatedSolid *>(
+        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    );
+    const int n = solid->GetNumberOfFacets();
+    data.reserve(9 * n);
+    for (int i = 0; i < n; i++) {
+        auto facet = solid->GetFacet(i);
+        for (int j = 0; j < 3; j++) {
+            auto vertex = facet->GetVertex(j);
+            data.push_back(vertex.x());
+            data.push_back(vertex.y());
+            data.push_back(vertex.z());
+        }
+    }
+}
+
+const rust::Box<SortedTessels> & VolumeBorrow::describe_tessellation() const {
+    auto solid = static_cast<Tessellation *>(
+        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    );
+    return solid->Describe();
+}
+
+TransformInfo VolumeBorrow::describe_transform() const {
+    G4ThreeVector translation;
+    G4RotationMatrix rotation;
+    auto solid = get_unsubtracted_solid(
+        this->volume->GetLogicalVolume()->GetSolid()
+    );
+    auto displaced = solid->GetDisplacedSolidPtr();
+    if (displaced == nullptr) {
+        translation = this->volume->GetTranslation();
+        auto r = this->volume->GetRotation();
+        if (r != nullptr) {
+            rotation = *r;
+        }
+    } else {
+        auto transform = G4AffineTransform(
+            this->volume->GetRotation(),
+            this->volume->GetTranslation()
+        );
+        transform *= displaced->GetTransform(); // XXX Check this.
+        translation = transform.NetTranslation();
+        rotation = transform.NetRotation();
+    }
+    return {
+        translation.x(), translation.y(), translation.z(),
+        rotation.xx(), rotation.xy(), rotation.xz(),
+        rotation.yx(), rotation.yy(), rotation.yz(),
+        rotation.zx(), rotation.zy(), rotation.zz()
+    };
+}
+
+TubsInfo VolumeBorrow::describe_tubs() const {
+    auto solid = static_cast<Tubs *>(
+        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    );
+    return {
+        solid->GetInnerRadius(),
+        solid->GetOuterRadius(),
+        2.0 * solid->GetZHalfLength(),
+        solid->GetStartPhiAngle(),
+        solid->GetDeltaPhiAngle(),
+    };
 }
 
 std::shared_ptr<Error> VolumeBorrow::dump(rust::Str path) const {
