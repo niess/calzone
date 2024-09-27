@@ -677,9 +677,9 @@ static const G4VPhysicalVolume * get_volume(
     const std::string & path,
     std::map<std::string, const G4VPhysicalVolume *> & elements
 ) {
-    auto volume = elements[path];
+    const G4VPhysicalVolume * volume = elements[path];
     if (volume == nullptr) {
-        auto msg = fmt::format("unknown volume '{}'", path);
+        std::string msg = fmt::format("unknown volume '{}'", path);
         set_error(ErrorType::ValueError, msg.c_str());
     }
     return volume;
@@ -688,18 +688,24 @@ static const G4VPhysicalVolume * get_volume(
 std::shared_ptr<VolumeBorrow> GeometryBorrow::borrow_volume(
     rust::Str name_
 ) const {
-    auto name = std::string(name_);
-    auto volume = get_volume(name, this->data->elements);
-    if (volume == nullptr) {
-        return nullptr;
+    clear_error();
+    std::string name = std::string(name_);
+    const G4VPhysicalVolume * volume = nullptr;
+    if (name == "__root__") {
+        volume = this->data->world;
     } else {
-        return std::make_shared<VolumeBorrow>(this->data, volume);
+        volume = get_volume(name, this->data->elements);
+        if (volume == nullptr) {
+            return nullptr;
+        }
     }
+    return std::make_shared<VolumeBorrow>(this->data, volume);
 }
 
 std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
     rust::Str stem_
 ) const {
+    clear_error();
     auto stem = std::string(stem_);
 
     std::function<G4VPhysicalVolume * (G4VPhysicalVolume *)> inspect;
@@ -876,6 +882,7 @@ std::array<double, 6> VolumeBorrow::compute_box(rust::Str frame) const {
 std::unique_ptr<G4AffineTransform> VolumeBorrow::compute_transform(
     rust::Str frame_
 ) const {
+    clear_error();
     std::string frame;
     if (frame_.empty()) {
         frame = this->geometry->world->GetName();
@@ -988,7 +995,6 @@ VolumeInfo VolumeBorrow::describe() const {
     info.material = rust::String(logical->GetMaterial()->GetName());
     G4VSolid * solid = get_base_solid(logical->GetSolid());
     info.solid = rust::String(solid->GetEntityType());
-    // XXX Resolve displaced / boolean.
     auto mother = this->geometry->mothers[this->volume];
     if (mother == nullptr) {
         info.mother = rust::String("");

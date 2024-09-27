@@ -87,14 +87,6 @@ Python interface
       :py:class:`Geant4Exception` is raised. Thus, only the first found overlap
       is reported, in case that the geometry comprises multiple overlaps.
 
-   .. method:: dump(path=None)
-
-      Dump the geometry to a `GDML`_ file.
-
-      If *path* is :python:`None`, then the geometry is dumped to
-      :python:`"geometry.gdml"`. Note that contrary to Geant4, this method
-      erases any existing `GDML`_ file with the same name.
-
    .. automethod:: export()
 
       Export the Geant4 geometry as a `goupil.ExternalGeometry
@@ -105,6 +97,10 @@ Python interface
       The *stem* argument might specify a volume :py:attr:`name
       <calzone.Volume.name>` or the tail of an incomplete :py:attr:`pathname
       <calzone.Volume.path>`.
+
+   .. attribute:: root
+
+      The geometry root :py:class:`volume <calzone.Volume>`.
 
 ----
 
@@ -596,8 +592,8 @@ Python interface
       Dump the volume geometry to a `GDML`_ file.
 
       If *path* is :python:`None`, then the geometry is dumped to
-      :python:`"volume.gdml"`. Note that contrary to Geant4, this method erases
-      any existing `GDML`_ file with the same name.
+      :python:`f"{self.name}.gdml"`. Note that contrary to Geant4, this method
+      erases any existing `GDML`_ file with the same name.
 
    .. automethod:: origin
 

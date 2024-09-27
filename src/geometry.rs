@@ -49,6 +49,12 @@ impl Geometry {
         Ok(geometry)
     }
 
+    /// The geometry root volume.
+    #[getter]
+    fn get_root(&self) -> PyResult<Volume> {
+        Volume::new(&self.0, "__root__", true)
+    }
+
     fn __getitem__(&self, path: &str) -> PyResult<Volume> {
         Volume::new(&self.0, path, true)
     }
@@ -59,21 +65,6 @@ impl Geometry {
         self.0
             .check(resolution)
             .to_result()?;
-        Ok(())
-    }
-
-    /// Dump the geometry to a GDML file.
-    fn dump(&self, path: Option<&str>) -> PyResult<()> {
-        let tmp = TempDir::new()?;
-        let path = path.unwrap_or("geometry.gdml");
-        let tmp_path = tmp
-            .child("geometry.gdml")
-            .display()
-            .to_string();
-        self.0
-            .dump(tmp_path.as_str())
-            .to_result()?;
-        std::fs::copy(&tmp_path, path)?;
         Ok(())
     }
 
