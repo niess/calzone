@@ -104,15 +104,15 @@ pub mod ffi {
     }
 
     #[derive(Serialize)]
-    #[serde(transparent)]
     struct BoxInfo {
-        size: [f64; 3]
+        size: [f64; 3],
+        displacement: [f64; 3],
     }
 
     #[derive(Serialize)]
-    #[serde(transparent)]
     struct OrbInfo {
         radius: f64,
+        displacement: [f64; 3],
     }
 
     #[derive(Serialize)]
@@ -138,6 +138,7 @@ pub mod ffi {
         length: f64,
         start_phi_angle: f64,
         delta_phi_angle: f64,
+        displacement: [f64; 3],
     }
 
 

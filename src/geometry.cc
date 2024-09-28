@@ -969,7 +969,7 @@ double VolumeBorrow::compute_volume(bool include_daughters) const {
 
 static G4VSolid * get_unsubtracted_solid(G4VSolid * solid) {
     for (;;) {
-        auto constituent = solid->GetConstituentSolid(0);
+        G4VSolid * constituent = solid->GetConstituentSolid(0);
         if (constituent == nullptr) {
             break;
         } else {
@@ -979,12 +979,21 @@ static G4VSolid * get_unsubtracted_solid(G4VSolid * solid) {
     return solid;
 }
 
-static G4VSolid * get_base_solid(G4VSolid * solid) {
+static std::pair<G4VSolid *, G4ThreeVector> get_displaced_solid(
+    G4VSolid * solid
+) {
     solid = get_unsubtracted_solid(solid);
-    if (solid->GetDisplacedSolidPtr() != nullptr) {
-        return solid->GetDisplacedSolidPtr()->GetConstituentMovedSolid();
+    G4DisplacedSolid * displaced = solid->GetDisplacedSolidPtr();
+    if (displaced != nullptr) {
+        return std::pair(
+            displaced->GetConstituentMovedSolid(),
+            displaced->GetTransform().Inverse().NetTranslation()
+        );
     } else {
-        return solid;
+        return std::pair(
+            solid,
+            G4ThreeVector(0.0, 0.0, 0.0)
+        );
     }
 }
 
@@ -993,7 +1002,7 @@ VolumeInfo VolumeBorrow::describe() const {
     info.path = this->volume->GetName();
     auto logical = this->volume->GetLogicalVolume();
     info.material = rust::String(logical->GetMaterial()->GetName());
-    G4VSolid * solid = get_base_solid(logical->GetSolid());
+    G4VSolid * solid = get_displaced_solid(logical->GetSolid()).first;
     info.solid = rust::String(solid->GetEntityType());
     auto mother = this->geometry->mothers[this->volume];
     if (mother == nullptr) {
@@ -1015,26 +1024,38 @@ VolumeInfo VolumeBorrow::describe() const {
 }
 
 BoxInfo VolumeBorrow::describe_box() const {
-    auto solid = static_cast<Box *>(
-        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    auto result = get_displaced_solid(
+        this->volume->GetLogicalVolume()->GetSolid()
     );
+    auto solid = static_cast<Box *>(result.first);
+    auto displacement = result.second;
     return {
         2.0 * solid->GetXHalfLength(),
         2.0 * solid->GetYHalfLength(),
-        2.0 * solid->GetZHalfLength()
+        2.0 * solid->GetZHalfLength(),
+        displacement.x(),
+        displacement.y(),
+        displacement.z()
     };
 }
 
 OrbInfo VolumeBorrow::describe_orb() const {
-    auto solid = static_cast<Orb *>(
-        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    auto result = get_displaced_solid(
+        this->volume->GetLogicalVolume()->GetSolid()
     );
-    return { solid->GetRadius() };
+    auto solid = static_cast<Orb *>(result.first);
+    auto displacement = result.second;
+    return {
+        solid->GetRadius(),
+        displacement.x(),
+        displacement.y(),
+        displacement.z()
+    };
 }
 
 SphereInfo VolumeBorrow::describe_sphere() const {
     auto solid = static_cast<Sphere *>(
-        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+        get_unsubtracted_solid(this->volume->GetLogicalVolume()->GetSolid())
     );
     return {
         solid->GetInnerRadius(),
@@ -1048,7 +1069,7 @@ SphereInfo VolumeBorrow::describe_sphere() const {
 
 void VolumeBorrow::describe_tessellated_solid(rust::Vec<float> & data) const {
     auto solid = static_cast<TessellatedSolid *>(
-        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+        get_unsubtracted_solid(this->volume->GetLogicalVolume()->GetSolid())
     );
     const int n = solid->GetNumberOfFacets();
     data.reserve(9 * n);
@@ -1065,32 +1086,19 @@ void VolumeBorrow::describe_tessellated_solid(rust::Vec<float> & data) const {
 
 const rust::Box<SortedTessels> & VolumeBorrow::describe_tessellation() const {
     auto solid = static_cast<Tessellation *>(
-        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+        get_unsubtracted_solid(this->volume->GetLogicalVolume()->GetSolid())
     );
     return solid->Describe();
 }
 
 TransformInfo VolumeBorrow::describe_transform() const {
-    G4ThreeVector translation;
+    G4ThreeVector translation = this->volume->GetTranslation();
     G4RotationMatrix rotation;
-    auto solid = get_unsubtracted_solid(
-        this->volume->GetLogicalVolume()->GetSolid()
-    );
-    auto displaced = solid->GetDisplacedSolidPtr();
-    if (displaced == nullptr) {
-        translation = this->volume->GetTranslation();
+    {
         auto r = this->volume->GetRotation();
         if (r != nullptr) {
             rotation = *r;
         }
-    } else {
-        auto transform = G4AffineTransform(
-            this->volume->GetRotation(),
-            this->volume->GetTranslation()
-        );
-        transform *= displaced->GetTransform(); // XXX Check this.
-        translation = transform.NetTranslation();
-        rotation = transform.NetRotation();
     }
     return {
         translation.x(), translation.y(), translation.z(),
@@ -1101,15 +1109,20 @@ TransformInfo VolumeBorrow::describe_transform() const {
 }
 
 TubsInfo VolumeBorrow::describe_tubs() const {
-    auto solid = static_cast<Tubs *>(
-        get_base_solid(this->volume->GetLogicalVolume()->GetSolid())
+    auto result = get_displaced_solid(
+        this->volume->GetLogicalVolume()->GetSolid()
     );
+    auto solid = static_cast<Tubs *>(result.first);
+    auto displacement = result.second;
     return {
         solid->GetInnerRadius(),
         solid->GetOuterRadius(),
         2.0 * solid->GetZHalfLength(),
         solid->GetStartPhiAngle(),
         solid->GetDeltaPhiAngle(),
+        displacement.x(),
+        displacement.y(),
+        displacement.z()
     };
 }
 
