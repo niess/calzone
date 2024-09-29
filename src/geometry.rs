@@ -585,84 +585,6 @@ impl Volume {
         Ok(())
     }
 
-    /// Return a binary representation of the volume.
-    #[pyo3(signature=(*, include_daughters=None))]
-    #[pyo3(text_signature="(*, include_daughters=True)")]
-    fn bytes<'py>(
-        &self,
-        py: Python<'py>,
-        include_daughters: Option<bool>
-    ) -> PyResult<Bound<'py, PyBytes>> {
-        fn get_info(
-            solid: &str,
-            material: String,
-            volume: &ffi::VolumeBorrow
-        ) -> bytes::VolumeInfo {
-            let solid = match solid {
-                "G4Box" => bytes::SolidInfo::Box(volume.describe_box()),
-                "G4Orb" => bytes::SolidInfo::Orb(volume.describe_orb()),
-                "G4Sphere" => bytes::SolidInfo::Sphere(volume.describe_sphere()),
-                "G4TessellatedSolid" => {
-                    let mut data: Vec<f32> = Vec::new();
-                    volume.describe_tessellated_solid(&mut data);
-                    bytes::SolidInfo::Tessellation(data)
-                },
-                "G4Tubs" => bytes::SolidInfo::Tubs(volume.describe_tubs()),
-                "Tessellation" => {
-                    let data: Vec<f32> = volume.describe_tessellation().as_ref().into();
-                    bytes::SolidInfo::Tessellation(data)
-                },
-                _ => unreachable!("unexpected solid '{}'", solid),
-            };
-            let transform = volume.describe_transform();
-            bytes::VolumeInfo {
-                solid,
-                material,
-                transform,
-                daughters: Vec::new()
-            }
-        }
-
-        let mut volume = get_info(self.solid.as_str(), self.material.clone(), &self.volume);
-
-        if include_daughters.unwrap_or(true) {
-            fn add(
-                volume: &mut bytes::VolumeInfo,
-                daughters: &[String],
-                geometry: &ffi::GeometryBorrow
-            ) { // recursively.
-                for daughter in daughters {
-                    let daughter_volume = geometry.borrow_volume(daughter);
-                    let ffi::VolumeInfo { material, solid, mut daughters, .. } =
-                        daughter_volume.describe();
-                    let daughters: Vec<_> = daughters.drain(..)
-                        .map(|ffi::DaughterInfo { path, .. }| path)
-                        .collect();
-                    let mut daughter_volume = get_info(
-                        solid.as_str(),
-                        material,
-                        &daughter_volume
-                    );
-                    add(&mut daughter_volume, &daughters, geometry);
-                    volume.daughters.push(daughter_volume);
-                }
-            }
-            add(&mut volume, &self.daughters, &self.geometry);
-        }
-
-        let mut buffer = Vec::new();
-        let mut serializer = Serializer::new(&mut buffer);
-        volume.serialize(&mut serializer)
-            .map_err(|err| {
-                let why = format!("{}", err);
-                Error::new(Exception)
-                    .what("serialisation")
-                    .why(&why)
-                    .to_err()
-            })?;
-        Ok(PyBytes::new_bound(py, &buffer))
-    }
-
     /// Return the volume's Axis-Aligned Bounding-Box (AABB).
     #[pyo3(name = "aabb")]
     fn compute_aabb(
@@ -785,6 +707,96 @@ impl Volume {
             result.into_py(py)
         };
         Ok(result)
+    }
+
+    /// Return a binary representation of the volume.
+    #[pyo3(signature=(*, include_daughters=None))]
+    #[pyo3(text_signature="(*, include_daughters=True)")]
+    fn to_bytes<'py>(
+        &self,
+        py: Python<'py>,
+        include_daughters: Option<bool>
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        fn get_info(
+            name: &str,
+            solid: &str,
+            material: String,
+            volume: &ffi::VolumeBorrow
+        ) -> bytes::VolumeInfo {
+            let solid = match solid {
+                "G4Box" => bytes::SolidInfo::Box(volume.describe_box()),
+                "G4Orb" => bytes::SolidInfo::Orb(volume.describe_orb()),
+                "G4Sphere" => bytes::SolidInfo::Sphere(volume.describe_sphere()),
+                "G4TessellatedSolid" => {
+                    let mut data: Vec<f32> = Vec::new();
+                    volume.describe_tessellated_solid(&mut data);
+                    bytes::SolidInfo::Tessellation(data)
+                },
+                "G4Tubs" => bytes::SolidInfo::Tubs(volume.describe_tubs()),
+                "Tessellation" => {
+                    let data: Vec<f32> = volume.describe_tessellation().as_ref().into();
+                    bytes::SolidInfo::Tessellation(data)
+                },
+                _ => unreachable!("unexpected solid '{}'", solid),
+            };
+            let transform = volume.describe_transform();
+            bytes::VolumeInfo {
+                name: name.to_string(),
+                solid,
+                material,
+                transform,
+                daughters: Vec::new()
+            }
+        }
+
+        let mut volume = get_info(
+            self.get_name(),
+            self.solid.as_str(),
+            self.material.clone(),
+            &self.volume
+        );
+
+        if include_daughters.unwrap_or(true) {
+            fn add(
+                volume: &mut bytes::VolumeInfo,
+                daughters: &[String],
+                geometry: &ffi::GeometryBorrow
+            ) { // recursively.
+                for daughter in daughters {
+                    let daughter_volume = geometry.borrow_volume(daughter);
+                    let ffi::VolumeInfo { path, material, solid, mut daughters, .. } =
+                        daughter_volume.describe();
+                    let name = match path.rsplit_once('.') {
+                        None => path.as_str(),
+                        Some((_, name)) => name,
+                    };
+                    let daughters: Vec<_> = daughters.drain(..)
+                        .map(|ffi::DaughterInfo { path, .. }| path)
+                        .collect();
+                    let mut daughter_volume = get_info(
+                        name,
+                        solid.as_str(),
+                        material,
+                        &daughter_volume
+                    );
+                    add(&mut daughter_volume, &daughters, geometry);
+                    volume.daughters.push(daughter_volume);
+                }
+            }
+            add(&mut volume, &self.daughters, &self.geometry);
+        }
+
+        let mut buffer = Vec::new();
+        let mut serializer = Serializer::new(&mut buffer);
+        volume.serialize(&mut serializer)
+            .map_err(|err| {
+                let why = format!("{}", err);
+                Error::new(Exception)
+                    .what("serialisation")
+                    .why(&why)
+                    .to_err()
+            })?;
+        Ok(PyBytes::new_bound(py, &buffer))
     }
 }
 

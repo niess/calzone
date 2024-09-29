@@ -4,6 +4,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct VolumeInfo {
+    pub name: String,
     pub solid: SolidInfo,
     pub material: String,
     pub transform: ffi::TransformInfo,
