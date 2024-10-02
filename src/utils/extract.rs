@@ -570,7 +570,7 @@ impl Rotation {
             Self::Matrix(m) => m,
             Self::Vector(v) => {
                 let v = Vector3::<f64>::from_iterator(v.as_ref().iter().map(|v| *v));
-                let angle = (v.norm() / 90.0) * std::f64::consts::PI;
+                let angle = v.norm().to_radians();
                 let axis = Unit::new_normalize(v);
                 let rotation = Rotation3::from_axis_angle(&axis, angle);
                 let rotation: [[f64; 3]; 3] = rotation.into_inner().into();
