@@ -14,6 +14,7 @@ use pyo3::types::{PyBytes, PyTuple};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use super::cxx::ffi;
+use std::path::Path;
 use temp_dir::TempDir;
 
 mod bytes;
@@ -142,7 +143,7 @@ impl GeometryBuilder {
     #[new]
     fn new(definition: Option<DictLike>) -> PyResult<Self> {
         let definition = match definition {
-            Some(definition) => GeometryDefinition::new(definition)?,
+            Some(definition) => GeometryDefinition::new(definition, None)?,
             None => GeometryDefinition::default(),
         };
         let algorithm = Algorithm::default();
@@ -329,7 +330,8 @@ impl GeometryBuilder {
         position: Option<f64x3>,
         rotation: Option<Rotation>,
     ) -> PyResult<Bound<'py, GeometryBuilder>> {
-        let GeometryDefinition { mut volume, materials } = GeometryDefinition::new(definition)?;
+        let GeometryDefinition { mut volume, materials } =
+            GeometryDefinition::new(definition, None)?;
         if let Some(position) = position {
             volume.position = Some(position);
         }
@@ -449,18 +451,18 @@ struct GeometryDefinition {
 }
 
 impl GeometryDefinition {
-    pub fn new(definition: DictLike) -> PyResult<Self> {
+    pub fn new(definition: DictLike, file: Option<&Path>) -> PyResult<Self> {
         const EXTRACTOR: Extractor<1> = Extractor::new([
             Property::optional_any("materials"),
         ]);
 
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let tag = Tag::new("geometry", "", None);
+        let tag = Tag::new("geometry", "", file);
         let [materials] = EXTRACTOR.extract(
             &tag, &definition, Some(&mut remainder)
         )?;
 
-        let (_, file) = definition.resolve(None)?;
+        let (_, file) = definition.resolve(file)?;
 
         if remainder.len() != 1 {
             let why = format!("expected 1 root volume, found {}", remainder.len());

@@ -69,6 +69,14 @@ pub(super) enum ShapeType {
     Tessellation,
 }
 
+pub struct Include {
+    path: String,
+    position: Option<f64x3>,
+    rotation: Option<f64x3x3>,
+    name: Option<String>,
+    subtract: Vec<String>,
+}
+
 impl Volume {
     pub(super) fn check(name: &str) -> Result<(), &'static str> {
         for c in name.chars() {
@@ -265,7 +273,7 @@ impl TryFromBound for Volume {
             .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
 
         // Extract base properties.
-        const EXTRACTOR: Extractor<7> = Extractor::new([
+        const EXTRACTOR: Extractor<8> = Extractor::new([
             Property::required_str("material"),
             Property::optional_strs("role"),
             Property::optional_vec("position"),
@@ -273,11 +281,13 @@ impl TryFromBound for Volume {
             Property::optional_dict("overlaps"),
             Property::optional_strs("subtract"),
             Property::optional_any("materials"),
+            Property::optional_any("include"), // XXX Document this option.
         ]);
 
+        let py = value.py();
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, role, position, rotation, overlaps, subtract, materials] =
+        let [material, role, position, rotation, overlaps, subtract, materials, include] =
             EXTRACTOR.extract(&tag, value, Some(&mut remainder))?;
 
         let name = tag.name().to_string();
@@ -287,6 +297,7 @@ impl TryFromBound for Volume {
         let rotation: Option<f64x3x3> = rotation.into();
         let overlaps: Option<DictLike> = overlaps.into();
         let subtract: Vec<String> = subtract.into();
+        let include: Option<Bound<PyAny>> = include.into();
 
         // Parse role(s).
         let (_, tag) = tag.resolve(value)?;
@@ -343,7 +354,45 @@ impl TryFromBound for Volume {
                 Self::try_from_any(&tag, &v)
             })
             .collect();
-        let volumes = volumes?;
+        let mut volumes = volumes?;
+
+        // Extract includes.
+        if let Some(include) = include {
+            let includes: PyResult<Vec<Bound<PyAny>>> = FromPyObject::extract_bound(&include);
+            let includes = includes.unwrap_or_else(|_| vec![include]);
+            for include in includes {
+                let include = {
+                    let path: PyResult<String> = FromPyObject::extract_bound(&include);
+                    match path {
+                        Ok(path) => Include::new(path),
+                        Err(_) => {
+                            let include: Include = TryFromBound::try_from_any(&tag, &include)?;
+                            include
+                        },
+                    }
+                };
+                let definition = super::GeometryDefinition::new(
+                    DictLike::from_str(py, include.path.as_str()), tag.file(),
+                )?;
+                let mut sub = *definition.volume;
+                if let Some(name) = include.name {
+                    sub.name = name
+                }
+                sub.position = include.position.or(sub.position);
+                sub.rotation = include.rotation.or(sub.rotation);
+                sub.subtract = include.subtract;
+
+                for v in volumes.iter() {
+                    if v.name == sub.name {
+                        let err = tag.bad().what("include").why(format!(
+                            "multiple definitions of volume '{}'", sub.name,
+                        )).to_err(ValueError);
+                        return Err(err);
+                    }
+                }
+                volumes.push(sub);
+            }
+        }
 
         // Extract overlaps.
         let overlaps = match overlaps {
@@ -362,6 +411,7 @@ impl TryFromBound for Volume {
             name, material, roles, shape, position, rotation, volumes, overlaps, subtract,
             materials
         };
+
         Ok(volume)
     }
 }
@@ -607,6 +657,36 @@ impl TryFromBound for ffi::TessellatedShape {
     }
 }
 
+impl TryFromBound for Include {
+    fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
+        // Extract base properties.
+        const EXTRACTOR: Extractor<5> = Extractor::new([
+            Property::required_str("path"),
+            Property::optional_vec("position"),
+            Property::optional_mat("rotation"),
+            Property::optional_str("name"),
+            Property::optional_strs("subtract"),
+        ]);
+
+        let tag = tag.cast("include");
+        let [path, position, rotation, name, subtract] = EXTRACTOR.extract_any(&tag, value, None)?;
+
+        let path: String = path.into();
+        let position: Option<f64x3> = position.into();
+        let rotation: Option<f64x3x3> = rotation.into();
+        let name: Option<String> = name.into();
+        let subtract: Vec<String> = subtract.into();
+
+        let include = Self { path, position, rotation, name, subtract };
+        Ok(include)
+    }
+}
+
+impl Include {
+    fn new(path: String) -> Self {
+        Self { path, position: None, rotation: None, name: None, subtract: Vec::new() }
+    }
+}
 
 // ===============================================================================================
 //

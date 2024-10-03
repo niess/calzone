@@ -282,7 +282,7 @@ impl<const N: usize> Extractor<N> {
                     let err = tag.bad().why(format!(
                         "unknown property '{}'",
                         k
-                    )).to_err(ErrorKind::ValueError);
+                    )).to_err(ErrorKind::TypeError);
                     return Err(err);
                 },
                 Some(remainder) => {
@@ -299,7 +299,7 @@ impl<const N: usize> Extractor<N> {
                     let err = tag.bad().why(format!(
                         "missing '{}' property",
                         self.properties[index].name,
-                    )).to_err(ErrorKind::ValueError);
+                    )).to_err(ErrorKind::TypeError);
                     return Err(err);
                 } else {
                     values[index] = default.into();

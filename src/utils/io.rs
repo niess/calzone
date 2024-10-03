@@ -118,6 +118,11 @@ impl<'py> DictLike<'py> {
             Self::String(path) => path.0.py(),
         }
     }
+
+    pub fn from_str(py: Python<'py>, value: &str) -> Self {
+        let value = PyString::new_bound(py, value);
+        Self::String(PathString(value))
+    }
 }
 
 
