@@ -57,7 +57,7 @@ pub mod ffi {
     #[derive(Deserialize, Serialize)]
     struct EnvelopeShape {
         shape: ShapeType,
-        safety: f64,
+        padding: [f64; 6],
     }
 
     struct DaughterInfo {

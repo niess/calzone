@@ -109,7 +109,14 @@ static G4VSolid * build_envelope(
             if (mx[i] > max[i]) max[i] = mx[i];
         }
     }
-    auto safety = envelope.safety * CLHEP::cm;
+    std::array<double, 6> padding = {
+        envelope.padding[0] * CLHEP::cm,
+        envelope.padding[1] * CLHEP::cm,
+        envelope.padding[2] * CLHEP::cm,
+        envelope.padding[3] * CLHEP::cm,
+        envelope.padding[4] * CLHEP::cm,
+        envelope.padding[5] * CLHEP::cm
+    };
 
     // Create bounding solid.
     G4VSolid * solid;
@@ -117,34 +124,34 @@ static G4VSolid * build_envelope(
         case ShapeType::Box:
             solid = new Box(
                 pathname,
-                0.5 * (max[0] - min[0]) + safety,
-                0.5 * (max[1] - min[1]) + safety,
-                0.5 * (max[2] - min[2]) + safety
+                0.5 * (max[0] - min[0] + padding[0] + padding[1]),
+                0.5 * (max[1] - min[1] + padding[2] + padding[3]),
+                0.5 * (max[2] - min[2] + padding[4] + padding[5])
             );
             break;
         case ShapeType::Cylinder: {
-                const double dx = max[0] - min[0];
-                const double dy = max[1] - min[1];
+                const double dx = max[0] - min[0] + padding[0] + padding[1];
+                const double dy = max[1] - min[1] + padding[2] + padding[3];
                 const double radius = 0.5 * std::sqrt(dx * dx + dy * dy);
                 solid = new Tubs(
                     pathname,
                     0.0,
-                    radius + safety,
-                    0.5 * (max[2] - min[2]) + safety,
+                    radius,
+                    0.5 * (max[2] - min[2] + padding[4] + padding[5]),
                     0.0,
                     CLHEP::twopi
                 );
             }
             break;
         case ShapeType::Sphere: {
-                const double dx = max[0] - min[0];
-                const double dy = max[1] - min[1];
-                const double dz = max[2] - min[2];
+                const double dx = max[0] - min[0] + padding[0] + padding[1];
+                const double dy = max[1] - min[1] + padding[2] + padding[3];
+                const double dz = max[2] - min[2] + padding[4] + padding[5];
                 const double radius =
                     0.5 * std::sqrt(dx * dx + dy * dy + dz * dz);
                 solid = new Orb(
                     pathname,
-                    radius + safety
+                    radius
                 );
             }
             break;
@@ -153,9 +160,9 @@ static G4VSolid * build_envelope(
     }
 
     // Translate solid, if not already centered.
-    auto tx = 0.5 * (max[0] + min[0]);
-    auto ty = 0.5 * (max[1] + min[1]);
-    auto tz = 0.5 * (max[2] + min[2]);
+    auto tx = 0.5 * (max[0] + min[0] + padding[1] - padding[0]);
+    auto ty = 0.5 * (max[1] + min[1] + padding[3] - padding[2]);
+    auto tz = 0.5 * (max[2] + min[2] + padding[5] - padding[4]);
     if ((tx == 0.0) && (ty == 0.0) && (tz == 0.0)) {
         return solid;
     } else {

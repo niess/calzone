@@ -1,6 +1,6 @@
 use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
 use crate::utils::error::variant_error;
-use crate::utils::extract::{extract, Extractor, Vector, Property, PropertyValue, Tag,
+use crate::utils::extract::{extract, Extractor, Vector, Padding, Property, PropertyValue, Tag,
                             TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
 use crate::utils::io::{DictLike, load_stl};
@@ -248,14 +248,14 @@ impl Shape {
 impl Default for Shape {
     fn default() -> Self {
         Self::Envelope(ffi::EnvelopeShape {
-            safety: ffi::EnvelopeShape::DEFAULT_SAFETY,
+            padding: ffi::EnvelopeShape::DEFAULT_PADDING,
             shape: ffi::EnvelopeShape::DEFAULT_SHAPE,
         })
     }
 }
 
 impl ffi::EnvelopeShape {
-    const DEFAULT_SAFETY: f64 = 0.01;
+    const DEFAULT_PADDING: [f64; 6] = [0.01; 6];
     const DEFAULT_SHAPE: ffi::ShapeType = ffi::ShapeType::Box;
     const DEFAULT_SHAPE_NAME: &'static str = "box";
 }
@@ -496,25 +496,26 @@ impl TryFromBound for ffi::CylinderShape {
 
 impl TryFromBound for ffi::EnvelopeShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let mut safety: Option<f64> = None;
+        let mut padding: Option<[f64; 6]> = None; // XXX Document padding.
         let shape: PyResult<String> = value.extract();
         let shape: String = match shape {
             Err(_) => {
-                let sfty: PyResult<f64> = value.extract();
-                match sfty {
+                let pdng: PyResult<Padding> = value.extract();
+                match pdng {
                     Err(_) => {
                         const EXTRACTOR: Extractor<2> = Extractor::new([
                             Property::new_str("shape", ffi::EnvelopeShape::DEFAULT_SHAPE_NAME),
-                            Property::optional_f64("safety"),
+                            Property::optional_padding("padding"),
                         ]);
 
                         let tag = tag.cast("Envelope");
-                        let [shape, sfty] = EXTRACTOR.extract_any(&tag, value, None)?;
-                        safety = sfty.into();
+                        let [shape, pdng] = EXTRACTOR.extract_any(&tag, value, None)?;
+                        padding = Option::<Padding>::from(pdng)
+                            .map(|padding| padding.into_array());
                         shape.into()
                     }
-                    Ok(sfty) => {
-                        safety = Some(sfty);
+                    Ok(pdng) => {
+                        padding = Some(pdng.into_array());
                         Self::DEFAULT_SHAPE_NAME.to_string()
                     },
                 }
@@ -533,8 +534,8 @@ impl TryFromBound for ffi::EnvelopeShape {
                 let options = ["box", "cylinder", "sphere"];
                 variant_error(message.as_str(), shape.as_str(), &options)
             })?;
-        let safety = safety.unwrap_or(Self::DEFAULT_SAFETY);
-        let envelope = Self { shape, safety };
+        let padding = padding.unwrap_or(Self::DEFAULT_PADDING);
+        let envelope = Self { shape, padding };
         Ok(envelope)
     }
 }

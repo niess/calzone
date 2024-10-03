@@ -224,6 +224,7 @@ enum PropertyDefault {
     F64x3x3(f64x3x3),
     Interval([f64; 2]),
     Optional,
+    Padding(Padding),
     Required,
     String(&'static str),
     U32(u32),
@@ -237,6 +238,7 @@ enum PropertyType {
     F64x3,
     F64x3x3,
     Interval,
+    Padding,
     String,
     Strings,
     U32,
@@ -251,6 +253,7 @@ pub enum PropertyValue<'py> {
     F64x3x3(f64x3x3),
     Interval([f64; 2]),
     None,
+    Padding(Padding),
     String(String),
     Strings(Vec<String>),
     U32(u32),
@@ -407,6 +410,12 @@ impl Property {
         Self::new(name, tp, default)
     }
 
+    pub const fn optional_padding(name: &'static str) -> Self {
+        let tp = PropertyType::Padding;
+        let default = PropertyDefault::Optional;
+        Self::new(name, tp, default)
+    }
+
     pub const fn optional_str(name: &'static str) -> Self {
         let tp = PropertyType::String;
         let default = PropertyDefault::Optional;
@@ -514,6 +523,11 @@ impl Property {
                     .or_else(bad_property)?;
                 PropertyValue::F64x3x3(value.into_mat())
             },
+            PropertyType::Padding => {
+                let value: Padding = extract(value)
+                    .or_else(bad_property)?;
+                PropertyValue::Padding(value)
+            },
             PropertyType::Interval => {
                 let value: [f64; 2] = extract(value)
                     .or_else(bad_property)?;
@@ -580,6 +594,26 @@ impl Rotation {
     }
 }
 
+#[derive(Clone, Copy, FromPyObject)]
+pub enum Padding {
+    #[pyo3(transparent, annotation = "[float;6]")]
+    Float6([f64; 6]),
+    #[pyo3(transparent, annotation = "[float;3]")]
+    Float3([f64; 3]),
+    #[pyo3(transparent, annotation = "float")]
+    Float(f64),
+}
+
+impl Padding {
+    pub fn into_array(self) -> [f64; 6] {
+        match self {
+            Self::Float(f) => [f; 6],
+            Self::Float3(a) => [a[0], a[0], a[1], a[1], a[2], a[2]],
+            Self::Float6(a) => a,
+        }
+    }
+}
+
 #[derive(FromPyObject)]
 pub enum Strings {
     #[pyo3(transparent, annotation = "str")]
@@ -624,6 +658,7 @@ impl<'py> From<&PropertyDefault> for PropertyValue<'py> {
             PropertyDefault::F64x3x3(value) => Self::F64x3x3(*value),
             PropertyDefault::Interval(value) => Self::Interval(*value),
             PropertyDefault::Optional => Self::None,
+            PropertyDefault::Padding(value) => Self::Padding(*value),
             PropertyDefault::String(value) => Self::String(value.to_string()),
             PropertyDefault::U32(value) => Self::U32(*value),
             _ => unreachable!()
@@ -758,6 +793,25 @@ impl<'py> From<PropertyValue<'py>> for Option<[f64; 2]> {
     fn from(value: PropertyValue<'py>) -> Option<[f64; 2]> {
         match value {
             PropertyValue::Interval(value) => Some(value),
+            PropertyValue::None => None,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Padding {
+    fn from(value: PropertyValue<'py>) -> Padding {
+        match value {
+            PropertyValue::Padding(value) => value,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'py> From<PropertyValue<'py>> for Option<Padding> {
+    fn from(value: PropertyValue<'py>) -> Option<Padding> {
+        match value {
+            PropertyValue::Padding(value) => Some(value),
             PropertyValue::None => None,
             _ => unreachable!(),
         }
@@ -906,6 +960,10 @@ impl TypeName for [f64; 2] {
 
 impl TypeName for Vector {
     fn type_name() -> &'static str { "a (vector of) 'float'" }
+}
+
+impl TypeName for Padding {
+    fn type_name() -> &'static str { "an (array of) 'float'" }
 }
 
 impl TypeName for Rotation {
