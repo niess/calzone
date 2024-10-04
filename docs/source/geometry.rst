@@ -592,13 +592,14 @@ explictily separated. For instance,
 
 .. code:: toml
 
-   [materials.molecules]
+   [molecules]
 
    H2O = { .. }
 
-   [materials.mixtures]
+   [mixtures.Air]
 
-   Air = { .. }
+   density = 1.205E-03
+   ..
 
 In addition, the materials table may also contain (custom) atomic elements.
 
@@ -693,17 +694,17 @@ number (*A*, in g/mol). Optionally, a *symbol* can be specified.
 Molecules
 ~~~~~~~~~
 
-Molecules are specified by their *density* (in g/cm\ :sup:`3`) and their
-*composition* (in atomic elements). Optionaly, a *state* can be specified (
-:python:`"gas"`, :python:`"liquid"` or :python:`"solid"`). For instance,
+Molecules are defined by their density (expressed in in g/cm\ :sup:`3`) and
+their atomic elements *composition*. Additionally, a *state* may be specified
+(:python:`"gas"`, :python:`"liquid"` or :python:`"solid"`). In the absence of an
+explicit composition specification, it is inferred from the molecule name, which
+is interpreted as a chemical formula. For example,
 
 .. code:: toml
 
-   [materials.molecules.H2O]
+   [molecules]
 
-   density = 1.0
-   state = "liquid"
-   composition = { H = 2, O = 1 }
+   H2O = { density = 1.0, state = "liquid" }
 
 .. _tab-molecule-items:
 
@@ -720,7 +721,7 @@ Molecules are specified by their *density* (in g/cm\ :sup:`3`) and their
      - 
    * - :python:`"composition"`
      - :python:`dict` (:numref:`tab-molecule-component`)
-     - 
+     - :python:`None`
    * - :python:`"state"`
      - :python:`str`
      - :python:`None`
@@ -748,7 +749,7 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 
 .. code:: toml
 
-   [materials.mixtures.Air]
+   [mixtures.Air]
 
    density = 1.205E-03
    state = "gas"

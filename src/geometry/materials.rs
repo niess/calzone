@@ -4,6 +4,7 @@ use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::io::DictLike;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use super::ffi;
 use super::volume::Volume;
@@ -239,13 +240,16 @@ impl TryFromBound for ffi::Molecule {
     fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
         const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("density"),
-            Property::required_dict("composition"), // XXX Parse from name & document.
+            Property::optional_dict("composition"), // XXX Parse from name.
             Property::optional_str("state"),
         ]);
 
         let tag = tag.cast("molecule");
         let (properties, composition) = try_into_properties(&EXTRACTOR, &tag, value)?;
-        let components = Vec::<ffi::MoleculeComponent>::try_from_dict(&tag, &composition)?;
+        let components = match composition {
+            Some(composition) => Vec::<ffi::MoleculeComponent>::try_from_dict(&tag, &composition)?,
+            None => ffi::MoleculeComponent::try_from_tag(&tag)?
+        };
 
         let molecule = Self::new(properties, components);
         Ok(molecule)
@@ -263,7 +267,7 @@ impl TryFromBound for ffi::Mixture {
         let tag = tag.cast("mixture");
         let (properties, composition) = try_into_properties(&EXTRACTOR, &tag, value)?;
         let components = Vec::<ffi::MixtureComponent>::try_from_dict(
-            &tag, &composition
+            &tag, &composition.unwrap()
         )?;
 
         let mixture = Self::new(properties, components);
@@ -275,7 +279,7 @@ fn try_into_properties<'py>(
     extractor: &Extractor<3>,
     tag: &Tag,
     value: &DictLike<'py>
-) -> PyResult<(ffi::MaterialProperties, DictLike<'py>)> {
+) -> PyResult<(ffi::MaterialProperties, Option<DictLike<'py>>)> {
     let [density, composition, state] = extractor.extract(tag, value, None)?;
 
     let state: ffi::G4State = if state.is_none() {
@@ -295,7 +299,7 @@ fn try_into_properties<'py>(
         state,
     };
 
-    let composition: DictLike = composition.into();
+    let composition: Option<DictLike> = composition.into();
     Ok((properties, composition))
 }
 
@@ -328,6 +332,35 @@ impl TryFromBound for ffi::MoleculeComponent {
             weight: weight.into(),
         };
         Ok(component)
+    }
+}
+
+impl ffi::MoleculeComponent {
+    fn try_from_tag<'py>(tag: &Tag) -> PyResult<Vec<Self>> {
+        let re = Regex::new(r"([A-Z][a-z]?)([0-9]*)").unwrap();
+        let mut composition = Vec::<Self>::new();
+        for captures in re.captures_iter(tag.name()) {
+            let name = captures.get(1).unwrap().as_str().to_string();
+            let weight = captures.get(2).unwrap().as_str();
+            let weight: u32 = if weight.len() == 0 {
+                1
+            } else {
+                weight.parse::<u32>()
+                    .map_err(|err| {
+                        let tag = tag.cast("weight");
+                        tag.bad().why(format!("{}", err)).to_err(ValueError)
+                    })?
+            };
+            composition.push(Self { name, weight });
+        }
+        if composition.is_empty() {
+            let tag = tag.cast("weight");
+            let err = tag.bad().why("bad chemical formula, or missing 'composition'".to_owned())
+                .to_err(ValueError);
+            Err(err)
+        } else {
+            Ok(composition)
+        }
     }
 }
 
