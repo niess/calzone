@@ -305,7 +305,7 @@ fn try_into_properties<'py>(
 
 #[derive(EnumVariantsStrings)]
 #[enum_variants_strings_transform(transform="lower_case")]
-enum State {
+pub enum State {
   Gas,
   Liquid,
   Solid,
@@ -317,6 +317,19 @@ impl From<State> for ffi::G4State {
             State::Gas => ffi::G4State::kStateGas,
             State::Liquid => ffi::G4State::kStateLiquid,
             State::Solid => ffi::G4State::kStateSolid,
+        }
+    }
+}
+
+impl TryFrom<ffi::G4State> for State {
+    type Error = &'static str;
+
+    fn try_from(value: ffi::G4State) -> Result<Self, Self::Error> {
+        match value {
+            ffi::G4State::kStateGas => Ok(Self::Gas),
+            ffi::G4State::kStateLiquid => Ok(Self::Liquid),
+            ffi::G4State::kStateSolid => Ok(Self::Solid),
+            _ => Err("undefined"),
         }
     }
 }

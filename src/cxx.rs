@@ -341,6 +341,7 @@ pub mod ffi {
 
         fn borrow_volume(self: &GeometryBorrow, name: &str) -> SharedPtr<VolumeBorrow>;
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
+        fn describe_material(self: &GeometryBorrow, name: &str) -> Mixture;
         fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn find_volume(self: &GeometryBorrow, stem: &str) -> SharedPtr<VolumeBorrow>;
         fn set_goupil(self: &GeometryBorrow);

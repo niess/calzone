@@ -14,6 +14,7 @@ use pyo3::types::{PyBytes, PyTuple};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use super::cxx::ffi;
+use std::collections::HashMap;
 use std::path::Path;
 use temp_dir::TempDir;
 
@@ -751,7 +752,7 @@ impl Volume {
             }
         }
 
-        let mut volume = get_info(
+        let mut volumes = get_info(
             self.get_name(),
             self.solid.as_str(),
             self.material.clone(),
@@ -785,12 +786,47 @@ impl Volume {
                     volume.daughters.push(daughter_volume);
                 }
             }
-            add(&mut volume, &self.daughters, &self.geometry);
+            add(&mut volumes, &self.daughters, &self.geometry);
         }
+
+        type Materials = HashMap::<String, bytes::MaterialInfo>;
+
+        fn get_material(
+            volume: &bytes::VolumeInfo,
+            materials: &mut Materials,
+            geometry: &ffi::GeometryBorrow,
+        ) {
+            materials
+                .entry(volume.material.clone())
+                .or_insert_with(|| {
+                    let mut mixture = geometry.describe_material(volume.material.as_str());
+                    let state = materials::State::try_from(mixture.properties.state)
+                        .map_or_else(
+                            |err| err.to_owned(),
+                            |state| state.to_str().to_owned(),
+                        );
+                    let composition: Vec<_> = mixture.components.drain(..)
+                        .map(|component| (component.name, component.weight))
+                        .collect();
+                    bytes::MaterialInfo {
+                        density: mixture.properties.density,
+                        state: state.to_string(),
+                        composition,
+                    }
+                });
+            for daughter in volume.daughters.iter() {
+                get_material(daughter, materials, geometry);
+            }
+        }
+
+        let mut materials = Materials::new();
+        get_material(&volumes, &mut materials, &self.geometry);
+
+        let geometry = bytes::GeometryInfo { volumes, materials };
 
         let mut buffer = Vec::new();
         let mut serializer = Serializer::new(&mut buffer);
-        volume.serialize(&mut serializer)
+        geometry.serialize(&mut serializer)
             .map_err(|err| {
                 let why = format!("{}", err);
                 Error::new(Exception)
