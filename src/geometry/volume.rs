@@ -281,7 +281,7 @@ impl TryFromBound for Volume {
             Property::optional_dict("overlaps"),
             Property::optional_strs("subtract"),
             Property::optional_any("materials"),
-            Property::optional_any("include"), // XXX Document this option.
+            Property::optional_any("include"),
         ]);
 
         let py = value.py();
@@ -496,7 +496,7 @@ impl TryFromBound for ffi::CylinderShape {
 
 impl TryFromBound for ffi::EnvelopeShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let mut padding: Option<[f64; 6]> = None; // XXX Document padding.
+        let mut padding: Option<[f64; 6]> = None;
         let shape: PyResult<String> = value.extract();
         let shape: String = match shape {
             Err(_) => {
@@ -660,23 +660,34 @@ impl TryFromBound for ffi::TessellatedShape {
 
 impl TryFromBound for Include {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
-        // Extract base properties.
-        const EXTRACTOR: Extractor<5> = Extractor::new([
-            Property::required_str("path"),
-            Property::optional_vec("position"),
-            Property::optional_mat("rotation"),
-            Property::optional_str("name"),
-            Property::optional_strs("subtract"),
-        ]);
+        let mut position: Option<f64x3> = None;
+        let mut rotation: Option<f64x3x3> = None;
+        let mut name: Option<String> = None;
+        let mut subtract: Vec<String> = Vec::new();
+        let path: PyResult<String> = value.extract();
+        let path: String = match path {
+            Err(_) => {
+                // Extract base properties.
+                const EXTRACTOR: Extractor<5> = Extractor::new([
+                    Property::required_str("path"),
+                    Property::optional_vec("position"),
+                    Property::optional_mat("rotation"),
+                    Property::optional_str("name"),
+                    Property::optional_strs("subtract"),
+                ]);
 
-        let tag = tag.cast("include");
-        let [path, position, rotation, name, subtract] = EXTRACTOR.extract_any(&tag, value, None)?;
+                let tag = tag.cast("include");
+                let [path, position_, rotation_, name_, subtract_] =
+                    EXTRACTOR.extract_any(&tag, value, None)?;
 
-        let path: String = path.into();
-        let position: Option<f64x3> = position.into();
-        let rotation: Option<f64x3x3> = rotation.into();
-        let name: Option<String> = name.into();
-        let subtract: Vec<String> = subtract.into();
+                position = position_.into();
+                rotation = rotation_.into();
+                name = name_.into();
+                subtract = subtract_.into();
+                path.into()
+            },
+            Ok(path) => path,
+        };
 
         let include = Self { path, position, rotation, name, subtract };
         Ok(include)

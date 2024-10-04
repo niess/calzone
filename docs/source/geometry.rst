@@ -36,8 +36,8 @@ Substitution rules
 
 For the sake of convenience, the values of geometry objects are subject to
 certain substitution rules, which are listed in
-:numref:`tab-geometry-substitutions`. To illustrate, a :external:py:class:`str`
-(which refers to a compatible file) can be substituted for any
+:numref:`tab-geometry-substitutions`. To illustrate, a
+path-:external:py:class:`str` (refering to a file) can be substituted for any
 :external:py:class:`dict` value. Another useful rule is that a size-one
 :external:py:class:`dict` whose item key can be inferred, can be substituted
 with the item value. This occurs, for instance, for object values that have a
@@ -71,6 +71,12 @@ box shape simplifies as,
    * - :python:`[[float; 3]; 3]`
      - :python:`[float; 3]`
      - Rotation vector (with :underline:`angles in deg`).
+
+.. topic:: Relative path
+
+   As a particular case of substitution rule, path-:python:`str`, pertaining to
+   included files, are relative to the directory in which the including file is
+   located, unless an absolute path is specified.
 
 
 Geometry structure
@@ -162,6 +168,9 @@ see :ref:`geometry:Shape definition`.
      - :python:`None`
    * - :python:`DaughterName`
      - :python:`dict` (:numref:`tab-volume-items`)
+     - :python:`None`
+   * - :python:`"include"`
+     - :python:`[dict]` (:numref:`tab-include-items`)
      - :python:`None`
    * - :python:`"materials"`
      - :python:`dict` (:numref:`tab-materials-items`)
@@ -281,6 +290,52 @@ of patching small (erroneous) overlaps (e.g. due to numeric approximations).
      - :python:`[str]`
      - 
 
+Includes
+~~~~~~~~
+
+The :python:`"include"` volume property permits the insertion of sub-geometries,
+defined in auxiliary files, as daughter volumes. For example, as
+
+.. code:: toml
+
+   [MotherName]
+
+   include = "relative/path/to/a/daughter/geometry.toml"
+
+Some of the properties of the included root volume can be overridden, as
+detailed in :numref:`tab-include-items` below. The following example explicitly
+sets the name of the included root volume.
+
+.. code:: toml
+
+   [MotherName]
+
+   include = { name = "DaughterName", path = "relative/path/to/a/daughter/geometry.toml" }
+
+.. _tab-include-items:
+
+.. list-table:: Include items.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default value
+   * - :python:`"path"`
+     - :python:`str`
+     - 
+   * - :python:`"position"`
+     - :python:`[float; 3]`
+     - :python:`numpy.zeros(3)`
+   * - :python:`"rotation"`
+     - :python:`[[float; 3]; 3]`
+     - :python:`numpy.eye(3)`
+   * - :python:`"subtract"`
+     - :python:`[str]`
+     - :python:`None`
+
+
 Shape definition
 ----------------
 
@@ -349,7 +404,7 @@ Envelope shape
 ~~~~~~~~~~~~~~
 
 A bounding envelope with a specified *shape*, whose size is determined by the
-bounded daughter volumes. The *safety* parameter (in cm) allows for extra space
+bounded daughter volumes. The *padding* parameter (in cm) allows for extra space
 around bounded objects.
 
 .. list-table:: Envelope items.
@@ -360,12 +415,22 @@ around bounded objects.
    * - Key
      - Value type
      - Default value
-   * - :python:`"safety"`
-     - :python:`float`
+   * - :python:`"padding"`
+     - :python:`[float; 6]`
      - :python:`0.01` (cm)
    * - :python:`"shape"`
      - :python:`str`
      - :python:`"box"`
+
+.. topic:: Padding
+
+   The *padding* parameter specifies additional space along the :math:`-X`,
+   :math:`X`, :math:`-Y`, :math:`Y`, :math:`-Z`, and :math:`Z` axes, in that
+   order. As a special case, the padding can also be specified as a length-3
+   array with elements corresponding to the :math:`\pm X`, :math:`\pm Y`, and
+   :math:`\pm Z` axes. A single float parameter can also be specified, following
+   the usual `substitution rules`_, resulting in uniform padding along the 6
+   directions.
 
 Sphere shape
 ~~~~~~~~~~~~
