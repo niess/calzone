@@ -2,15 +2,18 @@ Geometry definition
 ===================
 
 A `Geant4`_ Monte Carlo geometry consists of a hierarchy of nested
-`G4VPhysicalVolume`_\ s, starting from a single root ("world") volume. Calzone
+`G4VPhysicalVolume`_\ s, starting from a single root ("World") volume. Calzone
 represents this structure using base Python objects
 (:external:py:class:`bool`, :external:py:class:`dict`,
 :external:py:class:`float`, :external:py:class:`int`, :external:py:class:`list`
 and :external:py:class:`str`) that have associated representations in common
 configuration languages, such as `JSON`_, `TOML`_ or `YAML`_.
 
-.. XXX Refer to examples instead, as a more pragmatic way to learn about
-   geometry descriptions.
+A comprehensive account of the Calzone geometry format is presented in the
+following sections, accompanied by `TOML`_ code examples. For a more pragmatic
+approach, one might alternatively consult the examples folder, which is
+distributed with the Calzone `source <GitHub_>`_.
+
 
 Geometry objects
 ----------------
@@ -22,7 +25,9 @@ pair), where the :python:`key` is the object name, and the :python:`value` might
 be another :external:py:class:`dict`, e.g. containing the object's properties.
 To illustrate, a 1 |nbsp| cm\ :sup:`3` cubic box shape writes,
 
->>> { "box": { "size": [ 1.0, 1.0, 1.0 ] }}
+.. code:: toml
+
+   box = { size = [ 1.0, 1.0, 1.0 ] }
 
 .. topic:: Objects names
 
@@ -44,7 +49,9 @@ with the item value. This occurs, for instance, for object values that have a
 single mandatory property. Thus, using substitution rules, the previous cubic
 box shape simplifies as,
 
->>> { "box": 1.0 }
+.. code:: toml
+
+   box = 1.0
 
 .. _tab-geometry-substitutions:
 
@@ -84,7 +91,12 @@ Geometry structure
 
 A geometry definition starts with a root volume, for instance as follows,
 
->>> { "Environment": { "box" : 1.0, ... }}
+.. code:: toml
+
+   [RootName]
+
+   box = 1.0
+   ..
 
 There can be only one root volume in a geometry. However, the geometry
 :external:py:class:`dict` might contain an additional :python:`"materials"` key,
@@ -101,7 +113,7 @@ below, in :numref:`tab-geometry-items`.
    * - Key
      - Value type
      - Default value
-   * - :python:`RootVolumeName`
+   * - :python:`RootName`
      - :python:`dict` (:numref:`tab-volume-items`)
      - 
    * - :python:`"materials"`
@@ -129,7 +141,12 @@ below. It is required to define a *material*. If no *shape* is specified, then a
 box envelope is assumed. To illustrate, a 1 |nbsp| cm\ :sup:`3` cubic box volume
 filled with air would be represented as follows,
 
->>> { "material": "G4_AIR", "box": 1.0 }
+.. code:: toml
+
+   [VolumeName]
+
+   material = "G4_AIR"
+   box = 1.0
 
 Note that a volume can only have a single shape item (but multiple daughter
 volumes). For further information on shape types and their corresponding items,
@@ -205,7 +222,9 @@ verb (the action), and followed by a subject (the recipient). For example, the
 following indicates that the volume should record energy deposits, and capture
 outgoing particles.
 
->>> { "role": ["record_deposits", "catch_outgoing"] }
+.. code:: toml
+
+   role = [ "record_deposits", "catch_outgoing" ]
 
 Possible actions and recipients are listed in :numref:`tab-volume-roles` below.
 
@@ -269,7 +288,12 @@ accommodate a partially buried :python:`"Detector"` volume.
 The :python:`"overlaps"` property indicates pairs of overlapping daughter
 volumes, (see :numref:`tab-overlaps-items`), for instance as,
 
->>> { "overlaps": { "Bottom": [ "Left", "Right" ], "Top": "Left" }}
+.. code:: toml
+
+   [VolumeName.overlaps]
+
+   Bottom = [ "Left", "Right" ]
+   Top = "Left"
 
 These volumes are separated using an iterative subtraction procedure. It should
 be noted that this procedure does not guarantee which volume is subtracted or
@@ -548,7 +572,7 @@ or as a :ref:`Mixture <geometry:Mixtures>` of other materials.
 .. tip::
 
    A collection of standard atomic elements and materials is readily available
-   from the Geant4 `NIST`_ database. For example, :python:`"G4_H"`,
+   from the Geant4 `NIST`_ database. For example, :python:`"G4_WATER"`,
    :python:`"G4_AIR"`, etc. Depending on your application, you may not need to
    define your own materials.
 
@@ -564,10 +588,19 @@ Materials table
 
 The structure of a materials table is described by :numref:`tab-materials-items`
 (et al.) below. :ref:`geometry:Molecules` and :ref:`geometry:Mixtures` are
-explictily separated. In addition, the materials table may also contain (custom)
-atomic elements. For instance,
+explictily separated. For instance,
 
->>> { "molecules": { "H2O": { ... }}, "mixtures": { "Air": { ... }}}
+.. code:: toml
+
+   [materials.molecules]
+
+   H2O = { .. }
+
+   [materials.mixtures]
+
+   Air = { .. }
+
+In addition, the materials table may also contain (custom) atomic elements.
 
 .. _tab-materials-items:
 
@@ -664,7 +697,13 @@ Molecules are specified by their *density* (in g/cm\ :sup:`3`) and their
 *composition* (in atomic elements). Optionaly, a *state* can be specified (
 :python:`"gas"`, :python:`"liquid"` or :python:`"solid"`). For instance,
 
->>> { "density": 1.0, "state": "liquid", "composition": { "H": 2, "O": 1 }}
+.. code:: toml
+
+   [materials.molecules.H2O]
+
+   density = 1.0
+   state = "liquid"
+   composition = { H = 2, O = 1 }
 
 .. _tab-molecule-items:
 
@@ -707,11 +746,13 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 *composition*. Optionaly, a *state* can be specified ( :python:`"gas"`,
 :python:`"liquid"` or :python:`"solid"`). For instance,
 
->>> {
-...     "density": 1.205E-03,
-...     "state": "gas",
-...     "composition": { "N": 0.76, "O": 0.23, "Ar": 0.01 }
-... }
+.. code:: toml
+
+   [materials.mixtures.Air]
+
+   density = 1.205E-03
+   state = "gas"
+   composition = { N = 0.76, O = 0.23, Ar = 0.01 }
 
 .. _tab-mixture-items:
 
@@ -767,6 +808,7 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. _G4VPhysicalVolume: https://geant4.kek.jp/Reference/11.2.0/classG4VPhysicalVolume.html
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
 .. _Geant4: https://geant4.web.cern.ch/docs/
+.. _GitHub: https://github.com/niess/calzone/
 .. _NIST: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html?highlight=nist#
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _TOML: https://toml.io/en/

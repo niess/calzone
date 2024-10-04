@@ -239,7 +239,7 @@ impl TryFromBound for ffi::Molecule {
     fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
         const EXTRACTOR: Extractor<3> = Extractor::new([
             Property::required_f64("density"),
-            Property::required_dict("composition"),
+            Property::required_dict("composition"), // XXX Parse from name & document.
             Property::optional_str("state"),
         ]);
 
