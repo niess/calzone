@@ -11,8 +11,8 @@ configuration languages, such as `JSON`_, `TOML`_ or `YAML`_.
 
 A comprehensive account of the Calzone geometry format is presented in the
 following sections, accompanied by `TOML`_ code examples. For a more pragmatic
-approach, one might alternatively consult the examples folder, which is
-distributed with the Calzone `source <GitHub_>`_.
+approach, one might alternatively consult the :bash:`examples/` folder, which is
+distributed with the Calzone `source <Examples_>`_.
 
 
 Geometry objects
@@ -538,7 +538,7 @@ by adding side and bottom faces. The additional properties described in
    * - Key
      - Value type
      - Default value
-   * - :python:`"extra_depth"`
+   * - :python:`"padding"`
      - :python:`float`
      - 100.0 (in map units)
    * - :python:`"origin"`
@@ -551,8 +551,8 @@ by adding side and bottom faces. The additional properties described in
 .. topic:: Geometric properties.
 
    The *origin* property defines the origin of the 3D shape in the DEM
-   coordinates system. The *extra_depth* property extends the shape
-   below the DEM's minimum elevation value.
+   coordinates system. The *padding* property extends the shape below the DEM's
+   minimum elevation value.
 
 .. topic:: Meshing type.
 
@@ -809,7 +809,7 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. _G4VPhysicalVolume: https://geant4.kek.jp/Reference/11.2.0/classG4VPhysicalVolume.html
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
 .. _Geant4: https://geant4.web.cern.ch/docs/
-.. _GitHub: https://github.com/niess/calzone/
+.. _Examples: https://github.com/niess/calzone/tree/master/examples/
 .. _NIST: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html?highlight=nist#
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _TOML: https://toml.io/en/

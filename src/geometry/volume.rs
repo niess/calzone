@@ -574,7 +574,7 @@ impl TryFromBound for ffi::TessellatedShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let mut scale: f64 = 1.0;
         let mut origin: Option<f64x3> = None;
-        let mut extra_depth: Option<f64> = None;
+        let mut padding: Option<f64> = None;
         let mut regular: Option<bool> = None;
         let path: PyResult<String> = value.extract();
         let path: String = match path {
@@ -583,7 +583,7 @@ impl TryFromBound for ffi::TessellatedShape {
                     Property::required_str("path"),
                     Property::optional_str("units"),
                     Property::optional_vec("origin"),
-                    Property::optional_f64("extra_depth"),
+                    Property::optional_f64("padding"),
                     Property::optional_bool("regular"),
                 ]);
 
@@ -596,7 +596,7 @@ impl TryFromBound for ffi::TessellatedShape {
                         )?;
                 }
                 origin = center.into();
-                extra_depth = depth.into();
+                padding = depth.into();
                 regular = reg.into();
                 path.into()
             },
@@ -617,9 +617,9 @@ impl TryFromBound for ffi::TessellatedShape {
         };
         let mut facets = match path.extension().and_then(OsStr::to_str) {
             Some("stl") => {
-                if extra_depth.is_some() {
+                if padding.is_some() {
                     let err = tag.bad()
-                        .what("extra_depth")
+                        .what("padding")
                         .why("invalid option for STL format".to_string())
                         .to_err(ValueError);
                         return Err(err);
@@ -643,7 +643,7 @@ impl TryFromBound for ffi::TessellatedShape {
                 let py = value.py();
                 let map = Map::from_file(py, &path)?;
                 let regular = regular.unwrap_or(false);
-                let facets = map.tessellate(py, regular, origin, extra_depth)?;
+                let facets = map.tessellate(py, regular, origin, padding)?;
                 Ok(facets)
             },
             _ => return Err(PyNotImplementedError::new_err("")),
