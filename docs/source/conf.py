@@ -1,7 +1,7 @@
 project = "Calzone"
 copyright = "Université Clermont Auvergne, CNRS/IN2P3, LPCA"
 author = "Valentin Niess"
-release = "0.3.0"
+release = "0.3.1"
 
 highlight_language = "python3"
 
