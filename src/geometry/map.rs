@@ -2,7 +2,7 @@ use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
 use crate::utils::extract::{Extractor, Property, Tag};
 use crate::utils::float::f64x3;
-use crate::utils::io::dump_stl;
+use crate::utils::io::{dump_stl, PathString};
 use crate::utils::numpy::{PyArray, PyUntypedArray};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -49,11 +49,12 @@ pub struct Map {
 impl Map {
     #[new]
     fn new(
-        py: Python,
         map: MapLike,
     ) -> PyResult<Self> {
+        let py = map.py();
         match map {
             MapLike::String(filename) => {
+                let filename = filename.to_string();
                 let path = Path::new(&filename);
                 Self::from_file(py, &path)
             },
@@ -121,10 +122,11 @@ impl Map {
     #[pyo3(signature = (filename, **kwargs,))]
     fn dump<'py>(
         &self,
-        py: Python<'py>,
-        filename: String,
+        filename: PathString,
         kwargs: Option<&Bound<'py, PyDict>>
     ) -> PyResult<()> {
+        let py = filename.0.py();
+        let filename = filename.to_string();
         let path = Path::new(&filename);
         match path.extension().and_then(OsStr::to_str) {
             Some("png") | Some("PNG") => {
@@ -173,8 +175,17 @@ impl Map {
 
 #[derive(FromPyObject)]
 pub enum MapLike<'py> {
-    String(String),
+    String(PathString<'py>),
     Any(Bound<'py, PyAny>),
+}
+
+impl<'py> MapLike<'py> {
+    fn py(&self) -> Python<'py> {
+        match self {
+            Self::String(s) => s.0.py(),
+            Self::Any(a) => a.py(),
+        }
+    }
 }
 
 impl Map {

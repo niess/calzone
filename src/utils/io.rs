@@ -152,6 +152,12 @@ impl<'py> FromPyObject<'py> for PathString<'py> {
     }
 }
 
+impl<'py> ToString for PathString<'py> {
+    fn to_string(&self) -> String {
+        self.0.to_string_lossy().to_string()
+    }
+}
+
 
 // ===============================================================================================
 //
