@@ -191,11 +191,8 @@ impl SortedTessels {
         let ray = Ray::new(point, direction);
         let (hits, distance) = self.intersect(&ray, Side::Back);
         if hits == 0 {
-            panic!(
-                "interior point {:?} does not intersect along {:?}",
-                point,
-                direction,
-            );
+            0.0 // This should not happen, up to numeric uncertainties. In this case, Geant4
+                // seems to return 0.
         } else {
             distance
         }
