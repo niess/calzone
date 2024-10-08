@@ -390,6 +390,14 @@ impl TryFromBound for Volume {
                         return Err(err);
                     }
                 }
+
+                if let Some(materials) = definition.materials {
+                    match &mut sub.materials {
+                        Some(m) => m.extend(materials),
+                        None => sub.materials = Some(materials),
+                    }
+                }
+
                 volumes.push(sub);
             }
         }
