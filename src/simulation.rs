@@ -346,7 +346,7 @@ impl<'a> RunAgent<'a> {
         end: &ffi::G4ThreeVector,
     ) {
         if let Some(deposits) = self.deposits.as_mut() {
-            deposits.push(volume, self.index, deposit, non_ionising, start, end)
+            deposits.push(volume, self.index - 1, deposit, non_ionising, start, end)
         }
     }
 
@@ -356,20 +356,20 @@ impl<'a> RunAgent<'a> {
         particle: ffi::Particle,
     ) {
         if let Some(particles) = self.particles.as_mut() {
-            particles.push(volume, self.index, particle)
+            particles.push(volume, self.index - 1, particle)
         }
     }
 
     pub fn push_track(&mut self, mut track: ffi::Track) {
         if let Some(tracker) = self.tracker.as_mut() {
-            track.event = self.index;
+            track.event = self.index - 1;
             tracker.push_track(track)
         }
     }
 
     pub fn push_vertex(&mut self, mut vertex: ffi::Vertex) {
         if let Some(tracker) = self.tracker.as_mut() {
-            vertex.event = self.index;
+            vertex.event = self.index - 1;
             tracker.push_vertex(vertex)
         }
     }
