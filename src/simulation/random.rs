@@ -80,6 +80,13 @@ impl Random {
 }
 
 impl Random {
+    pub(super) fn index_2u64(&self) -> [u64; 2] {
+        [
+            (self.index >> 64) as u64,
+            self.index as u64
+        ]
+    }
+
     fn initialise(&mut self, seed: Option<u128>) -> PyResult<()> {
         match seed {
             None => {
@@ -123,6 +130,10 @@ pub struct RandomContext<'a> (&'a mut Random);
 impl<'a> RandomContext<'a> {
     pub fn get(&mut self) -> &mut Random {
         &mut self.0
+    }
+
+    pub fn index(&self) -> [u64; 2] {
+        self.0.index_2u64()
     }
 
     pub fn next_open01(&mut self) -> f64 {

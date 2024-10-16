@@ -209,12 +209,14 @@ impl Deposits {
         non_ionising: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
+        weight: f64,
+        random_index: &[u64; 2],
     ) {
         self.values.entry(volume)
-            .and_modify(|e| e.push(event, deposit, non_ionising, start, end))
+            .and_modify(|e| e.push(event, deposit, non_ionising, start, end, weight, random_index))
             .or_insert_with(|| {
                 let mut cell = DepositsCell::new(self.mode);
-                cell.push(event, deposit, non_ionising, start, end);
+                cell.push(event, deposit, non_ionising, start, end, weight, random_index);
                 cell
             });
     }
@@ -234,7 +236,7 @@ enum DepositsCell {
 
 #[derive(Default)]
 struct BriefDeposits {
-    total: IndexMap<usize, f64>,
+    total: IndexMap<usize, (f64, f64, [u64; 2])>,
 }
 
 #[derive(Default)]
@@ -257,8 +259,10 @@ impl DepositsCell {
         let deposits = match self {
             Self::Brief(mut deposits) => {
                 let array = PyArray::<TotalDeposit>::empty(py, &[deposits.total.len()])?;
-                for (i, (event, value)) in deposits.total.drain(..).enumerate() {
-                    let deposit = TotalDeposit { event, value };
+                for (i, (event, (value, weight, random_index))) in deposits.total
+                    .drain(..)
+                    .enumerate() {
+                    let deposit = TotalDeposit { event, value, weight, random_index };
                     array.set(i, deposit)?;
                 }
                 let array: &PyUntypedArray = array.into();
@@ -281,23 +285,30 @@ impl DepositsCell {
         non_ionising: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
+        weight: f64,
+        random_index: &[u64; 2],
     ) {
         match self {
             Self::Brief(ref mut deposits) => {
                 deposits.total.entry(event)
-                    .and_modify(|e| { *e += deposit })
-                    .or_insert(deposit);
+                    .and_modify(|e| { e.0 += deposit })
+                    .or_insert((deposit, weight, *random_index));
             },
             Self::Detailed(ref mut deposits) => {
                 let start = ffi::to_vec(start);
                 let end = ffi::to_vec(end);
                 let line_deposit = deposit - non_ionising;
+                let random_index = *random_index;
                 if line_deposit > 0.0 {
-                    let deposit = LineDeposit { event, start, end, value: line_deposit };
+                    let deposit = LineDeposit {
+                        event, start, end, value: line_deposit, weight, random_index
+                    };
                     deposits.line.push(deposit);
                 }
                 if non_ionising > 0.0 {
-                    let deposit = PointDeposit { event, position: end, value: non_ionising };
+                    let deposit = PointDeposit {
+                        event, position: end, value: non_ionising, weight, random_index
+                    };
                     deposits.point.push(deposit);
                 }
             },
@@ -319,6 +330,8 @@ pub struct LineDeposit {
     value: f64,
     start: [f64; 3],
     end: [f64; 3],
+    weight: f64,
+    random_index: [u64; 2],
 }
 
 #[derive(Clone, Copy)]
@@ -327,6 +340,8 @@ pub struct PointDeposit {
     event: usize,
     value: f64,
     position: [f64; 3],
+    weight: f64,
+    random_index: [u64; 2],
 }
 
 #[derive(Clone, Copy)]
@@ -334,6 +349,8 @@ pub struct PointDeposit {
 pub struct TotalDeposit {
     event: usize,
     value: f64,
+    weight: f64,
+    random_index: [u64; 2],
 }
 
 #[derive(AsMut, AsRef, From)]
@@ -377,12 +394,14 @@ impl ParticlesSampler {
         volume: *const ffi::G4VPhysicalVolume,
         event: usize,
         particle: ffi::Particle,
+        weight: f64,
+        random_index: &[u64; 2],
     ) {
         self.samples.entry(volume)
-            .and_modify(|e| e.push(event, particle))
+            .and_modify(|e| e.push(event, particle, weight, random_index))
             .or_insert_with(|| {
                 let mut cell = ParticlesCell::new();
-                cell.push(event, particle);
+                cell.push(event, particle, weight, random_index);
                 cell
             });
     }
@@ -410,8 +429,9 @@ impl ParticlesCell {
         Ok(samples)
     }
 
-    fn push(&mut self, event: usize, state: ffi::Particle) {
-        let sample = ffi::SampledParticle { event, state };
+    fn push(&mut self, event: usize, state: ffi::Particle, weight: f64, random_index: &[u64; 2]) {
+        let random_index = *random_index;
+        let sample = ffi::SampledParticle { event, state, weight, random_index };
         self.samples.push(sample);
     }
 }

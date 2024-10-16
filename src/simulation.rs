@@ -218,6 +218,8 @@ pub struct RunAgent<'a> {
     primaries: source::ParticlesIterator<'a>,
     // Iterator.
     index: usize,
+    random_index: [u64; 2],
+    weight: f64,
     // Energy deposits.
     deposits: Option<Deposits>,
     // Sampled particles.
@@ -314,6 +316,8 @@ impl<'a> RunAgent<'a> {
         let geometry = geometry.get().0.clone();
         let physics = simulation.physics.bind(py).borrow().0;
         let index = 0;
+        let random_index = [0, 0];
+        let weight = 0.0;
         let deposits = simulation.sample_deposits.map(|mode| Deposits::new(mode));
         let particles = if simulation.sample_particles {
             Some(ParticlesSampler::new())
@@ -323,14 +327,18 @@ impl<'a> RunAgent<'a> {
         let tracker = if simulation.tracking { Some(Tracker::new()) } else { None };
         let secondaries = simulation.secondaries;
         let agent = RunAgent {
-            geometry, physics, primaries, index, deposits, particles, tracker, secondaries
+            geometry, physics, primaries, index, random_index, weight, deposits, particles,
+            tracker, secondaries
         };
         Ok(Box::pin(agent))
     }
 
-    pub fn next_primary(&mut self) -> ffi::Particle {
+    pub fn next_primary(&mut self, random_index: &[u64; 2]) -> ffi::Particle {
         self.index += 1;
-        self.primaries.next().unwrap().unwrap()
+        self.random_index = *random_index;
+        let (particle, weight) = self.primaries.next().unwrap().unwrap();
+        self.weight = weight;
+        particle
     }
 
     pub fn physics<'b>(&'b self) -> &'b ffi::Physics {
@@ -346,7 +354,10 @@ impl<'a> RunAgent<'a> {
         end: &ffi::G4ThreeVector,
     ) {
         if let Some(deposits) = self.deposits.as_mut() {
-            deposits.push(volume, self.index - 1, deposit, non_ionising, start, end)
+            deposits.push(
+                volume, self.index - 1, deposit, non_ionising, start, end, self.weight,
+                &self.random_index
+            )
         }
     }
 
@@ -356,7 +367,7 @@ impl<'a> RunAgent<'a> {
         particle: ffi::Particle,
     ) {
         if let Some(particles) = self.particles.as_mut() {
-            particles.push(volume, self.index - 1, particle)
+            particles.push(volume, self.index - 1, particle, self.weight, &self.random_index)
         }
     }
 

@@ -124,11 +124,13 @@ pub fn initialise(py: Python) -> PyResult<()> {
         .into_py(py);
 
     let dtype_line_deposit: PyObject = {
-        let arg: [PyObject; 4] = [
-            ("event", "u8").into_py(py),
-            ("value", "f8").into_py(py),
-            ("start", "f8", 3).into_py(py),
-            ("end", "f8", 3).into_py(py),
+        let arg = [
+            ("event", "u8"),
+            ("value", "f8"),
+            ("start", "3f8"),
+            ("end", "3f8"),
+            ("weight", "f8"),
+            ("random_index", "2u8"),
         ];
         dtype
             .call1((arg, true))?
@@ -148,10 +150,12 @@ pub fn initialise(py: Python) -> PyResult<()> {
     };
 
     let dtype_point_deposit: PyObject = {
-        let arg: [PyObject; 3] = [
-            ("event", "u8").into_py(py),
-            ("value", "f8").into_py(py),
-            ("position", "f8", 3).into_py(py),
+        let arg = [
+            ("event", "u8"),
+            ("value", "f8"),
+            ("position", "3f8"),
+            ("weight", "f8"),
+            ("random_index", "2u8"),
         ];
         dtype
             .call1((arg, true))?
@@ -159,9 +163,14 @@ pub fn initialise(py: Python) -> PyResult<()> {
     };
 
     let dtype_sampled_particle: PyObject = {
-        let arg: [PyObject; 2] = [
-            ("event", "u8").into_py(py),
-            ("state", dtype_particle.clone()).into_py(py),
+        let arg = [
+            ("event", "u8"),
+            ("pid", "i4"),
+            ("energy", "f8"),
+            ("position", "3f8"),
+            ("direction", "3f8"),
+            ("weight", "f8"),
+            ("random_index", "2u8"),
         ];
         dtype
             .call1((arg, true))?
@@ -169,9 +178,11 @@ pub fn initialise(py: Python) -> PyResult<()> {
     };
 
     let dtype_total_deposit: PyObject = {
-        let arg: [PyObject; 2] = [
-            ("event", "u8").into_py(py),
-            ("value", "f8").into_py(py),
+        let arg = [
+            ("event", "u8"),
+            ("value", "f8"),
+            ("weight", "f8"),
+            ("random_index", "2u8"),
         ];
         dtype
             .call1((arg, true))?

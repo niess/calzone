@@ -30,6 +30,10 @@ std::istream & RandomImpl::get (std::istream &) {
     exit(EXIT_FAILURE);
 }
 
+std::array<size_t, 2> RandomImpl::GetIndex() const {
+    return this->context->index();
+}
+
 void RandomImpl::SetContext(RandomContext & context_) {
     if (this->context == nullptr) {
         // Enable.

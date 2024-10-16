@@ -1,6 +1,7 @@
 // fmt library.
 #include <fmt/core.h>
 // User interface.
+#include "random.h"
 #include "source.h"
 // Geant4 interafce.
 #include "G4Event.hh"
@@ -10,7 +11,8 @@
 
 
 void SourceImpl::GeneratePrimaries(G4Event * event) {
-    auto primary = RUN_AGENT->next_primary();
+    auto random_index = RandomImpl::Get()->GetIndex();
+    auto primary = RUN_AGENT->next_primary(random_index);
     G4ParticleDefinition * definition;
     if (primary.pid != 0) {
         definition = G4ParticleTable::GetParticleTable()->FindParticle(

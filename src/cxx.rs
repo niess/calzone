@@ -261,6 +261,8 @@ pub mod ffi {
     struct SampledParticle {
         event: usize,
         state: Particle,
+        weight: f64,
+        random_index: [u64; 2],
     }
 
     // ===========================================================================================
@@ -478,7 +480,7 @@ pub mod ffi {
         fn is_particles(self: &RunAgent) -> bool;
         fn is_secondaries(self: &RunAgent) -> bool;
         fn is_tracker(self: &RunAgent) -> bool;
-        unsafe fn next_primary(self: &mut RunAgent) -> Particle;
+        unsafe fn next_primary(self: &mut RunAgent, random_index: &[u64; 2]) -> Particle;
         unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
         unsafe fn push_deposit(
             self: &mut RunAgent,
@@ -499,6 +501,7 @@ pub mod ffi {
         // Random interface.
         type RandomContext<'a>;
 
+        fn index(self: &RandomContext) -> [u64; 2];
         fn next_open01(self: &mut RandomContext) -> f64;
         fn prng_name(self: &RandomContext) -> &'static str;
     }

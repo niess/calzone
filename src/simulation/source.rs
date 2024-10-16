@@ -73,6 +73,7 @@ pub struct ParticlesIterator<'a> {
     position: &'a PyArray<f64>,
     direction: &'a PyArray<f64>,
     pid: Option<&'a PyArray<i32>>,
+    weight: Option<&'a PyArray<f64>>,
     size: usize,
     index: usize,
 }
@@ -83,6 +84,7 @@ impl<'a> ParticlesIterator<'a> {
         let position = extract(elements, "position")?;
         let direction = extract(elements, "direction")?;
         let pid = extract(elements, "pid").ok();
+        let weight = extract(elements, "weight").ok();
         if *position.shape().last().unwrap_or(&0) != 3 {
             let why = format!("expected a shape '[..,3]' array, found '{:?}'", position.shape());
             let err = Error::new(ValueError)
@@ -104,6 +106,7 @@ impl<'a> ParticlesIterator<'a> {
             position.size() / 3,
             direction.size() / 3,
             pid.map(|a| a.size()).unwrap_or(size),
+            weight.map(|a| a.size()).unwrap_or(size),
         ];
         if others.iter().any(|x| *x != size) {
             let err = Error::new(ValueError)
@@ -114,12 +117,12 @@ impl<'a> ParticlesIterator<'a> {
         }
         let index = 0;
         let iter = Self {
-            energy, position, direction, pid, size, index
+            energy, position, direction, pid, weight, size, index
         };
         Ok(iter)
     }
 
-    fn get(&self, index: usize) -> PyResult<ffi::Particle> {
+    fn get(&self, index: usize) -> PyResult<(ffi::Particle, f64)> {
         let pid = match self.pid {
             None => DEFAULT_PID,
             Some(pid) => pid.get(index)?,
@@ -138,7 +141,11 @@ impl<'a> ParticlesIterator<'a> {
                 self.direction.get(3 * index + 2)?,
             ],
         };
-        Ok(particle)
+        let weight = match self.weight {
+            None => 1.0,
+            Some(weight) => weight.get(index)?,
+        };
+        Ok((particle, weight))
     }
 
     pub fn size(&self) -> usize {
@@ -162,7 +169,7 @@ where
 }
 
 impl<'a> Iterator for ParticlesIterator<'a> {
-    type Item = PyResult<ffi::Particle>;
+    type Item = PyResult<(ffi::Particle, f64)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.size {
