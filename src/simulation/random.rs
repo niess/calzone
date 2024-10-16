@@ -32,18 +32,22 @@ pub struct Random {
 #[pymethods]
 impl Random {
     #[new]
-    pub fn new(seed: Option<u128>) -> PyResult<Self> {
+    pub fn new(seed: Option<u128>, index: Option<Index>) -> PyResult<Self> {
         let rng = Pcg64Mcg::new(0xCAFEF00DD15EA5E5);
         let mut random = Self { rng, seed: 0, index: 0 };
         random.initialise(seed)?;
+        if index.is_some() {
+            random.set_index(index)?;
+        }
         Ok(random)
     }
 
     #[setter]
-    fn set_index(&mut self, index: Option<u128>) -> PyResult<()> {
+    fn set_index(&mut self, index: Option<Index>) -> PyResult<()> {
         match index {
             None => self.initialise(Some(self.seed))?,
             Some(index) => {
+                let index: u128 = index.into();
                 let delta: u128 = index.wrapping_sub(self.index);
                 self.rng.advance(delta);
                 self.index = index;
@@ -115,6 +119,23 @@ impl Random {
     #[inline]
     pub(super) fn uniform(&mut self, a: f64, b: f64) -> f64 {
         (b - a) * self.open01() + a
+    }
+}
+
+#[derive(FromPyObject)]
+pub enum Index {
+    #[pyo3(transparent, annotation = "[u64;2]")]
+    Array([u64; 2]),
+    #[pyo3(transparent, annotation = "u128")]
+    Scalar(u128),
+}
+
+impl From<Index> for u128 {
+    fn from(value: Index) -> Self {
+        match value {
+            Index::Array(value) => ((value[0] as u128) << 64) + (value[1] as u128),
+            Index::Scalar(value) => value,
+        }
     }
 }
 

@@ -80,7 +80,7 @@ impl Simulation {
             .unwrap_or_else(|| Py::new(py, Physics::default()))?;
         let random = random
             .map(|random| Ok(random.clone().unbind()))
-            .unwrap_or_else(|| Py::new(py, Random::new(None)?))?;
+            .unwrap_or_else(|| Py::new(py, Random::new(None, None)?))?;
         let sample_deposits = sample_deposits.or_else(|| Some(SamplerMode::Brief));
         let sample_particles = sample_particles.unwrap_or(false);
         let secondaries = secondaries.unwrap_or(true);

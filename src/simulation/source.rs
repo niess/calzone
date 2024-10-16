@@ -246,7 +246,7 @@ impl ParticlesGenerator {
     ) -> PyResult<Self> {
         let weight = weight.unwrap_or(false);
         let random = match random {
-            None => Py::new(py, Random::new(None)?)?,
+            None => Py::new(py, Random::new(None, None)?)?,
             Some(random) => random.unbind(),
         };
         let geometry = geometry.map(|geometry| geometry.borrow().0.clone());
