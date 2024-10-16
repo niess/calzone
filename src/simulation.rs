@@ -1,9 +1,9 @@
 use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
+use crate::utils::namespace::Namespace;
 use crate::utils::numpy::PyArray;
 use crate::utils::io::{DictLike, PathString};
-use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
@@ -257,47 +257,44 @@ impl<'a> RunAgent<'a> {
         let result = match deposits {
             Some(deposits) => match particles {
                 Some(particles) => match tracker {
-                    Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<5> = NamedTuple::new(
-                            "Result",
-                            ["deposits", "particles", "random_index", "tracks", "vertices"]
-                        );
-                        RESULT.instance(py, (
-                            deposits, particles, random_index.unwrap(), tracks, vertices
-                        ))?.unbind()
-                    },
-                    None => {
-                        static RESULT: NamedTuple<2> = NamedTuple::new(
-                            "Result", ["deposits", "particles"]);
-                        RESULT.instance(py, (deposits, particles))?.unbind()
-                    },
+                    Some((tracks, vertices)) => Namespace::new(py, &[
+                            ("deposits", deposits),
+                            ("particles", particles),
+                            ("random_index", random_index.unwrap()),
+                            ("tracks", tracks),
+                            ("vertices", vertices),
+                        ])?.unbind(),
+                    None => Namespace::new(py, &[
+                            ("deposits", deposits),
+                            ("particles", particles),
+                        ])?.unbind(),
                 },
                 None => match tracker {
-                    Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<4> = NamedTuple::new(
-                            "Result", ["deposits", "random_index", "tracks", "vertices"]);
-                        RESULT.instance(py, (deposits, random_index, tracks, vertices))?.unbind()
-                    },
+                    Some((tracks, vertices)) => Namespace::new(py, &[
+                            ("deposits", deposits),
+                            ("random_index", random_index.unwrap()),
+                            ("tracks", tracks),
+                            ("vertices", vertices),
+                        ])?.unbind(),
                     None => deposits,
                 },
             },
             None => match particles {
                 Some(particles) => match tracker {
-                    Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<4> = NamedTuple::new(
-                            "Result", ["particles", "random_index", "tracks", "vertices"]);
-                        RESULT.instance(py, (
-                            particles, random_index, tracks, vertices
-                        ))?.unbind()
-                    },
+                    Some((tracks, vertices)) => Namespace::new(py, &[
+                            ("particles", particles),
+                            ("random_index", random_index.unwrap()),
+                            ("tracks", tracks),
+                            ("vertices", vertices),
+                        ])?.unbind(),
                     None => particles,
                 },
                 None => match tracker {
-                    Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<3> = NamedTuple::new(
-                            "Result", ["random_index", "tracks", "vertices"]);
-                        RESULT.instance(py, (random_index, tracks, vertices))?.unbind()
-                    },
+                    Some((tracks, vertices)) => Namespace::new(py, &[
+                            ("random_index", random_index.unwrap()),
+                            ("tracks", tracks),
+                            ("vertices", vertices),
+                        ])?.unbind(),
                     None => py.None(),
                 },
             },

@@ -1,7 +1,7 @@
 use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::export::Export;
+use crate::utils::namespace::Namespace;
 use crate::utils::numpy::{PyArray, PyUntypedArray};
-use crate::utils::tuple::NamedTuple;
 use derive_more::{AsMut, AsRef, From};
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
@@ -254,8 +254,6 @@ impl DepositsCell {
     }
 
     fn export(self, py: Python) -> PyResult<PyObject> {
-        static DEPOSITS: NamedTuple<2> = NamedTuple::new("Deposits", ["line", "point"]);
-
         let deposits = match self {
             Self::Brief(mut deposits) => {
                 let array = PyArray::<TotalDeposit>::empty(py, &[deposits.total.len()])?;
@@ -271,8 +269,10 @@ impl DepositsCell {
             Self::Detailed(deposits) => {
                 let line = Export::export::<LineDepositsExport>(py, deposits.line)?;
                 let point = Export::export::<PointDepositsExport>(py, deposits.point)?;
-                let deposits = DEPOSITS.instance(py, (line, point))?;
-                deposits.unbind()
+                Namespace::new(py, &[
+                    ("line", line),
+                    ("point", point),
+                ])?.unbind()
             },
         };
         Ok(deposits)
