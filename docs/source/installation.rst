@@ -5,6 +5,20 @@ Installing Calzone
 
    Calzone requires CPython **3.7** or higher in order to operate.
 
+.. topic:: Geant4 data
+
+   In order to operate, Calzone requires 2 GB of Geant4 data tables, which are
+   not included in the Python package. Once Calzone has been installed, these
+   can be downloaded as
+
+   .. code:: bash
+
+      python3 -m calzone download
+
+   Alternatively, the :bash:`G4_DATA_DIR` environment variable can be set to the
+   location of already existing Geant4 data, e.g. from another Geant4
+   installation.
+
 
 From PyPI
 ---------
@@ -51,7 +65,7 @@ Calzone package in-source (under `src/python/calzone
 Optional dependencies
 ---------------------
 
-Danton might require some optional dependencies to be installed, depending on
+Calzone might require some optional dependencies to be installed, depending on
 your desired format for encoding geometries, and on your Python version. These
 are listed in :numref:`tab-optional-dependencies` below.
 
