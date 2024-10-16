@@ -1,6 +1,7 @@
 use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
+use crate::utils::numpy::PyArray;
 use crate::utils::io::{DictLike, PathString};
 use crate::utils::tuple::NamedTuple;
 use cxx::SharedPtr;
@@ -226,6 +227,7 @@ pub struct RunAgent<'a> {
     particles: Option<ParticlesSampler>,
     // tracks.
     tracker: Option<Tracker>,
+    tracker_index: Vec<[u64; 2]>,
     // secondaries.
     secondaries: bool,
 }
@@ -235,18 +237,34 @@ impl<'a> RunAgent<'a> {
         self.primaries.size()
     }
 
-    fn export(self, py: Python) -> PyResult<PyObject> {
+    fn export(mut self, py: Python) -> PyResult<PyObject> {
         let deposits = self.deposits.map(|deposits| deposits.export(py)).transpose()?;
         let particles = self.particles.map(|particles| particles.export(py)).transpose()?;
         let tracker = self.tracker.map(|tracker| tracker.export(py)).transpose()?;
+        let random_index = if tracker.is_some() {
+            let array = PyArray::<u64>::empty(py, &[self.index, 2])?;
+            let random_index = unsafe { array.slice_mut()? };
+            for (i, index) in self.tracker_index.drain(..).enumerate() {
+                random_index[2 * i] = index[0];
+                random_index[2 * i + 1] = index[1];
+            }
+            let array: &PyAny = array;
+            Some(array.into_py(py))
+        } else {
+            None
+        };
 
         let result = match deposits {
             Some(deposits) => match particles {
                 Some(particles) => match tracker {
                     Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<4> = NamedTuple::new(
-                            "Result", ["deposits", "particles", "tracks", "vertices"]);
-                        RESULT.instance(py, (deposits, particles, tracks, vertices))?.unbind()
+                        static RESULT: NamedTuple<5> = NamedTuple::new(
+                            "Result",
+                            ["deposits", "particles", "random_index", "tracks", "vertices"]
+                        );
+                        RESULT.instance(py, (
+                            deposits, particles, random_index.unwrap(), tracks, vertices
+                        ))?.unbind()
                     },
                     None => {
                         static RESULT: NamedTuple<2> = NamedTuple::new(
@@ -256,9 +274,9 @@ impl<'a> RunAgent<'a> {
                 },
                 None => match tracker {
                     Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<3> = NamedTuple::new(
-                            "Result", ["deposits", "tracks", "vertices"]);
-                        RESULT.instance(py, (deposits, tracks, vertices))?.unbind()
+                        static RESULT: NamedTuple<4> = NamedTuple::new(
+                            "Result", ["deposits", "random_index", "tracks", "vertices"]);
+                        RESULT.instance(py, (deposits, random_index, tracks, vertices))?.unbind()
                     },
                     None => deposits,
                 },
@@ -266,17 +284,19 @@ impl<'a> RunAgent<'a> {
             None => match particles {
                 Some(particles) => match tracker {
                     Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<3> = NamedTuple::new(
-                            "Result", ["particles", "tracks", "vertices"]);
-                        RESULT.instance(py, (particles, tracks, vertices))?.unbind()
+                        static RESULT: NamedTuple<4> = NamedTuple::new(
+                            "Result", ["particles", "random_index", "tracks", "vertices"]);
+                        RESULT.instance(py, (
+                            particles, random_index, tracks, vertices
+                        ))?.unbind()
                     },
                     None => particles,
                 },
                 None => match tracker {
                     Some((tracks, vertices)) => {
-                        static RESULT: NamedTuple<2> = NamedTuple::new(
-                            "Result", ["tracks", "vertices"]);
-                        RESULT.instance(py, (tracks, vertices))?.unbind()
+                        static RESULT: NamedTuple<3> = NamedTuple::new(
+                            "Result", ["random_index", "tracks", "vertices"]);
+                        RESULT.instance(py, (random_index, tracks, vertices))?.unbind()
                     },
                     None => py.None(),
                 },
@@ -325,15 +345,20 @@ impl<'a> RunAgent<'a> {
             None
         };
         let tracker = if simulation.tracking { Some(Tracker::new()) } else { None };
+        let tracker_index = Vec::new();
         let secondaries = simulation.secondaries;
         let agent = RunAgent {
             geometry, physics, primaries, index, random_index, weight, deposits, particles,
-            tracker, secondaries
+            tracker, tracker_index, secondaries
         };
         Ok(Box::pin(agent))
     }
 
     pub fn next_primary(&mut self, random_index: &[u64; 2]) -> ffi::Particle {
+        if self.tracker.is_some() {
+            self.tracker_index.push(*random_index);
+        }
+
         self.index += 1;
         self.random_index = *random_index;
         let (particle, weight) = self.primaries.next().unwrap().unwrap();
