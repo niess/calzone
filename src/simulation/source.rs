@@ -4,7 +4,6 @@ use crate::utils::error::ErrorKind::{KeyboardInterrupt, KeyError, NotImplemented
                                      ValueError};
 use crate::utils::float::f64x3;
 use crate::utils::numpy::{Dtype, PyArray, ShapeArg};
-use crate::utils::tuple::NamedTuple;
 use cxx::{SharedPtr, UniquePtr};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
@@ -318,19 +317,13 @@ impl ParticlesGenerator {
             Some(shape) => shape.into(),
             None => Vec::new(),
         };
-        let array = PyArray::<ffi::Particle>::zeros(py, &shape)?;
+        let array = PyArray::<ffi::SampledParticle>::zeros(py, &shape)?;
         let particles = unsafe { array.slice_mut()? };
-        let weights = {
+        let any_weight = {
             let direction = self.weight_direction.unwrap_or(self.weight);
             let energy = self.weight_energy.unwrap_or(self.weight);
             let position = self.weight_position.unwrap_or(self.weight);
             direction || energy || position
-        };
-        let weights = if weights {
-            let weights = PyArray::<f64>::zeros(py, &shape)?;
-            Some(weights)
-        } else {
-            None
         };
 
         // Prepare specific generators.
@@ -352,7 +345,11 @@ impl ParticlesGenerator {
         let mut random = RandomContext::new(&mut binding);
 
         // Loop over events.
-        for (event, particle) in particles.iter_mut().enumerate() {
+        for (event, primary) in particles.iter_mut().enumerate() {
+            primary.event = event;
+            primary.random_index = random.index();
+            let particle = &mut primary.state;
+
             if (event % 1000) == 0 && ctrlc_catched() {
                 return Err(Error::new(KeyboardInterrupt).to_err())
             }
@@ -385,13 +382,15 @@ impl ParticlesGenerator {
             }
             self.generate_energy(random.get(), particle, &mut weight);
 
-            if let Some(weights) = weights {
-                weights.set(event, weight)?;
-            }
+            primary.weight = if any_weight {
+                 weight
+            } else {
+                1.0
+            };
         }
 
         // Apply volume weight, if needed.
-        if let Some(weights) = weights {
+        if any_weight {
             if self.weight_position.unwrap_or(self.weight) {
                 if let Position::Inside { volume, include_daughters } = &self.position {
                     let has_volume = if *include_daughters {
@@ -403,9 +402,8 @@ impl ParticlesGenerator {
                         true => volume.volume.compute_volume(*include_daughters),
                         false => inside.as_ref().unwrap().compute_volume(),
                     };
-                    for i in 0..weights.size() {
-                        let weight = weights.get(i)? * cubic_volume;
-                        weights.set(i, weight)?;
+                    for primary in particles.iter_mut() {
+                        primary.weight *= cubic_volume;
                     }
                 }
             }
@@ -414,17 +412,7 @@ impl ParticlesGenerator {
         // Return result.
         let array: &PyAny = array;
         let array: PyObject = array.into();
-        let result = match weights {
-            Some(weights) => {
-                static RESULT: NamedTuple<2> = NamedTuple::new(
-                    "Result", ["particles", "weights"]);
-                let weights: &PyAny = weights;
-                let weights: PyObject = weights.into();
-                RESULT.instance(py, (array, weights))?.unbind()
-            },
-            None => array,
-        };
-        Ok(result)
+        Ok(array)
     }
 
     /// Set particles positions to be distributed inside a volume.

@@ -330,10 +330,6 @@ Python interface
       The *shape* argument defines the number of particles requested (as a
       :external:py:class:`ndarray <numpy.ndarray>` shape).
 
-      The outcome of this method is dependent on the *weight* configuration. If
-      weights are computed, there are returned as a second separated array.
-      Otherwise, only the generated particles are returned.
-
    .. automethod:: inside
 
       By default, the daughters volumes are excluded when generating the
