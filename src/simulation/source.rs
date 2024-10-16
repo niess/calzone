@@ -7,7 +7,8 @@ use crate::utils::numpy::{Dtype, PyArray, ShapeArg};
 use cxx::{SharedPtr, UniquePtr};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PyString, PyType};
+use pyo3::exceptions::PyKeyError;
 use super::ffi;
 use super::random::{Random, RandomContext};
 
@@ -68,22 +69,22 @@ pub fn particles(
 // ===============================================================================================
 
 pub struct ParticlesIterator<'a> {
-    energy: &'a PyArray<f64>,
+    energy: Property<'a, f64>,
     position: &'a PyArray<f64>,
     direction: &'a PyArray<f64>,
-    pid: Option<&'a PyArray<i32>>,
-    weight: Option<&'a PyArray<f64>>,
+    pid: Option<Property<'a, i32>>,
+    weight: Option<Property<'a, f64>>,
     size: usize,
     index: usize,
 }
 
 impl<'a> ParticlesIterator<'a> {
     pub fn new<'py: 'a>(elements: &'a Bound<'py, PyAny>) -> PyResult<Self> {
-        let energy = extract(elements, "energy")?;
+        let energy = Property::new(elements, "energy")?;
         let position = extract(elements, "position")?;
         let direction = extract(elements, "direction")?;
-        let pid = extract(elements, "pid").ok();
-        let weight = extract(elements, "weight").ok();
+        let pid = Property::maybe_new(elements, "pid")?;
+        let weight = Property::maybe_new(elements, "weight")?;
         if *position.shape().last().unwrap_or(&0) != 3 {
             let why = format!("expected a shape '[..,3]' array, found '{:?}'", position.shape());
             let err = Error::new(ValueError)
@@ -152,7 +153,7 @@ impl<'a> ParticlesIterator<'a> {
     }
 }
 
-pub fn extract<'a, 'py, T>(elements: &'a Bound<'py, PyAny>, key: &str) -> PyResult<&'a PyArray<T>>
+fn extract<'a, 'py, T>(elements: &'a Bound<'py, PyAny>, key: &str) -> PyResult<&'a PyArray<T>>
 where
     'py: 'a,
     T: Dtype,
@@ -165,6 +166,11 @@ where
                 .why(&err.value_bound(py).to_string()).to_err()
         })?
         .extract()
+        .map_err(|err| {
+            Error::new(TypeError)
+                .what(key)
+                .why(&err.value_bound(py).to_string()).to_err()
+        })
 }
 
 impl<'a> Iterator for ParticlesIterator<'a> {
@@ -180,6 +186,71 @@ impl<'a> Iterator for ParticlesIterator<'a> {
         }
     }
 }
+
+#[derive(Clone, Copy)]
+enum Property<'a, T>
+where
+    T: Copy + Dtype
+{
+    Array(&'a PyArray<T>),
+    Scalar(T),
+}
+
+impl <'a, T> Property<'a, T>
+where
+    T: Copy + Dtype + FromPyObject<'a>
+{
+    fn get(&self, index: usize) -> PyResult<T> {
+        match self {
+            Self::Array(array) => array.get(index),
+            Self::Scalar(value) => Ok(*value),
+        }
+    }
+
+    fn maybe_new<'py: 'a>(elements: &'a Bound<'py, PyAny>, key: &str) -> PyResult<Option<Self>> {
+        let py = elements.py();
+        match Self::new(elements, key) {
+            Ok(property) => Ok(Some(property)),
+            Err(err) => if err.get_type_bound(py).is(&PyType::new_bound::<PyKeyError>(py)) {
+                Ok(None)
+            } else {
+                Err(err)
+            },
+        }
+    }
+
+    fn new<'py: 'a>(elements: &'a Bound<'py, PyAny>, key: &str) -> PyResult<Self> {
+        let py = elements.py();
+        let value = elements.get_item(key)
+            .map_err(|err| {
+                Error::new(KeyError)
+                    .what("particles")
+                    .why(&err.value_bound(py).to_string()).to_err()
+            })?;
+        let maybe_scalar: PyResult<T> = value.extract();
+        match maybe_scalar {
+            Ok(value) => Ok(Self::Scalar(value)),
+            Err(_) => {
+                let array = value
+                    .extract()
+                    .map_err(|err| {
+                        Error::new(TypeError)
+                            .what(key)
+                            .why(&err.value_bound(py).to_string()).to_err()
+                    })?;
+                Ok(Self::Array(array))
+            },
+        }
+    }
+
+    fn size(&self) -> usize {
+        match self {
+            Self::Array(array) => array.size(),
+            Self::Scalar(_) => 1,
+        }
+    }
+}
+
 
 // ===============================================================================================
 //
