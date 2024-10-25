@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::mem::transmute;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use super::numpy::PyArray;
+use super::numpy::{PyArray, PyArrayMethods};
 
 
 // ===============================================================================================

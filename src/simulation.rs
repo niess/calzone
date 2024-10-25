@@ -2,7 +2,7 @@ use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::namespace::Namespace;
-use crate::utils::numpy::PyArray;
+use crate::utils::numpy::{PyArray, PyArrayMethods};
 use crate::utils::io::{DictLike, PathString};
 use cxx::SharedPtr;
 use pyo3::prelude::*;
@@ -248,8 +248,7 @@ impl<'a> RunAgent<'a> {
                 random_index[2 * i] = index[0];
                 random_index[2 * i + 1] = index[1];
             }
-            let array: &PyAny = array;
-            Some(array.into_py(py))
+            Some(array.into_any().unbind())
         } else {
             None
         };

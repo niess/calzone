@@ -3,7 +3,7 @@ use crate::utils::error::{ctrlc_catched, Error, variant_explain};
 use crate::utils::error::ErrorKind::{KeyboardInterrupt, KeyError, NotImplementedError, TypeError,
                                      ValueError};
 use crate::utils::float::f64x3;
-use crate::utils::numpy::{Dtype, PyArray, ShapeArg};
+use crate::utils::numpy::{Dtype, PyArray, PyArrayMethods, ShapeArg};
 use cxx::{SharedPtr, UniquePtr};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
@@ -31,7 +31,8 @@ pub fn particles(
     kwargs: Option<&Bound<PyDict>>
 ) -> PyResult<PyObject> {
     let shape: Vec<usize> = shape.into();
-    let array: &PyAny = PyArray::<ffi::Particle>::zeros(py, &shape)?;
+    let array = PyArray::<ffi::Particle>::zeros(py, &shape)?;
+    let array = array.into_any();
     let mut has_direction = false;
     let mut has_energy = false;
     let mut has_pid = false;
@@ -58,7 +59,7 @@ pub fn particles(
     if !has_pid {
         array.set_item("pid", 22)?;
     }
-    Ok(array.into())
+    Ok(array.unbind())
 }
 
 
@@ -481,9 +482,7 @@ impl ParticlesGenerator {
         }
 
         // Return result.
-        let array: &PyAny = array;
-        let array: PyObject = array.into();
-        Ok(array)
+        Ok(array.into_any().unbind())
     }
 
     /// Set particles positions to be distributed inside a volume.

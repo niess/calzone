@@ -76,8 +76,8 @@ impl Random {
                 let shape: Vec<usize> = shape.into();
                 let n = shape.iter().product();
                 let iter = (0..n).map(|_| self.open01());
-                let array: &PyAny = PyArray::<f64>::from_iter(py, &shape, iter)?;
-                Ok(array.into())
+                let array = PyArray::<f64>::from_iter(py, &shape, iter)?;
+                Ok(array.into_any().unbind())
             },
         }
     }

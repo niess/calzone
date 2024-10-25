@@ -30,13 +30,13 @@ where
         let ob: Bound<'py, W> = Bound::new(py, ob)?;
         ob.borrow_mut().as_mut().0 = Box::into_pin(values.into_boxed_slice());
         let binding = ob.borrow();
-        let array: &PyAny = PyArray::<T>::from_data(
+        let array = PyArray::<T>::from_data(
             py,
             &binding.as_ref().0,
             ob.as_any(),
             PyArrayFlags::ReadWrite,
             None
         )?;
-        Ok(array.into())
+        Ok(array.into_any().unbind())
     }
 }

@@ -3,7 +3,7 @@ use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
 use crate::utils::extract::{Extractor, Property, Tag};
 use crate::utils::float::f64x3;
 use crate::utils::io::{dump_stl, PathString};
-use crate::utils::numpy::{PyArray, PyUntypedArray};
+use crate::utils::numpy::{PyArray, PyArrayMethods, PyUntypedArray};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::ffi::OsStr;
@@ -483,7 +483,6 @@ impl Map {
             })?;
         let [ny, nx] = shape;
 
-        let z: &PyUntypedArray = array.into();
         let map = Self {
             crs: Some(crs),
             nx,
@@ -492,7 +491,7 @@ impl Map {
             ny,
             y0,
             y1,
-            z: z.into(),
+            z: array.as_any().into(),
         };
         Ok(map)
     }
@@ -586,7 +585,6 @@ impl Map {
             };
         }
 
-        let z: &PyUntypedArray = array.into();
         let map = Self {
             crs,
             nx,
@@ -595,7 +593,7 @@ impl Map {
             ny,
             y0,
             y1,
-            z: z.into(),
+            z: array.into_any().unbind(),
         };
         Ok(map)
     }
@@ -623,7 +621,6 @@ impl Map {
                 (r * (u16::MAX as f32)) as u16
             };
         }
-        let array: &PyUntypedArray = &array;
 
         // Serialise metadata.
         let crs = self.crs
@@ -658,7 +655,7 @@ impl Map {
         kwargs.set_item("pnginfo", info)?;
         let image = py.import_bound("PIL.Image")
             .and_then(|m| m.getattr("fromarray"))
-            .and_then(|f| f.call1((array,)))?;
+            .and_then(|f| f.call1((array.as_any(),)))?;
         image.call_method("save", (path,), Some(&kwargs))?;
 
         Ok(())

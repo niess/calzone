@@ -403,12 +403,6 @@ unsafe impl PyTypeInfo for PyUntypedArray {
 
 pyobject_native_type_named!(PyUntypedArray);
 
-impl IntoPy<PyObject> for PyUntypedArray {
-    fn into_py<'py>(self, py: Python<'py>) -> PyObject {
-        unsafe { PyObject::from_borrowed_ptr(py, self.as_ptr()) }
-    }
-}
-
 pyobject_native_type_extract!(PyUntypedArray);
 
 
@@ -430,7 +424,7 @@ where
         &self.0
     }
 
-    pub fn empty<'py>(py: Python<'py>, shape: &[usize]) -> PyResult<&'py Self> {
+    pub fn empty<'py>(py: Python<'py>, shape: &[usize]) -> PyResult<Bound<'py, Self>> {
         let api = api(py);
         let empty = unsafe { *api.empty };
         let dtype = T::dtype(py)?;
@@ -447,8 +441,10 @@ where
                 Some(err) => return Err(err),
             }
         }
+        unsafe { pyo3::ffi::Py_INCREF(dtype.as_ptr()); }
         let array = unsafe { &*(array as *const Self) };
-        Ok(array)
+        let array = unsafe { Py::from_owned_ptr(py, array.0.0.as_ptr()) };
+        Ok(array.into_bound(py))
     }
 
     pub fn from_data<'py>(
@@ -457,7 +453,7 @@ where
         base: &Bound<PyAny>,
         flags: PyArrayFlags,
         shape: Option<&[usize]>,
-    ) -> PyResult<&'py Self> {
+    ) -> PyResult<Bound<'py, Self>> {
         let api = api(py);
         let new_from_descriptor = unsafe { *api.new_from_descriptor };
         let dtype = T::dtype(py)?;
@@ -494,15 +490,21 @@ where
                 Some(err) => return Err(err),
             }
         }
+        unsafe { pyo3::ffi::Py_INCREF(dtype.as_ptr()); }
         let set_base_object = unsafe { *api.set_base_object };
         let ptr = base.as_ptr();
         set_base_object(array, ptr);
         unsafe { pyo3::ffi::Py_INCREF(ptr); }
         let array = unsafe { &*(array as *const Self) };
-        Ok(array)
+        let array = unsafe { Py::from_owned_ptr(py, array.0.0.as_ptr()) };
+        Ok(array.into_bound(py))
     }
 
-    pub fn from_iter<'py, I>(py: Python<'py>, shape: &[usize], iter: I) -> PyResult<&'py Self>
+    pub fn from_iter<'py, I>(
+        py: Python<'py>,
+        shape: &[usize],
+        iter: I
+    ) -> PyResult<Bound<'py, Self>>
     where
         I: Iterator<Item=T>,
     {
@@ -547,7 +549,7 @@ where
         Ok(slice)
     }
 
-    pub fn zeros<'py>(py: Python<'py>, shape: &[usize]) -> PyResult<&'py Self> {
+    pub fn zeros<'py>(py: Python<'py>, shape: &[usize]) -> PyResult<Bound<'py, Self>> {
         let api = api(py);
         let zeros = unsafe { *api.zeros };
         let dtype = T::dtype(py)?;
@@ -564,8 +566,10 @@ where
                 Some(err) => return Err(err),
             }
         }
+        unsafe { pyo3::ffi::Py_INCREF(dtype.as_ptr()); }
         let array = unsafe { &*(array as *const Self) };
-        Ok(array)
+        let array = unsafe { Py::from_owned_ptr(py, array.0.0.as_ptr()) };
+        Ok(array.into_bound(py))
     }
 }
 
@@ -675,6 +679,83 @@ where
         let untyped: &PyUntypedArray = FromPyObject::extract(obj)?;
         let typed: &PyArray<T> = std::convert::TryFrom::try_from(untyped)?;
         Ok(typed)
+    }
+}
+
+unsafe impl<T> PyNativeType for PyArray<T> {
+    type AsRefSource = Self;
+}
+
+
+// ===============================================================================================
+//
+// Bound interface.
+//
+// ===============================================================================================
+
+#[allow(dead_code)]
+pub trait PyArrayMethods<T> {
+    // Untyped methods.
+    fn dtype(&self) -> PyObject;
+    fn ndim(&self) -> usize;
+    fn readonly(&self);
+    fn shape(&self) -> Vec<usize>;
+    fn size(&self) -> usize;
+
+    // Typed methods.
+    fn get(&self, index: usize) -> PyResult<T>;
+    fn set(&self, index: usize, value: T) -> PyResult<()>;
+    unsafe fn slice(&self) -> PyResult<&[T]>;
+    unsafe fn slice_mut(&self) -> PyResult<&mut [T]>;
+}
+
+impl<'py, T> PyArrayMethods<T> for Bound<'py, PyArray<T>>
+where
+    T: Copy + Dtype,
+{
+    #[inline]
+    fn dtype(&self) -> PyObject {
+        self.as_gil_ref().0.dtype()
+    }
+
+    #[inline]
+    fn ndim(&self) -> usize {
+        self.as_gil_ref().0.ndim()
+    }
+
+    #[inline]
+    fn readonly(&self) {
+        self.as_gil_ref().0.readonly()
+    }
+
+    #[inline]
+    fn shape(&self) -> Vec<usize> {
+        self.as_gil_ref().0.shape()
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        self.as_gil_ref().0.size()
+    }
+
+    #[inline]
+    fn get(&self, index: usize) -> PyResult<T> {
+        self.as_gil_ref().get(index)
+    }
+
+    #[inline]
+    fn set(&self, index: usize, value: T) -> PyResult<()> {
+        self.as_gil_ref().set(index, value)
+    }
+
+    #[inline]
+    unsafe fn slice(&self) -> PyResult<&[T]> {
+        self.as_gil_ref().slice()
+    }
+
+    #[inline]
+    unsafe fn slice_mut(&self) -> PyResult<&mut [T]> {
+        self.as_gil_ref().slice_mut()
     }
 }
 

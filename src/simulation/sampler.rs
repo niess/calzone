@@ -1,7 +1,7 @@
 use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::export::Export;
 use crate::utils::namespace::Namespace;
-use crate::utils::numpy::{PyArray, PyUntypedArray};
+use crate::utils::numpy::{PyArray, PyArrayMethods};
 use derive_more::{AsMut, AsRef, From};
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
@@ -263,8 +263,7 @@ impl DepositsCell {
                     let deposit = TotalDeposit { event, value, weight, random_index };
                     array.set(i, deposit)?;
                 }
-                let array: &PyUntypedArray = array.into();
-                array.into_py(py)
+                array.into_any().unbind()
             },
             Self::Detailed(deposits) => {
                 let line = Export::export::<LineDepositsExport>(py, deposits.line)?;

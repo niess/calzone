@@ -5,7 +5,7 @@ use crate::utils::error::ErrorKind::{Exception, IndexError, NotImplementedError,
     ValueError};
 use crate::utils::float::f64x3;
 use crate::utils::io::DictLike;
-use crate::utils::numpy::PyArray;
+use crate::utils::numpy::{PyArray, PyArrayMethods};
 use cxx::SharedPtr;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
@@ -706,8 +706,7 @@ impl Volume {
                 let v: i32 = self.volume.inside(&point, &transform, include_daughters).into();
                 result.set(i, v)?;
             }
-            let result: &PyAny = result;
-            result.into_py(py)
+            result.into_any().unbind()
         };
         Ok(result)
     }
