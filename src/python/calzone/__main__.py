@@ -52,6 +52,8 @@ def main():
         action = "store_true"
     )
 
+    # XXX Add a display command.
+
     args = parser.parse_args()
 
     if args.command == "config":

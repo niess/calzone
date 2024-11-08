@@ -87,6 +87,17 @@ Python interface
       :py:class:`Geant4Exception` is raised. Thus, only the first found overlap
       is reported, in case that the geometry comprises multiple overlaps.
 
+   .. automethod:: display
+
+      .. note::
+
+         This method requires the `calzone-display`_ extension module to be
+         installed.
+
+      Launch an interactive display of the geometry. If tracking *data* is
+      provided (as returned by the :py:meth:`Simulation.run` method), this
+      information will be superimposed on the geometry display.
+
    .. automethod:: export()
 
       Export the Geant4 geometry as a `goupil.ExternalGeometry
@@ -583,6 +594,17 @@ Python interface
 
       >>> aabb = volume.aabb(volume.path)
 
+   .. automethod:: display
+
+      .. note::
+
+         This method requires the `calzone-display`_ extension module to be
+         installed.
+
+      Launch an interactive display of the volume. If tracking *data* is
+      provided (as returned by the :py:meth:`Simulation.run` method), this
+      information will be superimposed on the geometry display.
+
    .. method:: dump(path=None)
 
       Dump the volume geometry to a `GDML`_ file.
@@ -662,6 +684,7 @@ Python interface
 .. ============================================================================
 
 .. _builder: https://en.wikipedia.org/wiki/Builder_pattern
+.. _calzone-display: https://pypi.org/project/calzone-display
 .. _EMConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/electromagnetic/index.html
 .. _GDML: https://gdml.web.cern.ch/GDML/
 .. _Geant4: https://geant4.web.cern.ch/docs/

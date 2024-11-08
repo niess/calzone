@@ -23,6 +23,11 @@ below,
    particles = calzone.particles(10000, energy=0.5, position=(0,0,1))
    deposits = simulation.run(particles)
 
+Furthermore, Calzone features an :doc:`interactive display <display>` that
+enables users to navigate through the Monte Carlo geometry and to inspect Monte
+Carlo tracks.
+
+
 System of units
 ---------------
 
@@ -41,6 +46,7 @@ Documentation
    installation
    geometry
    api
+   display
 
 .. ============================================================================
 .. 

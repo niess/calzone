@@ -10,7 +10,7 @@ use cxx::SharedPtr;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyTuple};
 use rmp_serde::{Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use super::cxx::ffi;
@@ -68,6 +68,18 @@ impl Geometry {
             .check(resolution)
             .to_result()?;
         Ok(())
+    }
+
+    /// Display the geometry.
+    #[pyo3(signature=(data=None,/))]
+    fn display<'py>(
+        &self,
+        py: Python<'py>,
+        data: Option<&Bound<'py, PyAny>>
+    ) -> PyResult<()> {
+        let root = self.get_root()?;
+        let root = Bound::new(py, root)?;
+        Volume::display(&root, data)
     }
 
     /// Export the geometry as a `goupil.ExternalGeometry` object.
@@ -643,6 +655,29 @@ impl Volume {
 
         let volume = self.volume.compute_volume(include_daughters);
         Ok(volume)
+    }
+
+    /// Display the volume.
+    #[pyo3(signature=(data=None,/))]
+    fn display<'py>(
+        slf: &Bound<'py, Self>,
+        data: Option<&Bound<'py, PyAny>>,
+    ) -> PyResult<()> {
+        let py = slf.py();
+        let display_func = py.import_bound("calzone_display")
+            .and_then(|m| m.getattr("display"))?;
+        let args = (slf,);
+        match data {
+            Some(data) => {
+                let kwargs = [("data", data),].to_object(py);
+                let kwargs = PyDict::from_sequence_bound(&kwargs.bind(py))?;
+                display_func.call(args, Some(&kwargs))?;
+            },
+            None => {
+                display_func.call1(args)?;
+            },
+        }
+        Ok(())
     }
 
     /// Dump the volume geometry to a GDML file.
