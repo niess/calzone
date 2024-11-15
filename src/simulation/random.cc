@@ -34,6 +34,10 @@ std::array<size_t, 2> RandomImpl::GetIndex() const {
     return this->context->index();
 }
 
+void RandomImpl::SetIndex(std::array<size_t, 2> index) {
+    return this->context->set_index(index);
+}
+
 void RandomImpl::SetContext(RandomContext & context_) {
     if (this->context == nullptr) {
         // Enable.

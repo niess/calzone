@@ -510,7 +510,7 @@ Python interface
       to the simulation settings. Refer to the constructor of this object for
       further information.
 
-   .. method:: run(particles, /)
+   .. method:: run(particles, /, *, random_indices=None)
 
       Run a Geant4 Monte Carlo simulation.
 
@@ -522,6 +522,11 @@ Python interface
       :external:py:class:`NamedTuple <typing.NamedTuple>` is returned,
       containing the sampled energy deposits, as well as the recorded tracks and
       vertices (as :external:py:class:`numpy.ndarray`, each).
+
+      Optionally, an array of *random_indices* (of the same size as *particles*)
+      can be provided to set the :py:attr:`random` engine state of the
+      simulation for each event. This is typically used to replay previously
+      simulated Monte Carlo events (e.g. with additional tracking data).
 
    .. autoattribute:: geometry
 

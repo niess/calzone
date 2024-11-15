@@ -23,6 +23,7 @@ struct RandomImpl: public CLHEP::HepRandomEngine {
 
     // User interface.
     std::array<size_t, 2> GetIndex() const;
+    void SetIndex(std::array<size_t, 2>);
     void SetContext(RandomContext &);
     void ReleaseContext();
 

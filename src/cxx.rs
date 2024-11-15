@@ -478,8 +478,10 @@ pub mod ffi {
         unsafe fn geometry<'b>(self: &'b RunAgent) -> &'b GeometryBorrow;
         fn is_deposits(self: &RunAgent) -> bool;
         fn is_particles(self: &RunAgent) -> bool;
+        fn is_random_indices(self: &RunAgent) -> bool;
         fn is_secondaries(self: &RunAgent) -> bool;
         fn is_tracker(self: &RunAgent) -> bool;
+        fn next_random_index(self: &RunAgent) -> [u64; 2];
         unsafe fn next_primary(self: &mut RunAgent, random_index: &[u64; 2]) -> Particle;
         unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
         unsafe fn push_deposit(
@@ -504,5 +506,6 @@ pub mod ffi {
         fn index(self: &RandomContext) -> [u64; 2];
         fn next_open01(self: &mut RandomContext) -> f64;
         fn prng_name(self: &RandomContext) -> &'static str;
+        fn set_index(self: &mut RandomContext, index: [u64; 2]);
     }
 }

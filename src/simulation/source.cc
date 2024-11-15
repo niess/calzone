@@ -11,6 +11,9 @@
 
 
 void SourceImpl::GeneratePrimaries(G4Event * event) {
+    if (RUN_AGENT->is_random_indices()) {
+        RandomImpl::Get()->SetIndex(RUN_AGENT->next_random_index());
+    }
     auto random_index = RandomImpl::Get()->GetIndex();
     auto primary = RUN_AGENT->next_primary(random_index);
     G4ParticleDefinition * definition;

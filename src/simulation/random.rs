@@ -157,6 +157,11 @@ impl<'a> RandomContext<'a> {
         self.0.index_2u64()
     }
 
+    pub fn set_index(&mut self, index: [u64; 2]) {
+        let index = Index::Array(index);
+        self.0.set_index(Some(index)).unwrap();
+    }
+
     pub fn next_open01(&mut self) -> f64 {
         self.0.open01()
     }

@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::geometry::Geometry;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
@@ -134,16 +136,18 @@ impl Simulation {
     }
 
     /// Run a Geant4 Monte Carlo simulation.
-    #[pyo3(signature = (particles, /, verbose=false), text_signature="(particles, /)")]
+    #[pyo3(signature = (particles, /, *, random_indices=None, verbose=false))]
+    #[pyo3(text_signature = "(particles, /, *, random_indices=None)")]
     fn run<'py>(
         &self,
         particles: &Bound<'py, PyAny>,
+        random_indices: Option<&PyArray<u64>>,
         verbose: Option<bool>, // Hidden argument.
     ) -> PyResult<PyObject> {
         let py = particles.py();
         let verbose = verbose.unwrap_or(false);
         let particles = source::ParticlesIterator::new(particles)?;
-        let mut agent = RunAgent::new(py, self, particles)?;
+        let mut agent = RunAgent::new(py, self, particles, random_indices)?;
         let mut binding = self.random.bind(py).borrow_mut();
         let mut random = RandomContext::new(&mut binding);
         let result = ffi::run_simulation(&mut agent, &mut random, verbose)
@@ -217,6 +221,7 @@ pub struct RunAgent<'a> {
     geometry: SharedPtr<ffi::GeometryBorrow>,
     physics: ffi::Physics,
     primaries: source::ParticlesIterator<'a>,
+    indices: Option<&'a PyArray<u64>>,
     // Iterator.
     index: usize,
     random_index: [u64; 2],
@@ -313,6 +318,10 @@ impl<'a> RunAgent<'a> {
         self.particles.is_some()
     }
 
+    pub fn is_random_indices(&self) -> bool {
+        self.indices.is_some()
+    }
+
     pub fn is_secondaries(&self) -> bool {
         self.secondaries
     }
@@ -325,7 +334,21 @@ impl<'a> RunAgent<'a> {
         py: Python,
         simulation: &Simulation,
         primaries: source::ParticlesIterator<'a>,
+        indices: Option<&'a PyArray<u64>>,
     ) -> PyResult<Pin<Box<RunAgent<'a>>>> {
+        if let Some(indices) = indices {
+            if indices.size() != 2 * primaries.size() {
+                let why = format!(
+                    "expected a size {} array, found a size {} array",
+                    2 * primaries.size(),
+                    indices.size(),
+                );
+                let err = Error::new(ValueError)
+                    .what("random_indices")
+                    .why(&why);
+                return Err(err.to_err())
+            }
+        }
         let geometry = simulation.geometry
             .as_ref()
             .ok_or_else(|| Error::new(ValueError).what("geometry").why("undefined").to_err())?;
@@ -344,8 +367,8 @@ impl<'a> RunAgent<'a> {
         let tracker_index = Vec::new();
         let secondaries = simulation.secondaries;
         let agent = RunAgent {
-            geometry, physics, primaries, index, random_index, weight, deposits, particles,
-            tracker, tracker_index, secondaries
+            geometry, physics, primaries, indices, index, random_index, weight, deposits,
+            particles, tracker, tracker_index, secondaries
         };
         Ok(Box::pin(agent))
     }
@@ -360,6 +383,14 @@ impl<'a> RunAgent<'a> {
         let (particle, weight) = self.primaries.next().unwrap().unwrap();
         self.weight = weight;
         particle
+    }
+
+    pub fn next_random_index(&self) -> [u64; 2] {
+        let Some(indices) = self.indices else { unreachable!() };
+        [
+            indices.get(2 * self.index).unwrap(),
+            indices.get(2 * self.index + 1).unwrap(),
+        ]
     }
 
     pub fn physics<'b>(&'b self) -> &'b ffi::Physics {
