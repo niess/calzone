@@ -268,7 +268,7 @@ Python interface
    array of 100 primary particles (photons, by default) with a kinetic energy of
    0.5 MeV, starting from the origin (by default), and going downwards.
 
-   >>> particles = calzone.particles(100, energy=0.5, direction=(0, 0, -1))
+   >>> particles = calzone.particles(100, pid="e-", energy=0.5, direction=(0, 0, -1))
 
    The data structure (:external:py:class:`numpy.dtype`) of a primary particle
    is the following (the corresponding physical units are also indicated).
@@ -298,6 +298,37 @@ Python interface
 
       The type of a Monte Carlo particle (:python:`"pid"`) is encoded according
       to the Particle Data Group (PDG) `numbering scheme <PdgScheme_>`_.
+      Alternatively, for some prevalent particles, a name can be provided in
+      lieu of the number, as indicated in :numref:`tab-particles-pids`.
+
+   .. _tab-particles-pids:
+
+   .. list-table:: Common particles PIDs.
+      :width: 60%
+      :widths: auto
+      :header-rows: 1
+
+      * - Name
+        - PID
+        - Description
+      * - :python:`"e-"`, :python:`"e+"`
+        - :python:`11`, :python:`-11`
+        - An electron (positron).
+      * - :python:`"mu-"`, :python:`"mu+"`
+        - :python:`13`, :python:`-13`
+        - A (anti)muon.
+      * - :python:`"tau-"`, :python:`"tau+"`
+        - :python:`15`, :python:`-15`
+        - A (anti)tau.
+      * - :python:`"gamma"`
+        - :python:`22`
+        - A photon.
+      * - :python:`"p"`
+        - :python:`2212`
+        - A proton.
+      * - :python:`"n"`
+        - :python:`2112`
+        - A neutron.
 
 ----
 
@@ -367,6 +398,8 @@ Python interface
 
       Monte Carlo particles are indentified by their Particle ID (PID), which
       follows the Particle Data Group (`PDG <PdgScheme_>`_) numbering scheme.
+      Alternatively, a name can be provided for some common particles (see
+      :numref:`tab-particles-pids`).
 
    .. automethod:: position
 

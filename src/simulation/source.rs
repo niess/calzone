@@ -38,16 +38,27 @@ pub fn particles(
     let mut has_pid = false;
     if let Some(kwargs) = kwargs {
         for (key, value) in kwargs.iter() {
-            {
-                let key: String = key.extract()?;
-                match key.as_str() {
-                    "direction" => { has_direction = true; },
-                    "energy" => { has_energy = true; },
-                    "pid" => { has_pid = true; },
-                    _ => {},
-                }
+            let key: String = key.extract()?;
+            match key.as_str() {
+                "direction" => { has_direction = true; },
+                "energy" => { has_energy = true; },
+                "pid" => {
+                    has_pid = true;
+                    if let Ok(particle) = value.extract::<ParticleName>() {
+                        array.set_item(&key, i32::try_from(particle)?)?;
+                        continue;
+                    }
+                },
+                _ => {},
             }
-            array.set_item(key, value)?;
+            array.set_item(&key, value)
+                .map_err(|err| {
+                    let why = err.value(py).to_string();
+                    Error::new(ValueError)
+                        .what(&key)
+                        .why(&why)
+                        .to_err()
+                })?;
         }
     }
     if !has_direction {
@@ -57,7 +68,7 @@ pub fn particles(
         array.set_item("energy", 1.0)?;
     }
     if !has_pid {
-        array.set_item("pid", 22)?;
+        array.set_item("pid", DEFAULT_PID)?;
     }
     Ok(array.unbind())
 }
@@ -538,10 +549,10 @@ impl ParticlesGenerator {
     #[pyo3(signature=(value, /))]
     fn pid<'py>(
         slf: Bound<'py, Self>,
-        value: i32,
+        value: PidArg,
     ) -> PyResult<Bound<'py, Self>> {
         let mut generator = slf.borrow_mut();
-        generator.pid = Some(value);
+        generator.pid = Some(value.try_into()?);
         Ok(slf)
     }
 
@@ -927,5 +938,58 @@ impl <'a> OntoGenerator<'a> {
         }
 
         self.direction.is_some()
+    }
+}
+
+
+// ===============================================================================================
+//
+// Named particles.
+//
+// ===============================================================================================
+
+#[derive(FromPyObject)]
+struct ParticleName (String);
+
+impl TryFrom<ParticleName> for i32 {
+    type Error = PyErr;
+
+    fn try_from(value: ParticleName) -> PyResult<i32> {
+        let pid = match value.0.as_str() {
+            "e-" => 11,
+            "e+" => -11,
+            "mu-" => 13,
+            "mu+" => -13,
+            "tau-" => 15,
+            "tau+" => -15,
+            "gamma" => 22,
+            "p" => 2212,
+            "n" => 2112,
+            _ => {
+                let why = format!("unknown particle '{}'", value.0);
+                let err = Error::new(ValueError)
+                    .what("pid")
+                    .why(&why);
+                return Err(err.to_err());
+            },
+        };
+        Ok(pid)
+    }
+}
+
+#[derive(FromPyObject)]
+enum PidArg {
+    Name(ParticleName),
+    Number(i32),
+}
+
+impl TryFrom<PidArg> for i32 {
+    type Error = PyErr;
+
+    fn try_from(value: PidArg) -> PyResult<i32> {
+        match value {
+            PidArg::Name(name) => name.try_into(),
+            PidArg::Number(pid) => Ok(pid),
+        }
     }
 }

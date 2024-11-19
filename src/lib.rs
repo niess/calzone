@@ -9,9 +9,6 @@ mod geometry;
 mod simulation;
 mod utils;
 
-// XXX Import GDML (by conversion)?
-// XXX Particles names, instead of pids?
-
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 

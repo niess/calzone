@@ -20,7 +20,7 @@ below,
    import calzone
 
    simulation = calzone.Simulation("geometry.toml")
-   particles = calzone.particles(10000, energy=0.5, position=(0,0,1))
+   particles = calzone.particles(10000, pid="e-", energy=0.5, position=(0,0,1))
    deposits = simulation.run(particles)
 
 Furthermore, Calzone features an :doc:`interactive display <display>` that
