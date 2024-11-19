@@ -2,6 +2,7 @@ use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::error::{Error, variant_error};
 use crate::utils::extract::{Extractor, Property, Tag, TryFromBound};
 use crate::utils::io::DictLike;
+use crate::utils::namespace::Namespace;
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use regex::Regex;
@@ -15,11 +16,19 @@ mod hash;
 
 /// Define Geant4 material(s).
 #[pyfunction]
+#[pyo3(signature=(definition, /))]
 pub fn define(definition: DictLike) -> PyResult<()> {
     let tag = Tag::new("", "materials", None);
     let materials = MaterialsDefinition::try_from_dict(&tag, &definition)?;
     materials.build()?;
     Ok(())
+}
+
+/// Describe a Geant4 material.
+#[pyfunction]
+#[pyo3(signature=(material, /))]
+pub fn describe(py: Python, material: &str) -> PyObject {
+    ffi::describe_material(material).to_object(py)
 }
 
 
@@ -415,5 +424,36 @@ impl ffi::Molecule {
     ) -> Self {
         components.sort_by(|a, b| a.partial_cmp(b).unwrap());
         Self { properties, components }
+    }
+}
+
+
+// ===============================================================================================
+//
+// Conversion to a Python dict.
+//
+// ===============================================================================================
+
+impl ToPyObject for ffi::Mixture {
+    fn to_object(&self, py: Python) -> PyObject {
+        if self.properties.density <= 0.0 {
+            py.None()
+        } else {
+            let state = State::try_from(self.properties.state)
+                .map_or_else(
+                    |err| err.to_owned(),
+                    |state| state.to_str().to_owned(),
+                )
+                .to_string();
+            let composition: Vec<_> = self.components.iter()
+                .map(|component| (&component.name, component.weight))
+                .collect();
+
+            Namespace::new(py, &[
+                ("density", self.properties.density.into_py(py)),
+                ("state", state.into_py(py)),
+                ("composition", composition.into_py(py)),
+            ]).unwrap().unbind()
+        }
     }
 }

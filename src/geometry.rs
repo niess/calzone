@@ -833,7 +833,7 @@ impl Volume {
             materials
                 .entry(volume.material.clone())
                 .or_insert_with(|| {
-                    let mut mixture = geometry.describe_material(volume.material.as_str());
+                    let mut mixture = ffi::describe_material(volume.material.as_str());
                     let state = materials::State::try_from(mixture.properties.state)
                         .map_or_else(
                             |err| err.to_owned(),

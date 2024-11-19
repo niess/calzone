@@ -9,6 +9,9 @@ mod geometry;
 mod simulation;
 mod utils;
 
+// XXX Import GDML (by conversion)?
+// XXX Particles names, instead of pids?
+
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
@@ -61,6 +64,7 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     // Register function(s).
     module.add_function(wrap_pyfunction!(utils::data::download, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::materials::define, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::materials::describe, module)?)?;
     module.add_function(wrap_pyfunction!(simulation::source::particles, module)?)?;
 
     // Register constant(s).

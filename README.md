@@ -1,9 +1,6 @@
 # Calzone
 (**CAL**orimeter **ZONE**)
 
-> [!WARNING]
-> This is work in progress.
-
 
 ## Description
 

@@ -21,6 +21,14 @@ Python interface
       definition is provided for an existing (already loaded) material, then a
       :external:py:class:`ValueError` is raised.
 
+.. autofunction:: calzone.describe
+
+   Returns a :external:py:class:`namespace <types.SimpleNamespace>` object
+   containing the material properties, or :python:`None` if the material is
+   undefined. For example
+
+   >>> calzone.describe("G4_AIR").composition
+
 ----
 
 .. autofunction:: calzone.download
@@ -519,7 +527,7 @@ Python interface
       depends on the simulation :py:attr:`sample_deposits`,
       :py:attr:`sample_particles` and :py:attr:`tracking` attributes. For
       example, if both deposits sampling and tracking are enabled, then a
-      :external:py:class:`NamedTuple <typing.NamedTuple>` is returned,
+      :external:py:class:`namespace <types.SimpleNamespace>` object is returned,
       containing the sampled energy deposits, as well as the recorded tracks and
       vertices (as :external:py:class:`numpy.ndarray`, each).
 

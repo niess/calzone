@@ -40,7 +40,6 @@ struct GeometryBorrow {
 
     // User interface.
     std::shared_ptr<VolumeBorrow> borrow_volume(rust::Str) const;
-    Mixture describe_material(rust::Str) const;
     std::shared_ptr<VolumeBorrow> find_volume(rust::Str) const;
 
     // Geant4 interface.
@@ -122,6 +121,7 @@ std::shared_ptr<Error> add_molecule(const Molecule &);
 
 class G4Material;
 G4Material * get_material(const rust::String & name);
+Mixture describe_material(rust::Str);
 
 
 // ============================================================================
