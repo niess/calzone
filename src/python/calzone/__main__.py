@@ -1,5 +1,7 @@
 import argparse
+from importlib.util import find_spec
 import os
+from pathlib import Path
 
 import calzone
 
@@ -38,6 +40,16 @@ def main():
         action = "store_true",
     )
 
+    if find_spec("calzone_display"):
+        display = subparsers.add_parser("display",
+            help = "display geometry data."
+        )
+
+        display.add_argument("geometry",
+            help = "path to a geometry file.",
+            type = Path
+        )
+
     download = subparsers.add_parser("download",
         help = "download Geant4 data."
     )
@@ -52,8 +64,6 @@ def main():
         action = "store_true"
     )
 
-    # XXX Add a display command.
-
     args = parser.parse_args()
 
     if args.command == "config":
@@ -67,11 +77,19 @@ def main():
         if result:
             print(" ".join(result))
 
+    elif args.command == "display":
+        if args.geometry.suffix == ".stl":
+            import calzone_display
+            calzone_display.display(args.geometry)
+        else:
+            calzone.Geometry(args.geometry).display()
+
     elif args.command == "download":
         calzone.download(
             destination = args.destination,
             verbose = not args.quiet
         )
+
     else:
         parser.print_help()
 
