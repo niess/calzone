@@ -26,7 +26,18 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
         }
     }
 
-    if (RUN_AGENT->is_particles() && step->IsLastStepInVolume()) {
+    bool outgoing = RUN_AGENT->is_particles() && step->IsLastStepInVolume();
+    if (outgoing) {
+        // Check that the next volume is not a daughter of the current one.
+        auto pre = step->GetPreStepPoint()->GetPhysicalVolume();
+        auto post = step->GetPostStepPoint()->GetPhysicalVolume();
+        if ((pre != nullptr) && (post != nullptr)) {
+            if (post->GetMotherLogical() == pre->GetLogicalVolume()) {
+                outgoing = false;
+            }
+        }
+    }
+    if (outgoing) {
         auto && track = step->GetTrack();
         auto && action = this->roles.outgoing;
         if ((action == Action::Catch) ||
@@ -49,6 +60,43 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
         if ((action == Action::Catch) ||
             (action == Action::Kill)) {
             track->SetTrackStatus(fStopAndKill);
+
+            if (RUN_AGENT->is_tracker()) {
+                // Record the last vertex (since killed tracks do not seem to
+                // trigger the user stepping action).
+                auto && tid = track->GetTrackID();
+                auto && point = step->GetPostStepPoint();
+                auto && r = point->GetPosition() / CLHEP::cm;
+                auto && u = point->GetMomentumDirection();
+                Vertex vertex = {
+                    0,
+                    tid,
+                    point->GetKineticEnergy() / CLHEP::MeV,
+                    { r.x(), r.y(), r.z() },
+                    { u.x(), u.y(), u.z() },
+                    { 0x0 },
+                    { 0x0 }
+                };
+                auto volume = point->GetPhysicalVolume();
+                if (volume != nullptr) {
+                    std::string name;
+                    std::istringstream stream(volume->GetName());
+                    while (getline(stream, name, '.')) {}
+                    auto dst = (char *)(&vertex.volume);
+                    std::strncpy(
+                        dst,
+                        name.c_str(),
+                        sizeof(vertex.volume) - 1
+                    );
+                }
+                auto dst = (char *)(&vertex.process);
+                std::strncpy(
+                    dst,
+                    "Kill",
+                    sizeof(vertex.process) - 1
+                );
+                RUN_AGENT->push_vertex(std::move(vertex));
+            }
         }
     }
 
