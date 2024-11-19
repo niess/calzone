@@ -4,9 +4,9 @@
 // Calzone interface.
 #include "calzone.h"
 
-struct Tessellation: public G4VSolid {
-    Tessellation(const G4String &, const TessellatedShape & shape);
-    Tessellation(const Tessellation &) = delete;
+struct Mesh: public G4VSolid {
+    Mesh(const G4String &, const MeshShape & shape);
+    Mesh(const Mesh &) = delete;
 
     void BoundingLimits(G4ThreeVector &, G4ThreeVector &) const;
     G4bool CalculateExtent(
@@ -37,8 +37,8 @@ struct Tessellation: public G4VSolid {
     void DescribeYourselfTo(G4VGraphicsScene &) const;
     std::ostream & StreamInfo(std::ostream &) const;
 
-    const rust::Box<SortedTessels> & Describe() const;
+    const rust::Box<SortedFacets> & Describe() const;
 
 private:
-    rust::Box<SortedTessels> tessels;
+    rust::Box<SortedFacets> facets;
 };

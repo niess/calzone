@@ -44,7 +44,7 @@ pub enum Shape {
     Cylinder(ffi::CylinderShape),
     Envelope(ffi::EnvelopeShape),
     Sphere(ffi::SphereShape),
-    Tessellation(ffi::TessellatedShape),
+    Mesh(ffi::MeshShape),
 }
 
 impl From<&Shape> for ffi::ShapeType {
@@ -54,7 +54,7 @@ impl From<&Shape> for ffi::ShapeType {
             Shape::Cylinder(_) => ffi::ShapeType::Cylinder,
             Shape::Envelope(_) => ffi::ShapeType::Envelope,
             Shape::Sphere(_) => ffi::ShapeType::Sphere,
-            Shape::Tessellation(_) => ffi::ShapeType::Tessellation,
+            Shape::Mesh(_) => ffi::ShapeType::Mesh,
         }
     }
 }
@@ -66,7 +66,7 @@ pub(super) enum ShapeType {
     Cylinder,
     Envelope,
     Sphere,
-    Tessellation,
+    Mesh,
 }
 
 pub struct Include {
@@ -238,8 +238,8 @@ impl Shape {
                 ffi::EnvelopeShape::try_from_any(&tag, properties)?),
             ShapeType::Sphere => Shape::Sphere(
                 ffi::SphereShape::try_from_any(&tag, properties)?),
-            ShapeType::Tessellation => Shape::Tessellation(
-                ffi::TessellatedShape::try_from_any(&tag, properties)?),
+            ShapeType::Mesh => Shape::Mesh(
+                ffi::MeshShape::try_from_any(&tag, properties)?),
         };
         Ok(shape)
     }
@@ -578,7 +578,7 @@ impl TryFromBound for ffi::SphereShape {
     }
 }
 
-impl TryFromBound for ffi::TessellatedShape {
+impl TryFromBound for ffi::MeshShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let mut scale: f64 = 1.0;
         let mut origin: Option<f64x3> = None;
@@ -595,7 +595,7 @@ impl TryFromBound for ffi::TessellatedShape {
                     Property::optional_bool("regular"),
                 ]);
 
-                let tag = tag.cast("tessellation");
+                let tag = tag.cast("mesh");
                 let [path, units, center, depth, reg] = EXTRACTOR.extract_any(&tag, value, None)?;
                 if let PropertyValue::String(units) = units {
                     scale = convert(value.py(), units.as_str(), "cm")
@@ -651,7 +651,7 @@ impl TryFromBound for ffi::TessellatedShape {
                 let py = value.py();
                 let map = Map::from_file(py, &path)?;
                 let regular = regular.unwrap_or(false);
-                let facets = map.tessellate(py, regular, origin, padding)?;
+                let facets = map.build_mesh(py, regular, origin, padding)?;
                 Ok(facets)
             },
             _ => return Err(PyNotImplementedError::new_err("")),
@@ -793,9 +793,9 @@ impl Volume {
         self.subtract.as_slice()
     }
 
-    pub fn tessellated_shape(&self) -> &ffi::TessellatedShape {
+    pub fn mesh_shape(&self) -> &ffi::MeshShape {
         match &self.shape {
-            Shape::Tessellation(shape) => &shape,
+            Shape::Mesh(shape) => &shape,
             _ => unreachable!(),
         }
     }

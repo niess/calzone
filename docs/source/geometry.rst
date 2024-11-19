@@ -2,8 +2,8 @@ Geometry definition
 ===================
 
 A `Geant4`_ Monte Carlo geometry consists of a hierarchy of nested
-`G4VPhysicalVolume`_\ s, starting from a single root ("World") volume. Calzone
-represents this structure using base Python objects
+`G4VPhysicalVolumes <G4VPhysicalVolume_>`_, starting from a single root
+("World") volume. Calzone represents this structure using base Python objects
 (:external:py:class:`bool`, :external:py:class:`dict`,
 :external:py:class:`float`, :external:py:class:`int`, :external:py:class:`list`
 and :external:py:class:`str`) that have associated representations in common
@@ -363,8 +363,18 @@ sets the name of the included root volume.
 Shape definition
 ----------------
 
-The available shape types (`G4vSolid`_) are described below. Note that the shape
-type name follows the `snake_case` syntax (i.e. like property names).
+The available shape types are described below. Calzone only exports a limited
+number of the `G4VSolids <G4VSolid_>`_ defined by `Geant4`_, namely the
+:ref:`box <geometry:Box shape>`, :ref:`cylinder <geometry:Cylinder shape>` and
+:ref:`sphere <geometry:Sphere shape>` shapes. For more complex use cases,
+:ref:`meshes <geometry:Mesh shape>` should be employed, for which Calzone has
+its own implementation.
+
+
+.. note::
+
+   Shape type names follow the `snake_case` syntax (i.e. like property names).
+
 
 Box shape
 ~~~~~~~~~
@@ -456,6 +466,72 @@ around bounded objects.
    the usual `substitution rules`_, resulting in uniform padding along the 6
    directions.
 
+Mesh shape
+~~~~~~~~~~
+
+A triangle mesh defined from a data file (*path* property) with the specified
+length *units*.
+
+.. list-table:: Mesh items.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default value
+   * - :python:`"path"`
+     - :python:`str`
+     - 
+   * - :python:`"units"`
+     - :python:`str`
+     - :python:`"cm"`
+
+The actual shape depends on the data file format. If the file is a 3D `STL`_
+model, then the mesh is directly imported. Alternatively, the data can also be
+a surface described by a Digital Elevation Model (`DEM`_). In this case,
+elevation values are assumed to be along the z-axis, and the surface is closed
+by adding side and bottom faces. The additional properties described in
+:numref:`tab-topography-items` control the generated 3D shape.
+
+.. tip::
+
+   The :py:meth:`Map.dump() <calzone.Map.dump>` method allows one to export the
+   generated 3D shape in `STL`_ format.
+
+.. _tab-topography-items:
+
+.. list-table:: DEM specific items.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default value
+   * - :python:`"padding"`
+     - :python:`float`
+     - 100.0 (in map units)
+   * - :python:`"origin"`
+     - :python:`[float; 3]`
+     - :python:`numpy.zeros(3)`
+   * - :python:`"regular"`
+     - :python:`bool`
+     - :python:`False`
+
+.. topic:: Geometric properties.
+
+   The *origin* property defines the origin of the 3D shape in the DEM
+   coordinates system. The *padding* property extends the shape below the DEM's
+   minimum elevation value.
+
+.. topic:: Meshing type.
+
+   The *regular* flag controls the meshing algorithm. By default, a non-regular
+   -but optimised- mesh is used. However, this is not supported by the Geant4
+   traversal :py:attr:`algorithm <calzone.GeometryBuilder.algorithm>`.
+   Therefore, a *regular* mesh must be selected when using the latter algorithm.
+
 Sphere shape
 ~~~~~~~~~~~~
 
@@ -495,79 +571,13 @@ A sphere (`G4Orb`_ or `G4Sphere`_), centred on the origin, and defined by its
    closed, i.e. it spans the whole azimuth angle ([0, 360] deg), and the whole
    zenith angle ([0, 180] deg).
 
-Tessellation shape
-~~~~~~~~~~~~~~~~~~
-
-A 3D tessellation defined from a data file (*path* property) with the specified
-length *units*.
-
-.. list-table:: Tessellation items.
-   :width: 75%
-   :widths: auto
-   :header-rows: 1
-
-   * - Key
-     - Value type
-     - Default value
-   * - :python:`"path"`
-     - :python:`str`
-     - 
-   * - :python:`"units"`
-     - :python:`str`
-     - :python:`"cm"`
-
-The actual shape depends on the data file format. If the file is a 3D `STL`_
-model, then the model is directly imported. Alternatively, the data can also be
-a surface described by a Digital Elevation Model (`DEM`_). In this case,
-elevation values are assumed to be along the z-axis, and the surface is closed
-by adding side and bottom faces. The additional properties described in
-:numref:`tab-topography-items` control the generated 3D shape.
-
-.. tip::
-
-   The :py:meth:`Map.dump() <calzone.Map.dump>` method allows one to export the
-   generated 3D shape in `STL`_ format.
-
-.. _tab-topography-items:
-
-.. list-table:: DEM tesselation items.
-   :width: 75%
-   :widths: auto
-   :header-rows: 1
-
-   * - Key
-     - Value type
-     - Default value
-   * - :python:`"padding"`
-     - :python:`float`
-     - 100.0 (in map units)
-   * - :python:`"origin"`
-     - :python:`[float; 3]`
-     - :python:`numpy.zeros(3)`
-   * - :python:`"regular"`
-     - :python:`bool`
-     - :python:`False`
-
-.. topic:: Geometric properties.
-
-   The *origin* property defines the origin of the 3D shape in the DEM
-   coordinates system. The *padding* property extends the shape below the DEM's
-   minimum elevation value.
-
-.. topic:: Meshing type.
-
-   The *regular* flag controls the meshing. By default, a non-regular -but
-   optimised- meshing is used. However, this is not supported by the Geant4
-   traversal :py:attr:`algorithm <calzone.GeometryBuilder.algorithm>`.
-   Therefore, a *regular* meshing must be selected when using the latter
-   algorithm.
-
 Materials definition
 --------------------
 
 A Geant4 material (`G4Material`_) can be defined either as an assembly of atomic
-elements (`G4Element`_\ s), denoted :ref:`Molecule <geometry:Molecules>` herein,
-or as a :ref:`Mixture <geometry:Mixtures>` of other materials.
+elements (`G4Elements <G4Element_>`_), denoted :ref:`Molecule
+<geometry:Molecules>` herein, or as a :ref:`Mixture <geometry:Mixtures>` of
+other materials.
 
 .. tip::
 

@@ -21,9 +21,9 @@ pub struct VolumeInfo {
 #[derive(Serialize)]
 pub enum SolidInfo {
     Box(ffi::BoxInfo),
+    Mesh(Vec<f32>),
     Orb(ffi::OrbInfo),
     Sphere(ffi::SphereInfo),
-    Tessellation(Vec<f32>),
     Tubs(ffi::TubsInfo),
 }
 

@@ -83,7 +83,7 @@ struct VolumeBorrow {
     OrbInfo describe_orb() const;
     SphereInfo describe_sphere() const;
     void describe_tessellated_solid(rust::Vec<float> &) const;
-    const rust::Box<SortedTessels> & describe_tessellation() const;
+    const rust::Box<SortedFacets> & describe_mesh() const;
     TransformInfo describe_transform() const;
     TubsInfo describe_tubs() const;
     std::shared_ptr<Error> dump(rust::Str) const;

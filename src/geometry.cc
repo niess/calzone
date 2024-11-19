@@ -1,6 +1,6 @@
 #include "calzone.h"
 #include "geometry/solids.h"
-#include "geometry/tessellation.h"
+#include "geometry/mesh.h"
 #include "simulation/sampler.h"
 // standard library.
 #include <list>
@@ -178,7 +178,7 @@ static G4VSolid * build_envelope(
     }
 }
 
-static TessellatedSolid * build_geant4_tessellation(
+static TessellatedSolid * build_geant4_mesh(
     const std::string & pathname,
     const Volume & volume
 ) {
@@ -188,7 +188,7 @@ static TessellatedSolid * build_geant4_tessellation(
         return nullptr;
     }
 
-    auto shape = volume.tessellated_shape();
+    auto shape = volume.mesh_shape();
     const size_t n = shape.facets.size() / 9;
     float * data = shape.facets.data();
     const float unit = (float)CLHEP::cm;
@@ -206,7 +206,7 @@ static TessellatedSolid * build_geant4_tessellation(
         if (!solid->AddFacet((G4VFacet *)facet)) {
             delete solid;
             auto message = fmt::format(
-                "bad vertices for tessellation '{}'",
+                "bad vertices for tessellated solid '{}'",
                 pathname
             );
             set_error(ErrorType::ValueError, message.c_str());
@@ -217,18 +217,18 @@ static TessellatedSolid * build_geant4_tessellation(
     return solid;
 }
 
-static G4VSolid * build_tessellation(
+static G4VSolid * build_mesh(
     const TSTAlgorithm & algorithm,
     const std::string & pathname,
     const Volume & volume
 ) {
     switch (algorithm) {
         case TSTAlgorithm::Bvh: {
-            auto && shape = volume.tessellated_shape();
-            return new Tessellation(pathname, shape);
+            auto && shape = volume.mesh_shape();
+            return new Mesh(pathname, shape);
         }
         case TSTAlgorithm::Geant4:
-            return build_geant4_tessellation(pathname, volume);
+            return build_geant4_mesh(pathname, volume);
         default:
             return nullptr; // unreachable.
     }
@@ -393,8 +393,8 @@ static G4VSolid * build_solids(
                 }
             }
             break;
-        case ShapeType::Tessellation:
-            solid = build_tessellation(algorithm, pathname, volume);
+        case ShapeType::Mesh:
+            solid = build_mesh(algorithm, pathname, volume);
             break;
     }
     if (solid == nullptr) {
@@ -1091,8 +1091,8 @@ void VolumeBorrow::describe_tessellated_solid(rust::Vec<float> & data) const {
     }
 }
 
-const rust::Box<SortedTessels> & VolumeBorrow::describe_tessellation() const {
-    auto solid = static_cast<Tessellation *>(
+const rust::Box<SortedFacets> & VolumeBorrow::describe_mesh() const {
+    auto solid = static_cast<Mesh *>(
         get_unsubtracted_solid(this->volume->GetLogicalVolume()->GetSolid())
     );
     return solid->Describe();

@@ -22,8 +22,8 @@ mod bytes;
 mod goupil;
 mod map;
 pub mod materials;
+pub mod mesh;
 pub mod volume;
-pub mod tessellation;
 
 pub use map:: Map;
 pub use materials::MaterialsDefinition;
@@ -767,12 +767,12 @@ impl Volume {
                 "G4TessellatedSolid" => {
                     let mut data: Vec<f32> = Vec::new();
                     volume.describe_tessellated_solid(&mut data);
-                    bytes::SolidInfo::Tessellation(data)
+                    bytes::SolidInfo::Mesh(data)
                 },
                 "G4Tubs" => bytes::SolidInfo::Tubs(volume.describe_tubs()),
-                "Tessellation" => {
-                    let data: Vec<f32> = volume.describe_tessellation().as_ref().into();
-                    bytes::SolidInfo::Tessellation(data)
+                "Mesh" => {
+                    let data: Vec<f32> = volume.describe_mesh().as_ref().into();
+                    bytes::SolidInfo::Mesh(data)
                 },
                 _ => unreachable!("unexpected solid '{}'", solid),
             };
@@ -910,7 +910,7 @@ impl Volume {
                 "G4Box" | "G4DisplacedSolid" | "G4Orb" | "G4Sphere" | "G4Tubs" => {
                     SolidProperties::everything()
                 },
-                "Tessellation" => {
+                "Mesh" => {
                     SolidProperties {
                         has_cubic_volume: false,
                         has_exclusive_volume: false,

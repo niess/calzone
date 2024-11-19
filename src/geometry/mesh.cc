@@ -1,22 +1,22 @@
-#include "tessellation.h"
+#include "mesh.h"
 // Geant4 interface.
 #include "G4AffineTransform.hh"
 #include "G4BoundingEnvelope.hh"
 #include "Randomize.hh"
 
 
-Tessellation::Tessellation(
+Mesh::Mesh(
     const G4String & name,
-    const TessellatedShape & shape
+    const MeshShape & shape
 ):
     G4VSolid::G4VSolid(name),
-    tessels(sort_tessels(shape))
+    facets(sort_facets(shape))
 {}
 
-void Tessellation::BoundingLimits(
+void Mesh::BoundingLimits(
     G4ThreeVector & pMin,
     G4ThreeVector & pMax) const {
-    auto && envelope = this->tessels->envelope();
+    auto && envelope = this->facets->envelope();
     pMin[0] = envelope[0][0];
     pMin[1] = envelope[0][1];
     pMin[2] = envelope[0][2];
@@ -25,14 +25,14 @@ void Tessellation::BoundingLimits(
     pMax[2] = envelope[1][2];
 }
 
-G4bool Tessellation::CalculateExtent(
+G4bool Mesh::CalculateExtent(
     const EAxis axis,
     const G4VoxelLimits & limits,
     const G4AffineTransform & transform,
     G4double & min,
     G4double & max
 ) const {
-    auto && envelope = this->tessels->envelope();
+    auto && envelope = this->facets->envelope();
     G4ThreeVector bmin, bmax;
     bmin[0] = envelope[0][0], bmax[0] = envelope[1][0];
     bmin[1] = envelope[0][1], bmax[1] = envelope[1][1];
@@ -42,8 +42,8 @@ G4bool Tessellation::CalculateExtent(
     return bbox.CalculateExtent(axis, limits, transform, min, max);
 }
 
-G4double Tessellation::DistanceToIn(const G4ThreeVector & position) const {
-    auto && envelope = this->tessels->envelope();
+G4double Mesh::DistanceToIn(const G4ThreeVector & position) const {
+    auto && envelope = this->facets->envelope();
     G4ThreeVector center(
         0.5 * (envelope[0][0] + envelope[1][0]),
         0.5 * (envelope[0][1] + envelope[1][1]),
@@ -70,10 +70,10 @@ G4double Tessellation::DistanceToIn(const G4ThreeVector & position) const {
     }
 }
 
-G4double Tessellation::DistanceToIn(
+G4double Mesh::DistanceToIn(
     const G4ThreeVector & position, const G4ThreeVector & direction
 ) const {
-    auto && distance = this->tessels->distance_to_in(position, direction);
+    auto && distance = this->facets->distance_to_in(position, direction);
     const double delta = 0.5 * kCarTolerance;
     if ((distance <= delta) || (distance > kInfinity)) {
         return kInfinity;
@@ -82,11 +82,11 @@ G4double Tessellation::DistanceToIn(
     }
 }
 
-G4double Tessellation::DistanceToOut(const G4ThreeVector &) const {
+G4double Mesh::DistanceToOut(const G4ThreeVector &) const {
     return 0.0;
 }
 
-G4double Tessellation::DistanceToOut(
+G4double Mesh::DistanceToOut(
     const G4ThreeVector & position,
     const G4ThreeVector & direction,
     G4bool calculateNormal,
@@ -94,13 +94,13 @@ G4double Tessellation::DistanceToOut(
     G4ThreeVector * normal
 ) const {
     long index;
-    auto && distance = this->tessels->distance_to_out(
+    auto && distance = this->facets->distance_to_out(
         position, direction, index
     );
     if (calculateNormal) {
         if (index >= 0) {
             *validNormal = true;
-            auto && n = this->tessels->normal(index);
+            auto && n = this->facets->normal(index);
             (*normal)[0] = n[0];
             (*normal)[1] = n[1];
             (*normal)[2] = n[2];
@@ -116,12 +116,12 @@ G4double Tessellation::DistanceToOut(
     }
 }
 
-G4GeometryType Tessellation::GetEntityType() const {
-    return { "Tessellation" };
+G4GeometryType Mesh::GetEntityType() const {
+    return { "Mesh" };
 }
 
-G4ThreeVector Tessellation::GetPointOnSurface () const {
-    auto && point = this->tessels->surface_point(
+G4ThreeVector Mesh::GetPointOnSurface () const {
+    auto && point = this->facets->surface_point(
         G4UniformRand(),
         G4UniformRand(),
         G4UniformRand()
@@ -129,29 +129,29 @@ G4ThreeVector Tessellation::GetPointOnSurface () const {
     return G4ThreeVector(point[0], point[1], point[2]);
 }
 
-G4double Tessellation::GetSurfaceArea() {
-    return this->tessels->area();
+G4double Mesh::GetSurfaceArea() {
+    return this->facets->area();
 }
 
-EInside Tessellation::Inside(const G4ThreeVector & position) const {
+EInside Mesh::Inside(const G4ThreeVector & position) const {
     const double delta = 0.5 * kCarTolerance;
-    return this->tessels->inside(position, delta);
+    return this->facets->inside(position, delta);
 }
 
-G4ThreeVector Tessellation::SurfaceNormal(
+G4ThreeVector Mesh::SurfaceNormal(
     const G4ThreeVector & position
 ) const {
     const double delta = 0.5 * kCarTolerance;
-    auto && normal = this->tessels->surface_normal(position, delta);
+    auto && normal = this->facets->surface_normal(position, delta);
     return G4ThreeVector(normal[0], normal[1], normal[2]);
 }
 
-void Tessellation::DescribeYourselfTo(G4VGraphicsScene &) const {}
+void Mesh::DescribeYourselfTo(G4VGraphicsScene &) const {}
 
-std::ostream & Tessellation::StreamInfo(std::ostream & stream) const {
+std::ostream & Mesh::StreamInfo(std::ostream & stream) const {
     return stream;
 }
 
-const rust::Box<SortedTessels> & Tessellation::Describe() const {
-    return this->tessels;
+const rust::Box<SortedFacets> & Mesh::Describe() const {
+    return this->facets;
 }

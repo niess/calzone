@@ -154,7 +154,7 @@ impl Map {
                     regular = reg.into();
                 }
                 let regular = regular.unwrap_or(false);
-                let facets = self.tessellate(py, regular, origin, extra_depth)?;
+                let facets = self.build_mesh(py, regular, origin, extra_depth)?;
                 dump_stl(&facets, &path)
             },
             Some(other) => {
@@ -208,7 +208,7 @@ impl Map {
         }
     }
 
-    pub fn tessellate(
+    pub fn build_mesh(
         &self,
         py: Python,
         regular: bool,

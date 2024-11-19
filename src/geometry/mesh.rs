@@ -6,7 +6,7 @@ use bvh::ray::Ray;
 use super::ffi;
 
 
-pub struct SortedTessels {
+pub struct SortedFacets {
     envelope: Aabb<f64, 3>,
     facets: Vec<TriangularFacet>,
     tree: Bvh::<f64, 3>,
@@ -162,7 +162,7 @@ impl BHShape<f64, 3> for TriangularFacet {
     }
 }
 
-impl SortedTessels {
+impl SortedFacets {
     pub fn area(&self) -> f64 {
         self.area
     }
@@ -214,14 +214,14 @@ impl SortedTessels {
         impl Match {
             fn inspect(
                 &mut self,
-                tessels: &SortedTessels,
+                sorted_facets: &SortedFacets,
                 node_index: usize,
                 point: &Point3<f64>,
                 delta: f64,
             ) {
-                match &tessels.tree.nodes[node_index] {
+                match &sorted_facets.tree.nodes[node_index] {
                     BvhNode::Leaf{shape_index, ..} => {
-                        let facet = &tessels.facets[*shape_index];
+                        let facet = &sorted_facets.facets[*shape_index];
                         let d = facet.distance(point);
                         if d < self.distance {
                             self.distance = d;
@@ -230,10 +230,10 @@ impl SortedTessels {
                     BvhNode::Node{child_l_index, child_l_aabb,
                                   child_r_index, child_r_aabb, ..} => {
                         if child_l_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(tessels, *child_l_index, point, delta)
+                            self.inspect(sorted_facets, *child_l_index, point, delta)
                         }
                         if child_r_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(tessels, *child_r_index, point, delta)
+                            self.inspect(sorted_facets, *child_r_index, point, delta)
                         }
                     },
                 }
@@ -323,14 +323,14 @@ impl SortedTessels {
         impl Match {
             fn inspect(
                 &mut self,
-                tessels: &SortedTessels,
+                sorted_facets: &SortedFacets,
                 node_index: usize,
                 point: &Point3<f64>,
                 delta: f64,
             ) {
-                match &tessels.tree.nodes[node_index] {
+                match &sorted_facets.tree.nodes[node_index] {
                     BvhNode::Leaf{shape_index, ..} => {
-                        let facet = &tessels.facets[*shape_index];
+                        let facet = &sorted_facets.facets[*shape_index];
                         let d = facet.distance(point);
                         if d < self.distance {
                             self.normal = facet.normal.into();
@@ -340,10 +340,10 @@ impl SortedTessels {
                     BvhNode::Node{child_l_index, child_l_aabb,
                                   child_r_index, child_r_aabb, ..} => {
                         if child_l_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(tessels, *child_l_index, point, delta)
+                            self.inspect(sorted_facets, *child_l_index, point, delta)
                         }
                         if child_r_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(tessels, *child_r_index, point, delta)
+                            self.inspect(sorted_facets, *child_r_index, point, delta)
                         }
                     },
                 }
@@ -388,7 +388,7 @@ fn ray_intersects_aabb(ray: &Ray<f64, 3>, aabb: &Aabb<f64, 3>) -> bool {
     tmax >= tmin
 }
 
-pub fn sort_tessels(shape: &ffi::TessellatedShape) -> Box<SortedTessels> {
+pub fn sort_facets(shape: &ffi::MeshShape) -> Box<SortedFacets> {
     let data = &shape.facets;
     let mut envelope = Aabb::empty();
     let mut facets = Vec::<TriangularFacet>::with_capacity(data.len() / 9);
@@ -407,11 +407,11 @@ pub fn sort_tessels(shape: &ffi::TessellatedShape) -> Box<SortedTessels> {
         envelope.grow_mut(&v2);
     }
     let tree = Bvh::build(&mut facets);
-    Box::new(SortedTessels { envelope, facets, tree, area })
+    Box::new(SortedFacets { envelope, facets, tree, area })
 }
 
-impl From<&SortedTessels> for Vec<f32> {
-    fn from(value: &SortedTessels) -> Self {
+impl From<&SortedFacets> for Vec<f32> {
+    fn from(value: &SortedFacets) -> Self {
         let mut data = Vec::<f32>::with_capacity(9 * value.facets.len());
         for facet in value.facets.iter() {
             data.push(facet.v0[0] as f32);

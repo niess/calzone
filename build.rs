@@ -40,7 +40,7 @@ fn main() {
         "src/geometry.cc",
         "src/geometry/materials.cc",
         "src/geometry/solids.cc",
-        "src/geometry/tessellation.cc",
+        "src/geometry/mesh.cc",
         "src/simulation.cc",
         "src/simulation/geometry.cc",
         "src/simulation/physics.cc",
@@ -56,7 +56,7 @@ fn main() {
     let headers = [
         "src/calzone.h",
         "src/geometry/solids.h",
-        "src/geometry/tessellation.h",
+        "src/geometry/mesh.h",
         "src/simulation/geometry.h",
         "src/simulation/physics.h",
         "src/simulation/random.h",

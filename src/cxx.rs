@@ -1,5 +1,5 @@
 use crate::geometry::volume::Volume;
-use crate::geometry::tessellation::{SortedTessels, sort_tessels};
+use crate::geometry::mesh::{SortedFacets, sort_facets};
 use crate::simulation::{RandomContext, RunAgent};
 use crate::utils::error::ctrlc_catched;
 
@@ -66,14 +66,19 @@ pub mod ffi {
     }
 
     #[derive(Deserialize, Serialize)]
+    struct MeshShape {
+        facets: Vec<f32>,
+    }
+
+    #[derive(Deserialize, Serialize)]
     #[repr(i32)]
     #[serde(transparent)]
     enum ShapeType {
         Box,
         Cylinder,
         Envelope,
+        Mesh,
         Sphere,
-        Tessellation,
     }
 
     #[derive(Deserialize, Serialize)]
@@ -82,11 +87,6 @@ pub mod ffi {
         thickness: f64,
         azimuth_section: [f64; 2],
         zenith_section: [f64; 2],
-    }
-
-    #[derive(Deserialize, Serialize)]
-    struct TessellatedShape {
-        facets: Vec<f32>,
     }
 
     #[repr(i32)]
@@ -355,10 +355,10 @@ pub mod ffi {
         fn compute_volume(self: &VolumeBorrow, include_daughters: bool) -> f64;
         fn describe(self: &VolumeBorrow) -> VolumeInfo;
         fn describe_box(self: &VolumeBorrow) -> BoxInfo;
+        fn describe_mesh(self: &VolumeBorrow) -> &Box<SortedFacets>;
         fn describe_orb(self: &VolumeBorrow) -> OrbInfo;
         fn describe_sphere(self: &VolumeBorrow) -> SphereInfo;
         fn describe_tessellated_solid(self: &VolumeBorrow, vertices: &mut Vec<f32>);
-        fn describe_tessellation(self: &VolumeBorrow) -> &Box<SortedTessels>;
         fn describe_transform(self: &VolumeBorrow) -> TransformInfo;
         fn describe_tubs(self: &VolumeBorrow) -> TubsInfo;
         fn dump(self: &VolumeBorrow, path: &str) -> SharedPtr<Error>;
@@ -434,6 +434,7 @@ pub mod ffi {
         fn is_rotated(self: &Volume) -> bool;
         fn is_translated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
+        fn mesh_shape(self: &Volume) -> &MeshShape;
         fn name(self: &Volume) -> &String;
         fn overlaps(self: &Volume) -> &[[String; 2]];
         fn position(self: &Volume) -> [f64; 3];
@@ -443,29 +444,28 @@ pub mod ffi {
         fn shape(self: &Volume) -> ShapeType;
         fn sphere_shape(self: &Volume) -> &SphereShape;
         fn subtract(self: &Volume) -> &[String];
-        fn tessellated_shape(self: &Volume) -> &TessellatedShape;
         fn volumes(self: &Volume) -> &[Volume];
 
-        type SortedTessels;
-        fn sort_tessels(shape: &TessellatedShape) -> Box<SortedTessels>;
+        type SortedFacets;
+        fn sort_facets(shape: &MeshShape) -> Box<SortedFacets>;
 
-        fn area(self: &SortedTessels) -> f64;
+        fn area(self: &SortedFacets) -> f64;
         fn distance_to_in(
-            self: &SortedTessels,
+            self: &SortedFacets,
             point: &G4ThreeVector,
             direction: &G4ThreeVector
         ) -> f64;
         fn distance_to_out(
-            self: &SortedTessels,
+            self: &SortedFacets,
             point: &G4ThreeVector,
             direction: &G4ThreeVector,
             index: &mut i64,
         ) -> f64;
-        fn envelope(self: &SortedTessels) -> [[f64; 3]; 2];
-        fn inside(self: &SortedTessels, point: &G4ThreeVector, delta: f64) -> EInside;
-        fn normal(self: &SortedTessels, index: usize) -> [f64; 3];
-        fn surface_normal(self: &SortedTessels, point: &G4ThreeVector, delta: f64) -> [f64; 3];
-        fn surface_point(self: &SortedTessels, index: f64, u: f64, v: f64) -> [f64; 3];
+        fn envelope(self: &SortedFacets) -> [[f64; 3]; 2];
+        fn inside(self: &SortedFacets, point: &G4ThreeVector, delta: f64) -> EInside;
+        fn normal(self: &SortedFacets, index: usize) -> [f64; 3];
+        fn surface_normal(self: &SortedFacets, point: &G4ThreeVector, delta: f64) -> [f64; 3];
+        fn surface_point(self: &SortedFacets, index: f64, u: f64, v: f64) -> [f64; 3];
 
         // Materials interface.
         fn get_hash(self: &Mixture) -> u64;
