@@ -543,6 +543,10 @@ unsafe impl Sync for ffi::VolumeBorrow {}
 
 #[pymethods]
 impl Volume {
+    fn __eq__(&self, other: &Self) -> bool {
+        self.volume.eq(&other.volume)
+    }
+
     /// Daughter volume(s), if any (i.e. included insides).
     #[getter]
     fn get_daughters<'py>(&self, py: Python<'py>) -> Bound<'py, PyTuple> {

@@ -137,15 +137,15 @@ Volume definition
 -----------------
 
 The items of a Monte Carlo volume are presented in :numref:`tab-volume-items`
-below. It is required to define a *material*. If no *shape* is specified, then a
-box envelope is assumed. To illustrate, a 1 |nbsp| cm\ :sup:`3` cubic box volume
-filled with air would be represented as follows,
+below. If no *shape* is specified, then a box envelope is assumed. To
+illustrate, a 1 |nbsp| cm\ :sup:`3` cubic box volume filled with water would be
+represented as follows,
 
 .. code:: toml
 
    [VolumeName]
 
-   material = "G4_AIR"
+   material = "G4_WATER"
    box = 1.0
 
 Note that a volume can only have a single shape item (but multiple daughter
@@ -164,10 +164,10 @@ see :ref:`geometry:Shape definition`.
      - Default value
    * - :python:`"material"`
      - :python:`str`
-     - 
+     - :python:`"G4_AIR"`
    * - :python:`shape_type`
      - :python:`dict` (:ref:`Shape items <geometry:Shape definition>`)
-     - :python:`None`
+     - :python:`"envelope"`
    * - :python:`"position"`
      - :python:`[float; 3]`
      - :python:`numpy.zeros(3)`
@@ -176,7 +176,7 @@ see :ref:`geometry:Shape definition`.
      - :python:`numpy.eye(3)`
    * - :python:`"role"`
      - :python:`[str]`
-     - :python:`False`
+     - :python:`None`
    * - :python:`"disentangle"`
      - :python:`dict` (:numref:`tab-disentangle-items`)
      - :python:`None`

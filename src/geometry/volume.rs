@@ -24,6 +24,8 @@ use super::map::Map;
 //
 // ===============================================================================================
 
+const DEFAULT_MATERIAL: &'static str = "G4_AIR";
+
 #[derive(Default, Deserialize, Serialize)]
 pub struct Volume {
     pub(super) name: String,
@@ -274,7 +276,7 @@ impl TryFromBound for Volume {
 
         // Extract base properties.
         const EXTRACTOR: Extractor<8> = Extractor::new([
-            Property::required_str("material"),
+            Property::optional_str("material"),
             Property::optional_strs("role"),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
@@ -291,13 +293,16 @@ impl TryFromBound for Volume {
             EXTRACTOR.extract(&tag, value, Some(&mut remainder))?;
 
         let name = tag.name().to_string();
-        let material: String = material.into();
+        let material: Option<String> = material.into();
         let role: Vec<String> = role.into();
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
         let overlaps: Option<DictLike> = disentangle.into();
         let subtract: Vec<String> = subtract.into();
         let include: Option<Bound<PyAny>> = include.into();
+
+        // Use the default material, if not specified.
+        let material = material.unwrap_or_else(|| DEFAULT_MATERIAL.to_string());
 
         // Parse role(s).
         let (_, tag) = tag.resolve(value)?;

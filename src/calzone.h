@@ -87,6 +87,7 @@ struct VolumeBorrow {
     TransformInfo describe_transform() const;
     TubsInfo describe_tubs() const;
     std::shared_ptr<Error> dump(rust::Str) const;
+    bool eq(const VolumeBorrow & other) const;
     std::array<double, 6> generate_onto(
         RandomContext &,
         const G4AffineTransform &,

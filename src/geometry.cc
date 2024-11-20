@@ -1137,6 +1137,10 @@ std::shared_ptr<Error> VolumeBorrow::dump(rust::Str path) const {
     return dump_gdml(path, this->volume);
 }
 
+bool VolumeBorrow::eq(const VolumeBorrow & other) const {
+    return this->volume == other.volume;
+}
+
 std::array<double, 6> VolumeBorrow::generate_onto(
     RandomContext &, // Implicit scope.
     const G4AffineTransform & transform,

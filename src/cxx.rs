@@ -362,6 +362,7 @@ pub mod ffi {
         fn describe_transform(self: &VolumeBorrow) -> TransformInfo;
         fn describe_tubs(self: &VolumeBorrow) -> TubsInfo;
         fn dump(self: &VolumeBorrow, path: &str) -> SharedPtr<Error>;
+        fn eq(self: &VolumeBorrow, other: &VolumeBorrow) -> bool;
         fn generate_onto(
             self: &VolumeBorrow,
             random: &mut RandomContext,
