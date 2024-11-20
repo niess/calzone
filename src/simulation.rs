@@ -400,14 +400,14 @@ impl<'a> RunAgent<'a> {
     pub fn push_deposit(
         &mut self,
         volume: *const ffi::G4VPhysicalVolume,
-        deposit: f64,
-        non_ionising: f64,
+        total_deposit: f64,
+        point_deposit: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
     ) {
         if let Some(deposits) = self.deposits.as_mut() {
             deposits.push(
-                volume, self.index - 1, deposit, non_ionising, start, end, self.weight,
+                volume, self.index - 1, total_deposit, point_deposit, start, end, self.weight,
                 &self.random_index
             )
         }

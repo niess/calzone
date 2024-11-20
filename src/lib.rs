@@ -12,7 +12,6 @@ mod utils;
 
 // XXX Add a logo.
 // XXX Add unit tests.
-// XXX Check line vs point deposits.
 // XXX Add examples (incuding FreeCAD script).
 // XXX Update Geant4 version.
 // XXX Binary dist for OSX (and Windows?).

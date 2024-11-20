@@ -205,18 +205,20 @@ impl Deposits {
         &mut self,
         volume: *const ffi::G4VPhysicalVolume,
         event: usize,
-        deposit: f64,
-        non_ionising: f64,
+        total_deposit: f64,
+        point_deposit: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
         weight: f64,
         random_index: &[u64; 2],
     ) {
         self.values.entry(volume)
-            .and_modify(|e| e.push(event, deposit, non_ionising, start, end, weight, random_index))
+            .and_modify(|e| e.push(
+                event, total_deposit, point_deposit, start, end, weight, random_index
+            ))
             .or_insert_with(|| {
                 let mut cell = DepositsCell::new(self.mode);
-                cell.push(event, deposit, non_ionising, start, end, weight, random_index);
+                cell.push(event, total_deposit, point_deposit, start, end, weight, random_index);
                 cell
             });
     }
@@ -280,8 +282,8 @@ impl DepositsCell {
     fn push(
         &mut self,
         event: usize,
-        deposit: f64,
-        non_ionising: f64,
+        total_deposit: f64,
+        point_deposit: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
         weight: f64,
@@ -290,13 +292,13 @@ impl DepositsCell {
         match self {
             Self::Brief(ref mut deposits) => {
                 deposits.total.entry(event)
-                    .and_modify(|e| { e.0 += deposit })
-                    .or_insert((deposit, weight, *random_index));
+                    .and_modify(|e| { e.0 += total_deposit })
+                    .or_insert((total_deposit, weight, *random_index));
             },
             Self::Detailed(ref mut deposits) => {
                 let start = ffi::to_vec(start);
                 let end = ffi::to_vec(end);
-                let line_deposit = deposit - non_ionising;
+                let line_deposit = total_deposit - point_deposit;
                 let random_index = *random_index;
                 if line_deposit > 0.0 {
                     let deposit = LineDeposit {
@@ -304,9 +306,9 @@ impl DepositsCell {
                     };
                     deposits.line.push(deposit);
                 }
-                if non_ionising > 0.0 {
+                if point_deposit > 0.0 {
                     let deposit = PointDeposit {
-                        event, position: end, value: non_ionising, weight, random_index
+                        event, position: end, value: point_deposit, weight, random_index
                     };
                     deposits.point.push(deposit);
                 }

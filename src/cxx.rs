@@ -488,7 +488,7 @@ pub mod ffi {
             self: &mut RunAgent,
             volume: *const G4VPhysicalVolume,
             step_deposit: f64,
-            non_ionising: f64,
+            point_deposit: f64,
             start: &G4ThreeVector,
             end: &G4ThreeVector,
         );
