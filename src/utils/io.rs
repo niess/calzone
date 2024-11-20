@@ -18,6 +18,8 @@ use std::path::{Path, PathBuf};
 // ===============================================================================================
 
 trait ConfigFormat {
+    const LOADER: &'static str = "loads";
+
     fn import_module<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyModule>>;
 
     fn load_dict<'py>(py: Python<'py>, path: &Path) -> PyResult<Bound<'py, PyDict>> {
@@ -30,7 +32,7 @@ trait ConfigFormat {
                 _ => err.into(),
             })?;
         let module = Self::import_module(py)?;
-        let loads = module.getattr("loads")?;
+        let loads = module.getattr(Self::LOADER)?;
         let content = loads.call1((content,))?;
         let dict: Bound<PyDict> = content.extract()?;
         Ok(dict)
@@ -57,6 +59,8 @@ impl ConfigFormat for Toml {
 struct Yaml;
 
 impl ConfigFormat for Yaml {
+    const LOADER: &'static str = "safe_load";
+
     fn import_module<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyModule>> {
         py.import_bound("yaml")
     }
