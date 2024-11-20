@@ -587,6 +587,11 @@ other materials.
    :python:`"G4_AIR"`, etc. Depending on your application, you may not need to
    define your own materials.
 
+.. tip::
+
+   In addition to the `JSON`_, `TOML`_ and `YAML`_ formats, Calzone also
+   supports importing materials from a `Gate DB <OpenGate_>`_ file.
+
 .. topic:: Materials scope
 
    `Geant4`_ materials are defined on a global scale and are applicable to all
@@ -822,6 +827,7 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. _Geant4: https://geant4.web.cern.ch/docs/
 .. _Examples: https://github.com/niess/calzone/tree/master/examples/
 .. _NIST: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html?highlight=nist#
+.. _OpenGate: http://www.opengatecollaboration.org/
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _TOML: https://toml.io/en/
 .. _YAML: https://yaml.org/

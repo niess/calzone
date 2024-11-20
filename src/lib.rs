@@ -10,6 +10,14 @@ mod simulation;
 mod utils;
 
 
+// XXX Add a logo.
+// XXX Add unit tests.
+// XXX Check line vs point deposits.
+// XXX Add examples (incuding FreeCAD script).
+// XXX Update Geant4 version.
+// XXX Binary dist for OSX (and Windows?).
+
+
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
 // Fetch the Geant4 version (exported by the build script).

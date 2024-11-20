@@ -5,11 +5,11 @@ Python interface
 .. autofunction:: calzone.define
 
    The material(s) *definition* can be provided directly as a Python
-   :python:`dict` object, or loaded from a *definition* file (in Gate DB, JSON
-   or TOML format). For instance, the following defines materials from a Gate DB
-   file.
+   :python:`dict` object, or loaded from a *definition* file (in `Gate DB
+   <OpenGate_>`_, `JSON`_, `TOML`_ or `YAML`_ format). For instance, the
+   following defines materials from a `TOML`_ file.
 
-   >>> calzone.define("materials.db")
+   >>> calzone.define("materials.toml")
 
    See the :ref:`Materials definition <geometry:Materials definition>` section
    for further information.
@@ -348,6 +348,7 @@ Python interface
    >>> particles = simulation.particles()      \
    ...     .on(volume, direction="ingoing")    \
    ...     .powerlaw(1E-02, 1E+01)             \
+   ...     .pid("gamma")                       \
    ...     .generate(N)
 
    .. method:: __new__(*, geometry=None, random=None, weight=True)
@@ -744,6 +745,7 @@ Python interface
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
 .. _Geotiff: https://github.com/KipCrossing/geotiff
 .. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
+.. _OpenGate: http://www.opengatecollaboration.org/
 .. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
 .. _TOML: https://toml.io/en/
