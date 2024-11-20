@@ -177,11 +177,11 @@ see :ref:`geometry:Shape definition`.
    * - :python:`"role"`
      - :python:`[str]`
      - :python:`False`
+   * - :python:`"disentangle"`
+     - :python:`dict` (:numref:`tab-disentangle-items`)
+     - :python:`None`
    * - :python:`"subtract"`
      - :python:`[str]`
-     - :python:`None`
-   * - :python:`"overlaps"`
-     - :python:`dict` (:numref:`tab-overlaps-items`)
      - :python:`None`
    * - :python:`DaughterName`
      - :python:`dict` (:numref:`tab-volume-items`)
@@ -273,7 +273,7 @@ Possible actions and recipients are listed in :numref:`tab-volume-roles` below.
 Overlaps
 ~~~~~~~~
 
-The :python:`"subtract"` and :python:`"overlaps"` volume properties address the
+The :python:`"disentangle"` and :python:`"subtract"` volume properties address the
 issue of overlaps between sister volumes in two distinct ways. The
 :python:`"subtract"` property explicitly specifies sister volumes (by their
 name) whose shape are to be subtracted from the current volume. This can be
@@ -285,12 +285,13 @@ accommodate a partially buried :python:`"Detector"` volume.
    Only unsubtracted volumes can be subtracted from. Consequently, the
    *subtract* property does not permit the formation of subtraction chains.
 
-The :python:`"overlaps"` property indicates pairs of overlapping daughter
-volumes, (see :numref:`tab-overlaps-items`), for instance as,
+The :python:`"disentangle"` property indicates pairs of overlapping daughter
+volumes which should be separated, (see :numref:`tab-disentangle-items`), for
+instance as,
 
 .. code:: toml
 
-   [VolumeName.overlaps]
+   [VolumeName.disentangle]
 
    Bottom = [ "Left", "Right" ]
    Top = "Left"
@@ -300,9 +301,9 @@ be noted that this procedure does not guarantee which volume is subtracted or
 not. It is therefore recommended that this method be used only for the purpose
 of patching small (erroneous) overlaps (e.g. due to numeric approximations).
 
-.. _tab-overlaps-items:
+.. _tab-disentangle-items:
 
-.. list-table:: Overlaps items.
+.. list-table:: Disentangle items.
    :width: 75%
    :widths: auto
    :header-rows: 1

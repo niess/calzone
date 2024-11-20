@@ -9,8 +9,6 @@ mod geometry;
 mod simulation;
 mod utils;
 
-// XXX Change the "overlaps" property (maybe to "split"?)
-
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 

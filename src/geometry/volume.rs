@@ -107,7 +107,7 @@ impl Volume {
             // Check that the overlaping volume is defined.
             match volumes.iter().find(|v| &v.name == name) {
                 None => {
-                    let err = tag.bad().what("overlap").why(format!(
+                    let err = tag.bad().what("disentangle items").why(format!(
                         "undefined '{}' volume",
                         name,
                     )).to_err(ValueError);
@@ -131,13 +131,13 @@ impl Volume {
         let (overlaps, tag) = tag.resolve(&overlaps)?;
         for (left, right) in overlaps.iter() {
             let left: String = extract(&left)
-                .or_else(|| tag.bad().what("left overlap").into())?;
+                .or_else(|| tag.bad().what("left-hand side disentangle item").into())?;
             let result: PyResult<Vec<String>> = right.extract();
             match result {
                 Err(_) => {
                     let right: String = extract(&right)
                         .expect("a (sequence of) 'str'")
-                        .or_else(|| tag.bad().what("right overlap").into())?;
+                        .or_else(|| tag.bad().what("right-hand side disentangle item").into())?;
                     push(left, right)?;
                 },
                 Ok(rights) => {
@@ -278,7 +278,7 @@ impl TryFromBound for Volume {
             Property::optional_strs("role"),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
-            Property::optional_dict("overlaps"),
+            Property::optional_dict("disentangle"),
             Property::optional_strs("subtract"),
             Property::optional_any("materials"),
             Property::optional_any("include"),
@@ -287,7 +287,7 @@ impl TryFromBound for Volume {
         let py = value.py();
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, role, position, rotation, overlaps, subtract, materials, include] =
+        let [material, role, position, rotation, disentangle, subtract, materials, include] =
             EXTRACTOR.extract(&tag, value, Some(&mut remainder))?;
 
         let name = tag.name().to_string();
@@ -295,7 +295,7 @@ impl TryFromBound for Volume {
         let role: Vec<String> = role.into();
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
-        let overlaps: Option<DictLike> = overlaps.into();
+        let overlaps: Option<DictLike> = disentangle.into();
         let subtract: Vec<String> = subtract.into();
         let include: Option<Bound<PyAny>> = include.into();
 
