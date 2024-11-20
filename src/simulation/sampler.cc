@@ -11,9 +11,7 @@ SamplerImpl::SamplerImpl(const std::string & name, Roles r) :
 G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
     if (RUN_AGENT->is_deposits() && this->roles.deposits == Action::Record) {
         double deposit = step->GetTotalEnergyDeposit() / CLHEP::MeV;
-        if (deposit == 0.0) {
-            return false;
-        } else {
+        if (deposit > 0.0) {
             auto && pre = step->GetPreStepPoint();
             auto && post = step->GetPostStepPoint();
             auto && volume = pre->GetPhysicalVolume();
