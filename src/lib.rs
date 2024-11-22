@@ -16,7 +16,6 @@ mod utils;
 // XXX Update Geant4 version.
 // XXX Binary dist for OSX (and Windows?).
 // XXX Sample particles (by default?, perf. impact?).
-// XXX Share mesh data, e.g. using Rc? (perf. impact?)
 
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();

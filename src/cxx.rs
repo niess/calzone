@@ -1,5 +1,5 @@
 use crate::geometry::volume::Volume;
-use crate::geometry::mesh::{SortedFacets, sort_facets};
+use crate::geometry::mesh::{collect_meshes, MeshHandle, SolidHandle};
 use crate::simulation::{RandomContext, RunAgent};
 use crate::utils::error::ctrlc_catched;
 
@@ -355,10 +355,10 @@ pub mod ffi {
         fn compute_volume(self: &VolumeBorrow, include_daughters: bool) -> f64;
         fn describe(self: &VolumeBorrow) -> VolumeInfo;
         fn describe_box(self: &VolumeBorrow) -> BoxInfo;
-        fn describe_mesh(self: &VolumeBorrow) -> &Box<SortedFacets>;
+        fn describe_mesh(self: &VolumeBorrow) -> &Box<MeshHandle>;
         fn describe_orb(self: &VolumeBorrow) -> OrbInfo;
         fn describe_sphere(self: &VolumeBorrow) -> SphereInfo;
-        fn describe_tessellated_solid(self: &VolumeBorrow, vertices: &mut Vec<f32>);
+        fn describe_tessellated_solid(self: &VolumeBorrow) -> &Box<SolidHandle>;
         fn describe_transform(self: &VolumeBorrow) -> TransformInfo;
         fn describe_tubs(self: &VolumeBorrow) -> TubsInfo;
         fn dump(self: &VolumeBorrow, path: &str) -> SharedPtr<Error>;
@@ -379,6 +379,10 @@ pub mod ffi {
         fn clear_roles(self: &VolumeBorrow);
         fn get_roles(self: &VolumeBorrow) -> Roles;
         fn set_roles(self: &VolumeBorrow, roles: Roles);
+
+        type G4TessellatedSolid;
+        fn create_tessellated_solid(facets: Vec<f32>) -> *mut G4TessellatedSolid;
+        fn get_facets(solid: &SolidHandle, data: &mut Vec<f32>);
 
         // Material interface.
         type G4State;
@@ -427,15 +431,18 @@ pub mod ffi {
         fn ctrlc_catched() -> bool;
 
         // Geometry interface.
+        fn collect_meshes();
+
         type Volume;
 
         fn box_shape(self: &Volume) -> &BoxShape;
         fn cylinder_shape(self: &Volume) -> &CylinderShape;
         fn envelope_shape(self: &Volume) -> &EnvelopeShape;
+        fn get_mesh(self: &Volume) -> Box<MeshHandle>;
+        fn get_solid(self: &Volume) -> Box<SolidHandle>;
         fn is_rotated(self: &Volume) -> bool;
         fn is_translated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
-        fn mesh_shape(self: &Volume) -> &MeshShape;
         fn name(self: &Volume) -> &String;
         fn overlaps(self: &Volume) -> &[[String; 2]];
         fn position(self: &Volume) -> [f64; 3];
@@ -447,26 +454,28 @@ pub mod ffi {
         fn subtract(self: &Volume) -> &[String];
         fn volumes(self: &Volume) -> &[Volume];
 
-        type SortedFacets;
-        fn sort_facets(shape: &MeshShape) -> Box<SortedFacets>;
+        type MeshHandle;
 
-        fn area(self: &SortedFacets) -> f64;
+        fn area(self: &MeshHandle) -> f64;
         fn distance_to_in(
-            self: &SortedFacets,
+            self: &MeshHandle,
             point: &G4ThreeVector,
             direction: &G4ThreeVector
         ) -> f64;
         fn distance_to_out(
-            self: &SortedFacets,
+            self: &MeshHandle,
             point: &G4ThreeVector,
             direction: &G4ThreeVector,
             index: &mut i64,
         ) -> f64;
-        fn envelope(self: &SortedFacets) -> [[f64; 3]; 2];
-        fn inside(self: &SortedFacets, point: &G4ThreeVector, delta: f64) -> EInside;
-        fn normal(self: &SortedFacets, index: usize) -> [f64; 3];
-        fn surface_normal(self: &SortedFacets, point: &G4ThreeVector, delta: f64) -> [f64; 3];
-        fn surface_point(self: &SortedFacets, index: f64, u: f64, v: f64) -> [f64; 3];
+        fn envelope(self: &MeshHandle) -> [[f64; 3]; 2];
+        fn inside(self: &MeshHandle, point: &G4ThreeVector, delta: f64) -> EInside;
+        fn normal(self: &MeshHandle, index: usize) -> [f64; 3];
+        fn surface_normal(self: &MeshHandle, point: &G4ThreeVector, delta: f64) -> [f64; 3];
+        fn surface_point(self: &MeshHandle, index: f64, u: f64, v: f64) -> [f64; 3];
+
+        type SolidHandle;
+        fn ptr(self: &SolidHandle) -> *mut G4TessellatedSolid;
 
         // Materials interface.
         fn get_hash(self: &Mixture) -> u64;

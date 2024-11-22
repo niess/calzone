@@ -46,8 +46,9 @@ unsafe impl Sync for ffi::GeometryBorrow {}
 impl Geometry {
     #[new]
     pub fn new(volume: DictLike) -> PyResult<Self> {
-        let mut builder = GeometryBuilder::new(Some(volume))?;
-        let geometry = builder.build()?;
+        let py = volume.py();
+        let mut builder = GeometryBuilder::new(Some(volume), None)?;
+        let geometry = builder.build(py)?;
         Ok(geometry)
     }
 
@@ -154,20 +155,25 @@ impl IntoPy<PyObject> for Algorithm {
 #[pymethods]
 impl GeometryBuilder {
     #[new]
-    fn new(definition: Option<DictLike>) -> PyResult<Self> {
+    #[pyo3(signature=(definition, /, *, algorithm=None))]
+    fn new(definition: Option<DictLike>, algorithm: Option<Algorithm>) -> PyResult<Self> {
         let definition = match definition {
             Some(definition) => GeometryDefinition::new(definition, None)?,
             None => GeometryDefinition::default(),
         };
-        let algorithm = Algorithm::default();
+        let algorithm = algorithm.unwrap_or_else(|| Algorithm::default());
         let builder = Self { definition, algorithm };
         Ok(builder)
     }
 
     /// Build the Monte Carlo `Geometry`.
-    fn build(&mut self) -> PyResult<Geometry> {
+    fn build(&mut self, py: Python) -> PyResult<Geometry> {
         // Validate volumes.
         self.definition.volume.validate()?;
+
+        // Build meshes.
+        let algorithm: ffi::TSTAlgorithm = self.algorithm.into();
+        self.definition.volume.build_meshes(py, algorithm)?;
 
         // Build materials.
         self.definition.materials = MaterialsDefinition::drain(
@@ -179,7 +185,6 @@ impl GeometryBuilder {
         }
 
         // Build volumes.
-        let algorithm: ffi::TSTAlgorithm = self.algorithm.into();
         let geometry = ffi::create_geometry(&self.definition.volume, &algorithm);
         if geometry.is_null() {
             ffi::get_error().to_result()?;
@@ -769,8 +774,7 @@ impl Volume {
                 "G4Orb" => bytes::SolidInfo::Orb(volume.describe_orb()),
                 "G4Sphere" => bytes::SolidInfo::Sphere(volume.describe_sphere()),
                 "G4TessellatedSolid" => {
-                    let mut data: Vec<f32> = Vec::new();
-                    volume.describe_tessellated_solid(&mut data);
+                    let data: Vec<f32> = volume.describe_tessellated_solid().as_ref().into();
                     bytes::SolidInfo::Mesh(data)
                 },
                 "G4Tubs" => bytes::SolidInfo::Tubs(volume.describe_tubs()),
@@ -927,7 +931,7 @@ impl Volume {
                         has_cubic_volume: false,
                         has_exclusive_volume: false,
                         has_surface_area: true,
-                        has_surface_generation: false,
+                        has_surface_generation: false, // since it is not uniform.
                     }
                 },
                 _ => SolidProperties::nothing(),

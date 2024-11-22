@@ -5,7 +5,6 @@
 #include "G4Orb.hh"
 #include "G4Sphere.hh"
 #include "G4SubtractionSolid.hh"
-#include "G4TessellatedSolid.hh"
 #include "G4Tubs.hh"
 // Calzone interface.
 #include "calzone.h"
@@ -38,12 +37,6 @@ struct Sphere: public G4Sphere {
 
 struct SubtractionSolid: public G4SubtractionSolid {
     using G4SubtractionSolid::G4SubtractionSolid;
-
-    G4VSolid * Clone() const override;
-};
-
-struct TessellatedSolid: public G4TessellatedSolid {
-    using G4TessellatedSolid::G4TessellatedSolid;
 
     G4VSolid * Clone() const override;
 };

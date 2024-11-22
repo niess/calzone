@@ -3,7 +3,7 @@ use crate::utils::error::variant_error;
 use crate::utils::extract::{extract, Extractor, Vector, Padding, Property, PropertyValue, Tag,
                             TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
-use crate::utils::io::{DictLike, load_stl};
+use crate::utils::io::DictLike;
 use crate::utils::units::convert;
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
@@ -15,7 +15,7 @@ use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
 use std::path::Path;
 use super::{ffi, MaterialsDefinition};
-use super::map::Map;
+use super::mesh::{MapParameters, MeshDefinition, MeshHandle, SolidHandle};
 
 
 // ===============================================================================================
@@ -46,7 +46,7 @@ pub enum Shape {
     Cylinder(ffi::CylinderShape),
     Envelope(ffi::EnvelopeShape),
     Sphere(ffi::SphereShape),
-    Mesh(ffi::MeshShape),
+    Mesh(MeshDefinition),
 }
 
 impl From<&Shape> for ffi::ShapeType {
@@ -80,6 +80,16 @@ pub struct Include {
 }
 
 impl Volume {
+    pub(super) fn build_meshes(&self, py: Python, algorithm: ffi::TSTAlgorithm) -> PyResult<()> {
+        if let Shape::Mesh(ref definition) = self.shape {
+            definition.build(py, algorithm)?;
+        }
+        for daughter in self.volumes.iter() {
+            daughter.build_meshes(py, algorithm)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn check(name: &str) -> Result<(), &'static str> {
         for c in name.chars() {
             if !c.is_alphanumeric() {
@@ -241,7 +251,7 @@ impl Shape {
             ShapeType::Sphere => Shape::Sphere(
                 ffi::SphereShape::try_from_any(&tag, properties)?),
             ShapeType::Mesh => Shape::Mesh(
-                ffi::MeshShape::try_from_any(&tag, properties)?),
+                MeshDefinition::try_from_any(&tag, properties)?),
         };
         Ok(shape)
     }
@@ -583,7 +593,7 @@ impl TryFromBound for ffi::SphereShape {
     }
 }
 
-impl TryFromBound for ffi::MeshShape {
+impl TryFromBound for MeshDefinition {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let mut scale: f64 = 1.0;
         let mut origin: Option<f64x3> = None;
@@ -628,7 +638,7 @@ impl TryFromBound for ffi::MeshShape {
                 }
             },
         };
-        let mut facets = match path.extension().and_then(OsStr::to_str) {
+        let map = match path.extension().and_then(OsStr::to_str) {
             Some("stl") => {
                 if padding.is_some() {
                     let err = tag.bad()
@@ -649,25 +659,20 @@ impl TryFromBound for ffi::MeshShape {
                         .to_err(ValueError);
                         return Err(err);
                 } else {
-                    load_stl(&path)
+                    None
                 }
             },
             Some("png") | Some("tif") => {
-                let py = value.py();
-                let map = Map::from_file(py, &path)?;
                 let regular = regular.unwrap_or(false);
-                let facets = map.build_mesh(py, regular, origin, padding)?;
-                Ok(facets)
+                let map = MapParameters::new(padding, origin, regular);
+                Some(map)
             },
             _ => return Err(PyNotImplementedError::new_err("")),
-        }.map_err(|msg| tag.bad().why(msg).to_err(ValueError))?;
+        };
+        let path = path.canonicalize()?; // XXX Map the error.
 
-        let scale = scale as f32;
-        for value in &mut facets.iter_mut() {
-            *value *= scale;
-        }
-        let shape = Self { facets };
-        Ok(shape)
+        let definition = Self::new(path, scale, map);
+        Ok(definition)
     }
 }
 
@@ -741,6 +746,20 @@ impl Volume {
         }
     }
 
+    pub fn get_mesh(&self) -> Box<MeshHandle> {
+        match &self.shape {
+            Shape::Mesh(definition) => definition.get_mesh(),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_solid(&self) -> Box<SolidHandle> {
+        match &self.shape {
+            Shape::Mesh(definition) => definition.get_solid(),
+            _ => unreachable!(),
+        }
+    }
+
     pub fn is_rotated(&self) -> bool {
         return self.rotation.is_some()
     }
@@ -796,13 +815,6 @@ impl Volume {
 
     pub fn subtract(&self) -> &[String] {
         self.subtract.as_slice()
-    }
-
-    pub fn mesh_shape(&self) -> &ffi::MeshShape {
-        match &self.shape {
-            Shape::Mesh(shape) => &shape,
-            _ => unreachable!(),
-        }
     }
 
     pub fn volumes(&self) -> &[Volume] {

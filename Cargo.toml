@@ -17,6 +17,7 @@ getrandom = "0.2"
 indexmap = "2.2"
 indicatif = "0.17"
 nalgebra = "0.32"
+ordered-float = { version = "4.5.0", features = [ "serde" ] }
 process_path = "0.1"
 pyo3 = { version = "0.21", features = ["abi3", "extension-module"] }
 rand = "0.8"

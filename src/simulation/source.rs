@@ -382,7 +382,7 @@ impl ParticlesGenerator {
                     Direction::None => (),
                     _ => {
                         let why = format!(
-                            "'{}' conflicts with 'onto/{}'",
+                            "'{}' conflicts with 'on/{}'",
                             self.direction.display(),
                             direction.to_str(),
                         );
@@ -536,7 +536,7 @@ impl ParticlesGenerator {
             (weight_position && !volume.properties.has_surface_area) {
             let why = format!("not implemented for '{}'", volume.solid);
             let err = Error::new(NotImplementedError)
-                .what("onto operation")
+                .what("'on' operation")
                 .why(&why);
             return Err(err.to_err());
         }

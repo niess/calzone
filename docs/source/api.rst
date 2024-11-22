@@ -129,13 +129,16 @@ Python interface
    level operators for customising the Monte Carlo geometry before actually
    building it.
 
-   .. method:: __new__(definition)
+   .. method:: __new__(definition, /, *, algorithm=None)
 
       Create a new geometry *builder* from an initial *definition*, provided
       directly as a Python :python:`dict` object, or loaded from a *definition*
       file (in JSON, or TOML format). For instance,
 
       >>> builder = calzone.GeometryBuilder("geometry.toml")
+
+      Optionally, the meshes traversal *algorithm* can be specified (see the
+      :py:attr:`algorithm` attribute).
 
    .. automethod:: build
 

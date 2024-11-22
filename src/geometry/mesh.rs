@@ -1,10 +1,455 @@
 use bvh::aabb::{Aabb, Bounded};
 use bvh::bounding_hierarchy::BHShape;
 use bvh::bvh::{Bvh, BvhNode};
-use nalgebra::{Point3, Vector3};
 use bvh::ray::Ray;
-use super::ffi;
+use crate::utils::error::Error;
+use crate::utils::error::ErrorKind::{MemoryError, ValueError};
+use crate::utils::float::f64x3;
+use crate::utils::io::load_stl;
+use nalgebra::{Point3, Vector3};
+use ordered_float::OrderedFloat;
+use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
+use super::{ffi, map::Map};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, LazyLock, RwLock};
 
+
+// ===============================================================================================
+//
+// Mesh interface.
+//
+// ===============================================================================================
+
+static MESHES: LazyLock<RwLock<HashMap<MeshDefinition, MeshHandle>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+static SOLIDS: LazyLock<RwLock<HashMap<MeshDefinition, SolidHandle>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub fn collect_meshes() {
+    MESHES
+        .write()
+        .unwrap()
+        .retain(|_, v| Arc::strong_count(&v.facets) > 1);
+    SOLIDS
+        .write()
+        .unwrap()
+        .retain(|_, v| Arc::strong_count(&v.solid) > 1);
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct MeshDefinition {
+    path: PathBuf, // XXX this is fragile w.r.t. serialization.
+    scale: OrderedFloat<f64>,
+    map: Option<MapParameters>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct MapParameters {
+    padding: Option<OrderedFloat<f64>>,
+    origin: Option<[OrderedFloat<f64>; 3]>,
+    regular: bool,
+}
+
+impl MeshDefinition {
+    pub fn new(path: PathBuf, scale: f64, map: Option<MapParameters>) -> Self {
+        let scale = OrderedFloat(scale);
+        Self { path, scale, map }
+    }
+
+    pub fn build(&self, py: Python, algorithm: ffi::TSTAlgorithm) -> PyResult<()> {
+        match algorithm {
+            ffi::TSTAlgorithm::Bvh => MeshHandle::build(py, self),
+            ffi::TSTAlgorithm::Geant4 => SolidHandle::build(py, self),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn get_mesh(&self) -> Box<MeshHandle> {
+        let mesh = MESHES
+            .read()
+            .unwrap()
+            .get(self)
+            .unwrap()
+            .clone();
+        Box::new(mesh)
+    }
+
+    pub fn get_solid(&self) -> Box<SolidHandle> {
+        let solid = SOLIDS
+            .read()
+            .unwrap()
+            .get(self)
+            .unwrap()
+            .clone();
+        Box::new(solid)
+    }
+
+    fn load_facets(&self, py: Python) -> PyResult<Vec<f32>> {
+        let mut facets = match self.map.as_ref() {
+            Some(params) => {
+                let map = Map::from_file(py, self.path.as_path())?;
+                let origin = params.origin.map(|origin| {
+                    let origin: [f64; 3] = std::array::from_fn(|i| origin[i].into());
+                    (&origin).into()
+                });
+                let padding = params.padding.map(|padding| padding.into());
+                map.build_mesh(py, params.regular, origin, padding)?
+            },
+            None => load_stl(self.path.as_path())
+                .map_err(|msg| Error::new(ValueError).why(&msg).to_err())?,
+        };
+
+        let scale = f64::from(self.scale) as f32;
+        for value in &mut facets.iter_mut() {
+            *value *= scale;
+        }
+
+        Ok(facets)
+    }
+}
+
+impl MapParameters {
+    pub fn new(padding: Option<f64>, origin: Option<f64x3>, regular: bool) -> Self {
+        let padding = padding.map(|padding| OrderedFloat(padding));
+        let origin = origin.map(|origin| {
+            let origin: [f64; 3] = origin.into();
+            let origin: [OrderedFloat<f64>; 3] = std::array::from_fn(|i| OrderedFloat(origin[i]));
+            origin
+        });
+        Self { padding, origin, regular }
+    }
+}
+
+#[derive(Clone)]
+pub struct MeshHandle {
+    facets: Arc<SortedFacets>,
+}
+
+impl MeshHandle {
+    fn build(
+        py: Python,
+        definition: &MeshDefinition,
+    ) -> PyResult<()> {
+        if !MESHES
+            .read()
+            .unwrap()
+            .contains_key(&definition) {
+
+            let facets = definition.load_facets(py)?;
+            let facets = Arc::new(SortedFacets::new(facets));
+            let mesh = Self { facets };
+
+            MESHES
+                .write()
+                .unwrap()
+                .insert(definition.clone(), mesh);
+        }
+
+        Ok(())
+    }
+}
+
+// C++ interface.
+impl MeshHandle {
+    pub fn area(&self) -> f64 {
+        self.facets.area
+    }
+
+    pub fn distance_to_in(
+        &self,
+        point: &ffi::G4ThreeVector,
+        direction: &ffi::G4ThreeVector
+    ) -> f64 {
+        let point = Point3::new(point.x(), point.y(), point.z());
+        let direction = Vector3::new(direction.x(), direction.y(), direction.z());
+        let ray = Ray::new(point, direction);
+        let (_, distance) = self.intersect(&ray, Side::Front);
+        distance
+    }
+
+    pub fn distance_to_out(
+        &self,
+        point: &ffi::G4ThreeVector,
+        direction: &ffi::G4ThreeVector,
+        index: &mut i64,
+    ) -> f64 {
+        *index = -1;
+        let point = Point3::new(point.x(), point.y(), point.z());
+        let direction = Vector3::new(direction.x(), direction.y(), direction.z());
+        let ray = Ray::new(point, direction);
+        let (hits, distance) = self.intersect(&ray, Side::Back);
+        if hits == 0 {
+            0.0 // This should not happen, up to numeric uncertainties. In this case, Geant4
+                // seems to return 0.
+        } else {
+            distance
+        }
+    }
+
+    pub fn envelope(&self) -> [[f64; 3]; 2] {
+        let envelope = &self.facets.envelope;
+        [
+            [envelope.min[0], envelope.min[1], envelope.min[2]],
+            [envelope.max[0], envelope.max[1], envelope.max[2]],
+        ]
+    }
+
+    pub fn inside(&self, point: &ffi::G4ThreeVector, delta: f64) -> ffi::EInside {
+        // First, let us check if the point lies on the surface (according to Geant4).
+        struct Match {
+            distance: f64,
+        }
+
+        impl Match {
+            fn inspect(
+                &mut self,
+                sorted_facets: &SortedFacets,
+                node_index: usize,
+                point: &Point3<f64>,
+                delta: f64,
+            ) {
+                match &sorted_facets.tree.nodes[node_index] {
+                    BvhNode::Leaf{shape_index, ..} => {
+                        let facet = &sorted_facets.facets[*shape_index];
+                        let d = facet.distance(point);
+                        if d < self.distance {
+                            self.distance = d;
+                        }
+                    },
+                    BvhNode::Node{child_l_index, child_l_aabb,
+                                  child_r_index, child_r_aabb, ..} => {
+                        if child_l_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(sorted_facets, *child_l_index, point, delta)
+                        }
+                        if child_r_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(sorted_facets, *child_r_index, point, delta)
+                        }
+                    },
+                }
+            }
+        }
+
+        let point = Point3::new(point.x(), point.y(), point.z());
+        let mut closest = Match { distance: f64::INFINITY };
+        closest.inspect(&self.facets, 0, &point, delta);
+        if closest.distance <= delta {
+            return ffi::EInside::kSurface;
+        }
+
+        // Otherwise, let us check if the point actually lies outside of the bounding box.
+        if !self.facets.envelope.approx_contains_eps(&point, delta) {
+            return ffi::EInside::kOutside;
+        }
+
+        // Finally, let us count the number of intersections with the bounding surface. An odd
+        // value implies an inner point.
+        let direction = Vector3::new(0.0, 0.0, 1.0);
+        let ray = Ray::new(point, direction);
+        let (hits, _) = self.intersect(&ray, Side::Both);
+        if (hits % 2) == 1 { ffi::EInside::kInside } else { ffi::EInside::kOutside }
+    }
+
+    fn intersect(&self, ray: &Ray<f64, 3>, side: Side ) -> (usize, f64) {
+        struct Match<'a> {
+            tree: &'a Bvh<f64, 3>,
+            facets: &'a [TriangularFacet],
+            side: Side,
+            intersections: usize,
+            distance: f64,
+        }
+
+        impl<'a> Match<'a> {
+            fn inspect(&mut self, ray: &Ray<f64, 3>, index: usize) {
+                match self.tree.nodes[index] {
+                    BvhNode::Node {
+                        ref child_l_aabb,
+                        child_l_index,
+                        ref child_r_aabb,
+                        child_r_index,
+                        ..
+                    } => {
+                        if ray_intersects_aabb(ray, child_l_aabb) {
+                            self.inspect(ray, child_l_index);
+                        }
+                        if ray_intersects_aabb(ray, child_r_aabb) {
+                            self.inspect(ray, child_r_index);
+                        }
+                    }
+                    BvhNode::Leaf { shape_index, .. } => {
+                        let facet = &self.facets[shape_index];
+                        if let Some(distance) = facet.intersect(ray, self.side) {
+                            self.intersections += 1;
+                            if distance < self.distance {
+                                self.distance = distance;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut matches = Match {
+            side,
+            tree: &self.facets.tree,
+            facets: self.facets.facets.as_slice(),
+            intersections: 0,
+            distance: f64::INFINITY,
+        };
+        matches.inspect(ray, 0);
+        (matches.intersections, matches.distance)
+    }
+
+    pub fn normal(&self, index: usize) -> [f64; 3] {
+        self.facets.facets[index].normal.into()
+    }
+
+    pub fn surface_normal(&self, point: &ffi::G4ThreeVector, delta: f64) -> [f64; 3] {
+        struct Match {
+            normal: [f64; 3],
+            distance: f64,
+        }
+
+        impl Match {
+            fn inspect(
+                &mut self,
+                sorted_facets: &SortedFacets,
+                node_index: usize,
+                point: &Point3<f64>,
+                delta: f64,
+            ) {
+                match &sorted_facets.tree.nodes[node_index] {
+                    BvhNode::Leaf{shape_index, ..} => {
+                        let facet = &sorted_facets.facets[*shape_index];
+                        let d = facet.distance(point);
+                        if d < self.distance {
+                            self.normal = facet.normal.into();
+                            self.distance = d;
+                        }
+                    },
+                    BvhNode::Node{child_l_index, child_l_aabb,
+                                  child_r_index, child_r_aabb, ..} => {
+                        if child_l_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(sorted_facets, *child_l_index, point, delta)
+                        }
+                        if child_r_aabb.approx_contains_eps(&point, delta) {
+                            self.inspect(sorted_facets, *child_r_index, point, delta)
+                        }
+                    },
+                }
+            }
+        }
+
+        let point = Point3::new(point.x(), point.y(), point.z());
+        let mut closest = Match { normal: [0.0; 3], distance: f64::INFINITY };
+        closest.inspect(&self.facets, 0, &point, delta);
+        closest.normal
+    }
+
+    pub fn surface_point(&self, index: f64, u: f64, v: f64) -> [f64; 3] {
+        let target = index * self.facets.area;
+        let mut area = 0.0;
+        let mut index = self.facets.facets.len() - 1;
+        for (i, facet) in self.facets.facets.iter().enumerate() {
+            area += facet.area;
+            if target <= area {
+                index = i;
+                break;
+            }
+        }
+        let facet = &self.facets.facets[index];
+        let (u, v) = if u + v <= 1.0 { (u, v) } else { (1.0 - u, 1.0 - v) };
+        let dr: Vector3<f64> = (u * (facet.v1 - facet.v0) + v * (facet.v2 - facet.v0)).into();
+        let r = facet.v0 + dr;
+        r.into()
+    }
+}
+
+impl From<&MeshHandle> for Vec<f32> {
+    fn from(value: &MeshHandle) -> Self {
+        let mut data = Vec::<f32>::with_capacity(9 * value.facets.facets.len());
+        for facet in value.facets.facets.iter() {
+            data.push(facet.v0[0] as f32);
+            data.push(facet.v0[1] as f32);
+            data.push(facet.v0[2] as f32);
+            data.push(facet.v1[0] as f32);
+            data.push(facet.v1[1] as f32);
+            data.push(facet.v1[2] as f32);
+            data.push(facet.v2[0] as f32);
+            data.push(facet.v2[1] as f32);
+            data.push(facet.v2[2] as f32);
+        }
+        data
+    }
+}
+
+#[derive(Clone)]
+pub struct SolidHandle {
+    solid: Arc<*mut ffi::G4TessellatedSolid>,
+}
+
+unsafe impl Send for SolidHandle {}
+unsafe impl Sync for SolidHandle {}
+
+impl SolidHandle {
+    fn build(
+        py: Python,
+        definition: &MeshDefinition,
+    ) -> PyResult<()> {
+        if !SOLIDS
+            .read()
+            .unwrap()
+            .contains_key(&definition) {
+
+            let facets = definition.load_facets(py)?;
+            let solid = ffi::create_tessellated_solid(facets);
+            let result = ffi::get_error();
+            match result.tp {
+                ffi::ErrorType::None => (),
+                ffi::ErrorType::MemoryError => {
+                    let why = format!("{}", definition.path.display());
+                    let err = Error::new(MemoryError).what("mesh").why(&why);
+                    return Err(err.into());
+                },
+                _ => {
+                    let why = format!("{}: {}", definition.path.display(), result.message);
+                    let err = Error::new(ValueError).what("mesh").why(&why);
+                    return Err(err.into());
+                }
+            }
+            let solid = Arc::new(solid);
+            let solid = Self { solid };
+
+            SOLIDS
+                .write()
+                .unwrap()
+                .insert(definition.clone(), solid);
+        }
+
+        Ok(())
+    }
+
+    pub fn ptr(&self) -> *mut ffi::G4TessellatedSolid {
+        *self.solid
+    }
+}
+
+impl From<&SolidHandle> for Vec<f32> {
+    fn from(value: &SolidHandle) -> Self {
+        let mut data = Vec::<f32>::new();
+        ffi::get_facets(value, &mut data);
+        data
+    }
+}
+
+
+// ===============================================================================================
+//
+// Mesh implementation.
+//
+// ===============================================================================================
 
 pub struct SortedFacets {
     envelope: Aabb<f64, 3>,
@@ -163,215 +608,25 @@ impl BHShape<f64, 3> for TriangularFacet {
 }
 
 impl SortedFacets {
-    pub fn area(&self) -> f64 {
-        self.area
-    }
-
-    pub fn distance_to_in(
-        &self,
-        point: &ffi::G4ThreeVector,
-        direction: &ffi::G4ThreeVector
-    ) -> f64 {
-        let point = Point3::new(point.x(), point.y(), point.z());
-        let direction = Vector3::new(direction.x(), direction.y(), direction.z());
-        let ray = Ray::new(point, direction);
-        let (_, distance) = self.intersect(&ray, Side::Front);
-        distance
-    }
-
-    pub fn distance_to_out(
-        &self,
-        point: &ffi::G4ThreeVector,
-        direction: &ffi::G4ThreeVector,
-        index: &mut i64,
-    ) -> f64 {
-        *index = -1;
-        let point = Point3::new(point.x(), point.y(), point.z());
-        let direction = Vector3::new(direction.x(), direction.y(), direction.z());
-        let ray = Ray::new(point, direction);
-        let (hits, distance) = self.intersect(&ray, Side::Back);
-        if hits == 0 {
-            0.0 // This should not happen, up to numeric uncertainties. In this case, Geant4
-                // seems to return 0.
-        } else {
-            distance
-        }
-    }
-
-    pub fn envelope(&self) -> [[f64; 3]; 2] {
-        [
-            [self.envelope.min[0], self.envelope.min[1], self.envelope.min[2]],
-            [self.envelope.max[0], self.envelope.max[1], self.envelope.max[2]],
-        ]
-    }
-
-    pub fn inside(&self, point: &ffi::G4ThreeVector, delta: f64) -> ffi::EInside {
-        // First, let us check if the point lies on the surface (according to Geant4).
-        struct Match {
-            distance: f64,
-        }
-
-        impl Match {
-            fn inspect(
-                &mut self,
-                sorted_facets: &SortedFacets,
-                node_index: usize,
-                point: &Point3<f64>,
-                delta: f64,
-            ) {
-                match &sorted_facets.tree.nodes[node_index] {
-                    BvhNode::Leaf{shape_index, ..} => {
-                        let facet = &sorted_facets.facets[*shape_index];
-                        let d = facet.distance(point);
-                        if d < self.distance {
-                            self.distance = d;
-                        }
-                    },
-                    BvhNode::Node{child_l_index, child_l_aabb,
-                                  child_r_index, child_r_aabb, ..} => {
-                        if child_l_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(sorted_facets, *child_l_index, point, delta)
-                        }
-                        if child_r_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(sorted_facets, *child_r_index, point, delta)
-                        }
-                    },
-                }
-            }
-        }
-
-        let point = Point3::new(point.x(), point.y(), point.z());
-        let mut closest = Match { distance: f64::INFINITY };
-        closest.inspect(self, 0, &point, delta);
-        if closest.distance <= delta {
-            return ffi::EInside::kSurface;
-        }
-
-        // Otherwise, let us check if the point actually lies outside of the bounding box.
-        if !self.envelope.approx_contains_eps(&point, delta) {
-            return ffi::EInside::kOutside;
-        }
-
-        // Finally, let us count the number of intersections with the bounding surface. An odd
-        // value implies an inner point.
-        let direction = Vector3::new(0.0, 0.0, 1.0);
-        let ray = Ray::new(point, direction);
-        let (hits, _) = self.intersect(&ray, Side::Both);
-        if (hits % 2) == 1 { ffi::EInside::kInside } else { ffi::EInside::kOutside }
-    }
-
-    fn intersect(&self, ray: &Ray<f64, 3>, side: Side ) -> (usize, f64) {
-        struct Match<'a> {
-            tree: &'a Bvh<f64, 3>,
-            facets: &'a [TriangularFacet],
-            side: Side,
-            intersections: usize,
-            distance: f64,
-        }
-
-        impl<'a> Match<'a> {
-            fn inspect(&mut self, ray: &Ray<f64, 3>, index: usize) {
-                match self.tree.nodes[index] {
-                    BvhNode::Node {
-                        ref child_l_aabb,
-                        child_l_index,
-                        ref child_r_aabb,
-                        child_r_index,
-                        ..
-                    } => {
-                        if ray_intersects_aabb(ray, child_l_aabb) {
-                            self.inspect(ray, child_l_index);
-                        }
-                        if ray_intersects_aabb(ray, child_r_aabb) {
-                            self.inspect(ray, child_r_index);
-                        }
-                    }
-                    BvhNode::Leaf { shape_index, .. } => {
-                        let facet = &self.facets[shape_index];
-                        if let Some(distance) = facet.intersect(ray, self.side) {
-                            self.intersections += 1;
-                            if distance < self.distance {
-                                self.distance = distance;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut matches = Match {
-            side,
-            tree: &self.tree,
-            facets: self.facets.as_slice(),
-            intersections: 0,
-            distance: f64::INFINITY,
-        };
-        matches.inspect(ray, 0);
-        (matches.intersections, matches.distance)
-    }
-
-    pub fn normal(&self, index: usize) -> [f64; 3] {
-        self.facets[index].normal.into()
-    }
-
-    pub fn surface_normal(&self, point: &ffi::G4ThreeVector, delta: f64) -> [f64; 3] {
-        struct Match {
-            normal: [f64; 3],
-            distance: f64,
-        }
-
-        impl Match {
-            fn inspect(
-                &mut self,
-                sorted_facets: &SortedFacets,
-                node_index: usize,
-                point: &Point3<f64>,
-                delta: f64,
-            ) {
-                match &sorted_facets.tree.nodes[node_index] {
-                    BvhNode::Leaf{shape_index, ..} => {
-                        let facet = &sorted_facets.facets[*shape_index];
-                        let d = facet.distance(point);
-                        if d < self.distance {
-                            self.normal = facet.normal.into();
-                            self.distance = d;
-                        }
-                    },
-                    BvhNode::Node{child_l_index, child_l_aabb,
-                                  child_r_index, child_r_aabb, ..} => {
-                        if child_l_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(sorted_facets, *child_l_index, point, delta)
-                        }
-                        if child_r_aabb.approx_contains_eps(&point, delta) {
-                            self.inspect(sorted_facets, *child_r_index, point, delta)
-                        }
-                    },
-                }
-            }
-        }
-
-        let point = Point3::new(point.x(), point.y(), point.z());
-        let mut closest = Match { normal: [0.0; 3], distance: f64::INFINITY };
-        closest.inspect(self, 0, &point, delta);
-        closest.normal
-    }
-
-    pub fn surface_point(&self, index: f64, u: f64, v: f64) -> [f64; 3] {
-        let target = index * self.area;
+    fn new(data: Vec<f32>) -> Self {
+        let mut envelope = Aabb::empty();
+        let mut facets = Vec::<TriangularFacet>::with_capacity(data.len() / 9);
         let mut area = 0.0;
-        let mut index = self.facets.len() - 1;
-        for (i, facet) in self.facets.iter().enumerate() {
+        for facet in data.chunks(9) {
+            let [x0, y0, z0, x1, y1, z1, x2, y2, z2] = facet else { unreachable!() };
+            const CM: f64 = 10.0;
+            let v0 = Point3::<f64>::new(*x0 as f64 * CM, *y0 as f64 * CM, *z0 as f64 * CM);
+            let v1 = Point3::<f64>::new(*x1 as f64 * CM, *y1 as f64 * CM, *z1 as f64 * CM);
+            let v2 = Point3::<f64>::new(*x2 as f64 * CM, *y2 as f64 * CM, *z2 as f64 * CM);
+            let facet = TriangularFacet::new(v0, v1, v2);
             area += facet.area;
-            if target <= area {
-                index = i;
-                break;
-            }
+            facets.push(facet);
+            envelope.grow_mut(&v0);
+            envelope.grow_mut(&v1);
+            envelope.grow_mut(&v2);
         }
-        let facet = &self.facets[index];
-        let (u, v) = if u + v <= 1.0 { (u, v) } else { (1.0 - u, 1.0 - v) };
-        let dr: Vector3<f64> = (u * (facet.v1 - facet.v0) + v * (facet.v2 - facet.v0)).into();
-        let r = facet.v0 + dr;
-        r.into()
+        let tree = Bvh::build(&mut facets);
+        Self { envelope, facets, tree, area }
     }
 }
 
@@ -386,44 +641,4 @@ fn ray_intersects_aabb(ray: &Ray<f64, 3>, aabb: &Aabb<f64, 3>) -> bool {
     let tmax = sup.min();
 
     tmax >= tmin
-}
-
-pub fn sort_facets(shape: &ffi::MeshShape) -> Box<SortedFacets> {
-    let data = &shape.facets;
-    let mut envelope = Aabb::empty();
-    let mut facets = Vec::<TriangularFacet>::with_capacity(data.len() / 9);
-    let mut area = 0.0;
-    for facet in data.chunks(9) {
-        let [x0, y0, z0, x1, y1, z1, x2, y2, z2] = facet else { unreachable!() };
-        const CM: f64 = 10.0;
-        let v0 = Point3::<f64>::new(*x0 as f64 * CM, *y0 as f64 * CM, *z0 as f64 * CM);
-        let v1 = Point3::<f64>::new(*x1 as f64 * CM, *y1 as f64 * CM, *z1 as f64 * CM);
-        let v2 = Point3::<f64>::new(*x2 as f64 * CM, *y2 as f64 * CM, *z2 as f64 * CM);
-        let facet = TriangularFacet::new(v0, v1, v2);
-        area += facet.area;
-        facets.push(facet);
-        envelope.grow_mut(&v0);
-        envelope.grow_mut(&v1);
-        envelope.grow_mut(&v2);
-    }
-    let tree = Bvh::build(&mut facets);
-    Box::new(SortedFacets { envelope, facets, tree, area })
-}
-
-impl From<&SortedFacets> for Vec<f32> {
-    fn from(value: &SortedFacets) -> Self {
-        let mut data = Vec::<f32>::with_capacity(9 * value.facets.len());
-        for facet in value.facets.iter() {
-            data.push(facet.v0[0] as f32);
-            data.push(facet.v0[1] as f32);
-            data.push(facet.v0[2] as f32);
-            data.push(facet.v1[0] as f32);
-            data.push(facet.v1[1] as f32);
-            data.push(facet.v1[2] as f32);
-            data.push(facet.v2[0] as f32);
-            data.push(facet.v2[1] as f32);
-            data.push(facet.v2[2] as f32);
-        }
-        data
-    }
 }

@@ -178,19 +178,17 @@ static G4VSolid * build_envelope(
     }
 }
 
-static TessellatedSolid * build_geant4_mesh(
-    const std::string & pathname,
-    const Volume & volume
-) {
-    auto solid = new TessellatedSolid(pathname);
+G4TessellatedSolid * create_tessellated_solid(rust::Vec<float> facets) {
+    auto solid = new G4TessellatedSolid("anonymous");
     if (solid == nullptr) {
         set_error(ErrorType::MemoryError, "");
         return nullptr;
+    } else {
+        clear_error();
     }
 
-    auto shape = volume.mesh_shape();
-    const size_t n = shape.facets.size() / 9;
-    float * data = shape.facets.data();
+    const size_t n = facets.size() / 9;
+    float * data = facets.data();
     const float unit = (float)CLHEP::cm;
     for (size_t i = 0; i < n; i++, data += 9) {
         float * v0 = data;
@@ -205,16 +203,30 @@ static TessellatedSolid * build_geant4_mesh(
         );
         if (!solid->AddFacet((G4VFacet *)facet)) {
             delete solid;
-            auto message = fmt::format(
-                "bad vertices for tessellated solid '{}'",
-                pathname
-            );
-            set_error(ErrorType::ValueError, message.c_str());
+            set_error(ErrorType::ValueError, "invalid vertices");
             return nullptr;
         }
     }
     solid->SetSolidClosed(true);
     return solid;
+}
+
+void get_facets(
+    const SolidHandle & handle,
+    rust::Vec<float> & data
+) {
+    auto solid = handle.ptr();
+    const int n = solid->GetNumberOfFacets();
+    data.reserve(9 * n);
+    for (int i = 0; i < n; i++) {
+        auto facet = solid->GetFacet(i);
+        for (int j = 0; j < 3; j++) {
+            auto vertex = facet->GetVertex(j);
+            data.push_back(vertex.x());
+            data.push_back(vertex.y());
+            data.push_back(vertex.z());
+        }
+    }
 }
 
 static G4VSolid * build_mesh(
@@ -224,11 +236,10 @@ static G4VSolid * build_mesh(
 ) {
     switch (algorithm) {
         case TSTAlgorithm::Bvh: {
-            auto && shape = volume.mesh_shape();
-            return new Mesh(pathname, shape);
+            return new Mesh(pathname, volume);
         }
         case TSTAlgorithm::Geant4:
-            return build_geant4_mesh(pathname, volume);
+            return new TessellatedSolid(pathname, volume);
         default:
             return nullptr; // unreachable.
     }
@@ -631,6 +642,7 @@ GeometryData::~GeometryData() {
         }
         this->orphans.clear();
         this->elements.clear();
+        collect_meshes();
     }
 }
 
@@ -1074,24 +1086,14 @@ SphereInfo VolumeBorrow::describe_sphere() const {
     };
 }
 
-void VolumeBorrow::describe_tessellated_solid(rust::Vec<float> & data) const {
+const rust::Box<SolidHandle> & VolumeBorrow::describe_tessellated_solid() const {
     auto solid = static_cast<TessellatedSolid *>(
         get_unsubtracted_solid(this->volume->GetLogicalVolume()->GetSolid())
     );
-    const int n = solid->GetNumberOfFacets();
-    data.reserve(9 * n);
-    for (int i = 0; i < n; i++) {
-        auto facet = solid->GetFacet(i);
-        for (int j = 0; j < 3; j++) {
-            auto vertex = facet->GetVertex(j);
-            data.push_back(vertex.x());
-            data.push_back(vertex.y());
-            data.push_back(vertex.z());
-        }
-    }
+    return solid->Describe();
 }
 
-const rust::Box<SortedFacets> & VolumeBorrow::describe_mesh() const {
+const rust::Box<MeshHandle> & VolumeBorrow::describe_mesh() const {
     auto solid = static_cast<Mesh *>(
         get_unsubtracted_solid(this->volume->GetLogicalVolume()->GetSolid())
     );
