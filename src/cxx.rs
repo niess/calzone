@@ -1,5 +1,5 @@
 use crate::geometry::volume::Volume;
-use crate::geometry::mesh::{collect_meshes, MeshHandle, SolidHandle};
+use crate::geometry::mesh::{collect_meshes, MeshHandle, TessellatedSolidHandle};
 use crate::simulation::{RandomContext, RunAgent};
 use crate::utils::error::ctrlc_catched;
 
@@ -358,7 +358,7 @@ pub mod ffi {
         fn describe_mesh(self: &VolumeBorrow) -> &Box<MeshHandle>;
         fn describe_orb(self: &VolumeBorrow) -> OrbInfo;
         fn describe_sphere(self: &VolumeBorrow) -> SphereInfo;
-        fn describe_tessellated_solid(self: &VolumeBorrow) -> &Box<SolidHandle>;
+        fn describe_tessellated_solid(self: &VolumeBorrow) -> &Box<TessellatedSolidHandle>;
         fn describe_transform(self: &VolumeBorrow) -> TransformInfo;
         fn describe_tubs(self: &VolumeBorrow) -> TubsInfo;
         fn dump(self: &VolumeBorrow, path: &str) -> SharedPtr<Error>;
@@ -382,7 +382,7 @@ pub mod ffi {
 
         type G4TessellatedSolid;
         fn create_tessellated_solid(facets: Vec<f32>) -> *mut G4TessellatedSolid;
-        fn get_facets(solid: &SolidHandle, data: &mut Vec<f32>);
+        fn get_facets(solid: &TessellatedSolidHandle, data: &mut Vec<f32>);
 
         // Material interface.
         type G4State;
@@ -439,7 +439,7 @@ pub mod ffi {
         fn cylinder_shape(self: &Volume) -> &CylinderShape;
         fn envelope_shape(self: &Volume) -> &EnvelopeShape;
         fn get_mesh(self: &Volume) -> Box<MeshHandle>;
-        fn get_solid(self: &Volume) -> Box<SolidHandle>;
+        fn get_tessellated_solid(self: &Volume) -> Box<TessellatedSolidHandle>;
         fn is_rotated(self: &Volume) -> bool;
         fn is_translated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
@@ -474,8 +474,8 @@ pub mod ffi {
         fn surface_normal(self: &MeshHandle, point: &G4ThreeVector, delta: f64) -> [f64; 3];
         fn surface_point(self: &MeshHandle, index: f64, u: f64, v: f64) -> [f64; 3];
 
-        type SolidHandle;
-        fn ptr(self: &SolidHandle) -> *mut G4TessellatedSolid;
+        type TessellatedSolidHandle;
+        fn ptr(self: &TessellatedSolidHandle) -> *mut G4TessellatedSolid;
 
         // Materials interface.
         fn get_hash(self: &Mixture) -> u64;

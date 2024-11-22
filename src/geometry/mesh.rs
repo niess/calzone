@@ -25,7 +25,7 @@ use std::sync::{Arc, LazyLock, RwLock};
 static MESHES: LazyLock<RwLock<HashMap<MeshDefinition, MeshHandle>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-static SOLIDS: LazyLock<RwLock<HashMap<MeshDefinition, SolidHandle>>> =
+static TESSELLATED_SOLIDS: LazyLock<RwLock<HashMap<MeshDefinition, TessellatedSolidHandle>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub fn collect_meshes() {
@@ -33,7 +33,7 @@ pub fn collect_meshes() {
         .write()
         .unwrap()
         .retain(|_, v| Arc::strong_count(&v.facets) > 1);
-    SOLIDS
+    TESSELLATED_SOLIDS
         .write()
         .unwrap()
         .retain(|_, v| Arc::strong_count(&v.solid) > 1);
@@ -62,7 +62,7 @@ impl MeshDefinition {
     pub fn build(&self, py: Python, algorithm: ffi::TSTAlgorithm) -> PyResult<()> {
         match algorithm {
             ffi::TSTAlgorithm::Bvh => MeshHandle::build(py, self),
-            ffi::TSTAlgorithm::Geant4 => SolidHandle::build(py, self),
+            ffi::TSTAlgorithm::Geant4 => TessellatedSolidHandle::build(py, self),
             _ => unreachable!(),
         }
     }
@@ -77,8 +77,8 @@ impl MeshDefinition {
         Box::new(mesh)
     }
 
-    pub fn get_solid(&self) -> Box<SolidHandle> {
-        let solid = SOLIDS
+    pub fn get_tessellated_solid(&self) -> Box<TessellatedSolidHandle> {
+        let solid = TESSELLATED_SOLIDS
             .read()
             .unwrap()
             .get(self)
@@ -386,19 +386,19 @@ impl From<&MeshHandle> for Vec<f32> {
 }
 
 #[derive(Clone)]
-pub struct SolidHandle {
+pub struct TessellatedSolidHandle {
     solid: Arc<*mut ffi::G4TessellatedSolid>,
 }
 
-unsafe impl Send for SolidHandle {}
-unsafe impl Sync for SolidHandle {}
+unsafe impl Send for TessellatedSolidHandle {}
+unsafe impl Sync for TessellatedSolidHandle {}
 
-impl SolidHandle {
+impl TessellatedSolidHandle {
     fn build(
         py: Python,
         definition: &MeshDefinition,
     ) -> PyResult<()> {
-        if !SOLIDS
+        if !TESSELLATED_SOLIDS
             .read()
             .unwrap()
             .contains_key(&definition) {
@@ -422,7 +422,7 @@ impl SolidHandle {
             let solid = Arc::new(solid);
             let solid = Self { solid };
 
-            SOLIDS
+            TESSELLATED_SOLIDS
                 .write()
                 .unwrap()
                 .insert(definition.clone(), solid);
@@ -436,8 +436,8 @@ impl SolidHandle {
     }
 }
 
-impl From<&SolidHandle> for Vec<f32> {
-    fn from(value: &SolidHandle) -> Self {
+impl From<&TessellatedSolidHandle> for Vec<f32> {
+    fn from(value: &TessellatedSolidHandle) -> Self {
         let mut data = Vec::<f32>::new();
         ffi::get_facets(value, &mut data);
         data

@@ -83,7 +83,7 @@ struct VolumeBorrow {
     BoxInfo describe_box() const;
     OrbInfo describe_orb() const;
     SphereInfo describe_sphere() const;
-    const rust::Box<SolidHandle> & describe_tessellated_solid() const;
+    const rust::Box<TessellatedSolidHandle> & describe_tessellated_solid() const;
     const rust::Box<MeshHandle> & describe_mesh() const;
     TransformInfo describe_transform() const;
     TubsInfo describe_tubs() const;
@@ -114,7 +114,7 @@ class G4TessellatedSolid;
 G4TessellatedSolid * create_tessellated_solid(rust::Vec<float> facets);
 
 void get_facets(
-    const SolidHandle & solid,
+    const TessellatedSolidHandle & solid,
     rust::Vec<float> & data
 );
 

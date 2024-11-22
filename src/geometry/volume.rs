@@ -15,7 +15,7 @@ use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
 use std::path::Path;
 use super::{ffi, MaterialsDefinition};
-use super::mesh::{MapParameters, MeshDefinition, MeshHandle, SolidHandle};
+use super::mesh::{MapParameters, MeshDefinition, MeshHandle, TessellatedSolidHandle};
 
 
 // ===============================================================================================
@@ -753,9 +753,9 @@ impl Volume {
         }
     }
 
-    pub fn get_solid(&self) -> Box<SolidHandle> {
+    pub fn get_tessellated_solid(&self) -> Box<TessellatedSolidHandle> {
         match &self.shape {
-            Shape::Mesh(definition) => definition.get_solid(),
+            Shape::Mesh(definition) => definition.get_tessellated_solid(),
             _ => unreachable!(),
         }
     }

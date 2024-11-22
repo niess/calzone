@@ -918,20 +918,12 @@ impl Volume {
                 "G4Box" | "G4DisplacedSolid" | "G4Orb" | "G4Sphere" | "G4Tubs" => {
                     SolidProperties::everything()
                 },
-                "Mesh" => {
+                "G4TessellatedSolid" | "Mesh" => {
                     SolidProperties {
                         has_cubic_volume: false,
                         has_exclusive_volume: false,
                         has_surface_area: true,
                         has_surface_generation: true,
-                    }
-                },
-                "G4TessellatedSolid" => {
-                    SolidProperties {
-                        has_cubic_volume: false,
-                        has_exclusive_volume: false,
-                        has_surface_area: true,
-                        has_surface_generation: false, // since it is not uniform.
                     }
                 },
                 _ => SolidProperties::nothing(),

@@ -174,7 +174,7 @@ TessellatedSolid::TessellatedSolid(
     const Volume & volume
 ):
     G4VSolid::G4VSolid(name),
-    solid(volume.get_solid())
+    solid(volume.get_tessellated_solid())
 {}
 
 void TessellatedSolid::BoundingLimits(
@@ -235,7 +235,25 @@ G4GeometryType TessellatedSolid::GetEntityType() const {
 }
 
 G4ThreeVector TessellatedSolid::GetPointOnSurface () const {
-    return this->solid->ptr()->GetPointOnSurface();
+    auto ptr = this->solid->ptr();
+    const int n = ptr->GetNumberOfFacets();
+    if (n <= 0) {
+        return ptr->GetPointOnSurface();
+    }
+
+    // Select facets according to their respective areas (contrary to Geant4
+    // native implementation).
+    const double target = ptr->GetSurfaceArea() * G4UniformRand();
+    double area = 0.0;
+    G4VFacet * facet = nullptr;
+    for (int i = 0; i < n; i++) {
+        facet = ptr->GetFacet(i);
+        area += facet->GetArea();
+        if (target <= area) {
+            break;
+        }
+    }
+    return facet->GetPointOnFace();
 }
 
 G4double TessellatedSolid::GetSurfaceArea() {
@@ -260,6 +278,6 @@ std::ostream & TessellatedSolid::StreamInfo(std::ostream & stream) const {
     return this->solid->ptr()->StreamInfo(stream);
 }
 
-const rust::Box<SolidHandle> & TessellatedSolid::Describe() const {
+const rust::Box<TessellatedSolidHandle> & TessellatedSolid::Describe() const {
     return this->solid;
 }

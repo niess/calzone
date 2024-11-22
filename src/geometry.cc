@@ -212,7 +212,7 @@ G4TessellatedSolid * create_tessellated_solid(rust::Vec<float> facets) {
 }
 
 void get_facets(
-    const SolidHandle & handle,
+    const TessellatedSolidHandle & handle,
     rust::Vec<float> & data
 ) {
     auto solid = handle.ptr();
@@ -1086,7 +1086,8 @@ SphereInfo VolumeBorrow::describe_sphere() const {
     };
 }
 
-const rust::Box<SolidHandle> & VolumeBorrow::describe_tessellated_solid() const {
+const rust::Box<TessellatedSolidHandle> &
+    VolumeBorrow::describe_tessellated_solid() const {
     auto solid = static_cast<TessellatedSolid *>(
         get_unsubtracted_solid(this->volume->GetLogicalVolume()->GetSolid())
     );

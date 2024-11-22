@@ -78,8 +78,8 @@ struct TessellatedSolid: public G4VSolid {
     void DescribeYourselfTo(G4VGraphicsScene &) const;
     std::ostream & StreamInfo(std::ostream &) const;
 
-    const rust::Box<SolidHandle> & Describe() const;
+    const rust::Box<TessellatedSolidHandle> & Describe() const;
 
 private:
-    rust::Box<SolidHandle> solid;
+    rust::Box<TessellatedSolidHandle> solid;
 };
