@@ -1,5 +1,5 @@
 use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
-use crate::utils::error::variant_error;
+use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::extract::{extract, Extractor, Vector, Padding, Property, PropertyValue, Tag,
                             TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
@@ -46,7 +46,54 @@ pub enum Shape {
     Cylinder(ffi::CylinderShape),
     Envelope(ffi::EnvelopeShape),
     Sphere(ffi::SphereShape),
-    Mesh(MeshDefinition),
+    Mesh(MeshShape),
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct MeshShape {
+    definition: MeshDefinition,
+    algorithm: Option<Algorithm>,
+    #[serde(skip)]
+    applied: ffi::TSTAlgorithm,
+}
+
+
+#[derive(Clone, Copy, Default, EnumVariantsStrings, Deserialize, Serialize)]
+#[enum_variants_strings_transform(transform="lower_case")]
+pub enum Algorithm {
+    Bvh,
+    #[default]
+    Voxels,
+}
+
+impl From<Algorithm> for ffi::TSTAlgorithm {
+    fn from(value: Algorithm) -> Self {
+        match value {
+            Algorithm::Bvh => ffi::TSTAlgorithm::Bvh,
+            Algorithm::Voxels => ffi::TSTAlgorithm::Voxels,
+        }
+    }
+}
+
+impl<'py> FromPyObject<'py> for Algorithm {
+    fn extract_bound(algorithm: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let algorithm: String = algorithm.extract()?;
+        let algorithm = Algorithm::from_str(&algorithm)
+            .map_err(|options| variant_error("algorith", &algorithm, options))?;
+        Ok(algorithm)
+    }
+}
+
+impl IntoPy<PyObject> for Algorithm {
+    fn into_py(self, py: Python) -> PyObject {
+        self.to_str().into_py(py)
+    }
+}
+
+impl Default for ffi::TSTAlgorithm {
+    fn default() -> Self {
+        ffi::TSTAlgorithm::Voxels
+    }
 }
 
 impl From<&Shape> for ffi::ShapeType {
@@ -80,11 +127,16 @@ pub struct Include {
 }
 
 impl Volume {
-    pub(super) fn build_meshes(&self, py: Python, algorithm: ffi::TSTAlgorithm) -> PyResult<()> {
-        if let Shape::Mesh(ref definition) = self.shape {
-            definition.build(py, algorithm)?;
+    pub(super) fn build_meshes(
+        &mut self,
+        py: Python,
+        algorithm: Option<Algorithm>
+    ) -> PyResult<()> {
+        if let Shape::Mesh(ref mut mesh) = self.shape {
+            let algorithm = algorithm.or_else(|| mesh.algorithm);
+            mesh.applied = mesh.definition.build(py, algorithm.map(|a| a.into()))?;
         }
-        for daughter in self.volumes.iter() {
+        for daughter in self.volumes.iter_mut() {
             daughter.build_meshes(py, algorithm)?;
         }
         Ok(())
@@ -251,7 +303,7 @@ impl Shape {
             ShapeType::Sphere => Shape::Sphere(
                 ffi::SphereShape::try_from_any(&tag, properties)?),
             ShapeType::Mesh => Shape::Mesh(
-                MeshDefinition::try_from_any(&tag, properties)?),
+                MeshShape::try_from_any(&tag, properties)?),
         };
         Ok(shape)
     }
@@ -593,31 +645,42 @@ impl TryFromBound for ffi::SphereShape {
     }
 }
 
-impl TryFromBound for MeshDefinition {
+impl TryFromBound for MeshShape {
     fn try_from_any<'py>(tag: &Tag, value: &Bound<'py, PyAny>) -> PyResult<Self> {
         let mut scale: f64 = 1.0;
+        let mut algorithm: Option<Algorithm> = None;
         let mut origin: Option<f64x3> = None;
         let mut padding: Option<f64> = None;
         let mut regular: Option<bool> = None;
         let path: PyResult<String> = value.extract();
         let path: String = match path {
             Err(_) => {
-                const EXTRACTOR: Extractor<5> = Extractor::new([
+                const EXTRACTOR: Extractor<6> = Extractor::new([
                     Property::required_str("path"),
                     Property::optional_str("units"),
+                    Property::optional_str("algorithm"),
                     Property::optional_vec("origin"),
                     Property::optional_f64("padding"),
                     Property::optional_bool("regular"),
                 ]);
 
                 let tag = tag.cast("mesh");
-                let [path, units, center, depth, reg] = EXTRACTOR.extract_any(&tag, value, None)?;
+                let [path, units, algo, center, depth, reg] = EXTRACTOR
+                    .extract_any(&tag, value, None)?;
                 if let PropertyValue::String(units) = units {
                     scale = convert(value.py(), units.as_str(), "cm")
                         .map_err(|e|
                             tag.bad().what("units").why(format!("{}", e)).to_err(ValueError)
                         )?;
                 }
+                let algo: Option<String> = algo.into();
+                algorithm = algo.map(|algo| {
+                    Algorithm::from_str(&algo)
+                        .map_err(|options| {
+                            let why = variant_explain(&algo, options);
+                            tag.bad().why(why).to_err(ValueError)
+                        })
+                }).transpose()?;
                 origin = center.into();
                 padding = depth.into();
                 regular = reg.into();
@@ -671,8 +734,9 @@ impl TryFromBound for MeshDefinition {
         };
         let path = path.canonicalize()?; // XXX Map the error.
 
-        let definition = Self::new(path, scale, map);
-        Ok(definition)
+        let definition = MeshDefinition::new(path, scale, map);
+        let applied = ffi::TSTAlgorithm::default();
+        Ok(Self { definition, algorithm, applied })
     }
 }
 
@@ -748,14 +812,14 @@ impl Volume {
 
     pub fn get_mesh(&self) -> Box<MeshHandle> {
         match &self.shape {
-            Shape::Mesh(definition) => definition.get_mesh(),
+            Shape::Mesh(shape) => shape.definition.get_mesh(),
             _ => unreachable!(),
         }
     }
 
     pub fn get_tessellated_solid(&self) -> Box<TessellatedSolidHandle> {
         match &self.shape {
-            Shape::Mesh(definition) => definition.get_tessellated_solid(),
+            Shape::Mesh(shape) => shape.definition.get_tessellated_solid(),
             _ => unreachable!(),
         }
     }
@@ -770,6 +834,13 @@ impl Volume {
 
     pub fn material(&self) -> &String {
         &self.material
+    }
+
+    pub fn mesh_algorithm(&self) -> ffi::TSTAlgorithm {
+        match &self.shape {
+            Shape::Mesh(shape) => shape.applied,
+            _ => unreachable!(),
+        }
     }
 
     pub fn name(&self) -> &String {

@@ -56,10 +56,7 @@ private:
     GeometryData * data;
 };
 
-std::shared_ptr<GeometryBorrow> create_geometry(
-    const rust::Box<Volume> &,
-    const TSTAlgorithm &
-);
+std::shared_ptr<GeometryBorrow> create_geometry(const rust::Box<Volume> &);
 
 
 // ============================================================================

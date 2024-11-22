@@ -1,3 +1,5 @@
+#![allow(unused_unsafe)]
+
 use crate::geometry::volume::Volume;
 use crate::geometry::mesh::{collect_meshes, MeshHandle, TessellatedSolidHandle};
 use crate::simulation::{RandomContext, RunAgent};
@@ -92,7 +94,7 @@ pub mod ffi {
     #[repr(i32)]
     enum TSTAlgorithm {
         Bvh,
-        Geant4,
+        Voxels,
     }
 
     struct VolumeInfo { // From Geant4.
@@ -336,10 +338,7 @@ pub mod ffi {
         type G4AffineTransform;
 
         type GeometryBorrow;
-        fn create_geometry(
-            volume: &Box<Volume>,
-            algorithm: &TSTAlgorithm,
-        ) -> SharedPtr<GeometryBorrow>;
+        fn create_geometry(volume: &Box<Volume>) -> SharedPtr<GeometryBorrow>;
 
         fn borrow_volume(self: &GeometryBorrow, name: &str) -> SharedPtr<VolumeBorrow>;
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
@@ -443,6 +442,7 @@ pub mod ffi {
         fn is_rotated(self: &Volume) -> bool;
         fn is_translated(self: &Volume) -> bool;
         fn material(self: &Volume) -> &String;
+        fn mesh_algorithm(self: &Volume) -> TSTAlgorithm;
         fn name(self: &Volume) -> &String;
         fn overlaps(self: &Volume) -> &[[String; 2]];
         fn position(self: &Volume) -> [f64; 3];

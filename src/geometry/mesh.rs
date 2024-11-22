@@ -59,12 +59,23 @@ impl MeshDefinition {
         Self { path, scale, map }
     }
 
-    pub fn build(&self, py: Python, algorithm: ffi::TSTAlgorithm) -> PyResult<()> {
+    pub fn build(
+        &self,
+        py: Python,
+        algorithm: Option<ffi::TSTAlgorithm>
+    ) -> PyResult<ffi::TSTAlgorithm> {
+        let algorithm = algorithm
+            .unwrap_or_else(|| if self.map.is_none() {
+                ffi::TSTAlgorithm::Voxels
+            } else {
+                ffi::TSTAlgorithm::Bvh
+            });
         match algorithm {
-            ffi::TSTAlgorithm::Bvh => MeshHandle::build(py, self),
-            ffi::TSTAlgorithm::Geant4 => TessellatedSolidHandle::build(py, self),
+            ffi::TSTAlgorithm::Bvh => MeshHandle::build(py, self)?,
+            ffi::TSTAlgorithm::Voxels => TessellatedSolidHandle::build(py, self)?,
             _ => unreachable!(),
         }
+        Ok(algorithm)
     }
 
     pub fn get_mesh(&self) -> Box<MeshHandle> {

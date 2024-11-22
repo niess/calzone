@@ -1,6 +1,6 @@
 use convert_case::{Case, Casing};
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
-use crate::utils::error::{Error, variant_explain};
+use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::{Exception, IndexError, NotImplementedError, TypeError,
     ValueError};
 use crate::utils::float::f64x3;
@@ -25,8 +25,9 @@ pub mod materials;
 pub mod mesh;
 pub mod volume;
 
-pub use map:: Map;
+pub use map::Map;
 pub use materials::MaterialsDefinition;
+pub use volume::Algorithm;
 
 
 // ===============================================================================================
@@ -112,44 +113,9 @@ impl Geometry {
 #[derive(Deserialize, Serialize)]
 pub struct GeometryBuilder {
     definition: GeometryDefinition,
-    /// Traversal algorithm for tessellated shapes.
+    /// Meshes traversal algorithm.
     #[pyo3(get, set)]
-    algorithm: Algorithm,
-}
-
-#[derive(Clone, Copy, Default, EnumVariantsStrings, Deserialize, Serialize)]
-#[enum_variants_strings_transform(transform="lower_case")]
-enum Algorithm {
-    #[default]
-    Bvh,
-    Geant4,
-}
-
-impl From<Algorithm> for ffi::TSTAlgorithm {
-    fn from(value: Algorithm) -> Self {
-        match value {
-            Algorithm::Bvh => ffi::TSTAlgorithm::Bvh,
-            Algorithm::Geant4 => ffi::TSTAlgorithm::Geant4,
-        }
-    }
-}
-
-impl<'py> FromPyObject<'py> for Algorithm {
-    fn extract_bound(algorithm: &Bound<'py, PyAny>) -> PyResult<Self> {
-        let algorithm: String = algorithm.extract()?;
-        let algorithm = Algorithm::from_str(&algorithm)
-            .map_err(|options| {
-                let why = variant_explain(&algorithm, options);
-                Error::new(ValueError).what("algorithm").why(&why).to_err()
-            })?;
-        Ok(algorithm)
-    }
-}
-
-impl IntoPy<PyObject> for Algorithm {
-    fn into_py(self, py: Python) -> PyObject {
-        self.to_str().into_py(py)
-    }
+    algorithm: Option<Algorithm>,
 }
 
 #[pymethods]
@@ -161,7 +127,6 @@ impl GeometryBuilder {
             Some(definition) => GeometryDefinition::new(definition, None)?,
             None => GeometryDefinition::default(),
         };
-        let algorithm = algorithm.unwrap_or_else(|| Algorithm::default());
         let builder = Self { definition, algorithm };
         Ok(builder)
     }
@@ -172,8 +137,7 @@ impl GeometryBuilder {
         self.definition.volume.validate()?;
 
         // Build meshes.
-        let algorithm: ffi::TSTAlgorithm = self.algorithm.into();
-        self.definition.volume.build_meshes(py, algorithm)?;
+        self.definition.volume.build_meshes(py, self.algorithm)?;
 
         // Build materials.
         self.definition.materials = MaterialsDefinition::drain(
@@ -185,7 +149,7 @@ impl GeometryBuilder {
         }
 
         // Build volumes.
-        let geometry = ffi::create_geometry(&self.definition.volume, &algorithm);
+        let geometry = ffi::create_geometry(&self.definition.volume);
         if geometry.is_null() {
             ffi::get_error().to_result()?;
             unreachable!()

@@ -484,6 +484,9 @@ length *units*.
    * - :python:`"path"`
      - :python:`str`
      - 
+   * - :python:`"algorithm"`
+     - :python:`str`
+     - :python:`None`
    * - :python:`"units"`
      - :python:`str`
      - :python:`"cm"`
@@ -495,10 +498,22 @@ elevation values are assumed to be along the z-axis, and the surface is closed
 by adding side and bottom faces. The additional properties described in
 :numref:`tab-topography-items` control the generated 3D shape.
 
-.. tip::
+.. topic:: Algorithm
 
-   The :py:meth:`Map.dump() <calzone.Map.dump>` method allows one to export the
-   generated 3D shape in `STL`_ format.
+   The *algorithm* property specifies the method used to traverse the mesh. The
+   available options are :python:`"bvh"` or :python:`"voxels"` (Geant4 method).
+   The `BVH`_ method is an efficient solution for penetrating particles
+   (photons, muons, etc.). However, if short-range secondaries are also
+   simulated (e.g. electrons), the `Voxels`_ method is a more efficient CPU-wise
+   solution, though it requires more memory (which prevents using this method
+   with large meshes).
+
+   If no *algorithm* is specified, :python:`"voxels"` is used for `STL`_ meshes
+   and :python:`"bvh"` for `DEMs <DEM_>`_. See also the :py:attr:`algorithm
+   <calzone.GeometryBuilder.algorithm>` attribute of the
+   :py:class:`GeometryBuilder <calzone.GeometryBuilder>` class, which allows for
+   the global override of the mesh traversal algorithm across the entire
+   geometry.
 
 .. _tab-topography-items:
 
@@ -532,6 +547,12 @@ by adding side and bottom faces. The additional properties described in
    -but optimised- mesh is used. However, this is not supported by the Geant4
    traversal :py:attr:`algorithm <calzone.GeometryBuilder.algorithm>`.
    Therefore, a *regular* mesh must be selected when using the latter algorithm.
+
+.. tip::
+
+   The :py:meth:`Map.dump() <calzone.Map.dump>` method allows one to export the
+   generated 3D topography in `STL`_ format.
+
 
 Sphere shape
 ~~~~~~~~~~~~
@@ -814,6 +835,7 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. 
 .. ============================================================================
 
+.. _BVH: https://en.wikipedia.org/wiki/Bounding_volume_hierarchy
 .. _DEM: https://en.wikipedia.org/wiki/Digital_elevation_model
 .. _JSON: https://www.json.org/json-en.html
 .. _G4Box: https://geant4.kek.jp/Reference/11.2.0/classG4Box.html
@@ -830,4 +852,5 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. _OpenGate: http://www.opengatecollaboration.org/
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _TOML: https://toml.io/en/
+.. _Voxels: https://en.wikipedia.org/wiki/Voxel
 .. _YAML: https://yaml.org/

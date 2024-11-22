@@ -190,9 +190,15 @@ Python interface
 
    .. autoattribute:: algorithm
 
-      Must be one of :python:`"bvh"` (default) or :python:`"geant4"`. Note that
-      Geant4 native algorithm is inefficient for large meshes. Therefore, it
-      should be avoided when a tessellated topography is used.
+      If not :python:`None`, this attribute will override the traversal
+      algorithm for all meshes within the geometry. The available options are
+      :python:`"bvh"` or :python:`"voxels"`. Refer to the :ref:`Geometry
+      <geometry:Mesh shape>` section for further details.
+
+   .. caution::
+
+      `Voxels`_ are inefficient for large meshes (e.g. topographies), due to the
+      large memory usage.
 
 ----
 
@@ -752,5 +758,6 @@ Python interface
 .. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
 .. _TOML: https://toml.io/en/
+.. _Voxels: https://en.wikipedia.org/wiki/Voxel
 .. _WikipediaPCG: https://en.wikipedia.org/wiki/Permuted_congruential_generator
 .. _YAML: https://yaml.org/
