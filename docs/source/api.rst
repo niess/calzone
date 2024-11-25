@@ -4,30 +4,30 @@ Python interface
 
 .. autofunction:: calzone.define
 
-   The material(s) *definition* can be provided directly as a Python
-   :python:`dict` object, or loaded from a *definition* file (in `Gate DB
-   <OpenGate_>`_, `JSON`_, `TOML`_ or `YAML`_ format). For instance, the
-   following defines materials from a `TOML`_ file.
+   The *materials* and *meshes* definitions can be provided directly as a Python
+   :python:`dict` object, or loaded from a file (in `Gate DB <OpenGate_>`_,
+   `JSON`_, `TOML`_ or `YAML`_ format). For instance, the following defines
+   materials from a `TOML`_ file.
 
-   >>> calzone.define("materials.toml")
+   >>> calzone.define(materials="materials.toml")
 
-   See the :ref:`Materials definition <geometry:Materials definition>` section
-   for further information.
+   See the :ref:`Materials <geometry:Materials definition>` and :ref:`Meshes
+   <geometry:Meshes definition>` definition sections for further information.
 
    .. important::
 
-      Materials are uniquely identified by their name. However, once loaded to
-      Geant4, a material cannot be unloaded, nor modified. If a different
-      definition is provided for an existing (already loaded) material, then a
+      Materials and meshes are uniquely identified by their name. However, once
+      loaded they cannot be unloaded, nor modified. If a different definition is
+      provided for an existing (already loaded) material or mesh, then a
       :external:py:class:`ValueError` is raised.
 
 .. autofunction:: calzone.describe
 
-   Returns a :external:py:class:`namespace <types.SimpleNamespace>` object
-   containing the material properties, or :python:`None` if the material is
-   undefined. For example
+   A :external:py:class:`namespace <types.SimpleNamespace>` object is returned
+   containing the material or the mesh properties, or :python:`None` if the
+   material or the mesh is undefined. For example
 
-   >>> calzone.describe("G4_AIR").composition
+   >>> calzone.describe(material="G4_AIR").composition
 
 ----
 

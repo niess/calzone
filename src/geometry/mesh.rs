@@ -4,16 +4,21 @@ use bvh::bvh::{Bvh, BvhNode};
 use bvh::ray::Ray;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::{MemoryError, ValueError};
+use crate::utils::extract::{Extractor, Tag, TryFromBound};
 use crate::utils::float::f64x3;
-use crate::utils::io::load_stl;
+use crate::utils::namespace::Namespace;
+use crate::utils::io::{DictLike, load_stl};
+use enum_variants_strings::EnumVariantsStrings;
+use indexmap::IndexMap;
 use nalgebra::{Point3, Vector3};
 use ordered_float::OrderedFloat;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
-use super::{ffi, map::Map};
+use super::{ffi, map::Map, volume::MeshShape};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock, RwLock};
+use super::Algorithm;
 
 
 // ===============================================================================================
@@ -652,4 +657,120 @@ fn ray_intersects_aabb(ray: &Ray<f64, 3>, aabb: &Aabb<f64, 3>) -> bool {
     let tmax = sup.min();
 
     tmax >= tmin
+}
+
+
+// ===============================================================================================
+//
+// Named meshes.
+//
+// ===============================================================================================
+
+static NAMED_MESHES: LazyLock<RwLock<HashMap<String, MeshShape>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub struct NamedMesh;
+
+impl NamedMesh {
+    fn check(name: &str) -> Result<(), &'static str> {
+        for c in name.chars() {
+            if !c.is_alphanumeric() {
+                return Err("expected an alphanumeric string");
+            }
+        }
+        match name.chars().next() {
+            None => {
+                return Err("empty string");
+            },
+            Some(c) => if !c.is_uppercase() {
+                return Err("should be capitalised");
+            },
+        }
+        Ok(())
+    }
+
+    pub fn define(name: String, shape: MeshShape) -> Result<(), String> {
+        if let Some(other) = NAMED_MESHES.read().unwrap().get(&name) {
+            if (other.definition != shape.definition) || (other.algorithm != shape.algorithm) {
+                let msg = format!("redefinition of '{}'", name);
+                return Err(msg)
+            } else {
+                return Ok(())
+            }
+        }
+
+        NAMED_MESHES.write().unwrap().insert(name, shape);
+        Ok(())
+    }
+
+    pub fn describe(name: &str) -> Option<MeshShape> {
+        NAMED_MESHES
+            .read()
+            .unwrap()
+            .get(name)
+            .map(|shape| shape.clone())
+    }
+}
+
+impl TryFromBound for NamedMesh {
+    fn try_from_dict<'py>(tag: &Tag, value: &DictLike<'py>) -> PyResult<Self> {
+        // Extract meshes.
+        const EXTRACTOR: Extractor<0> = Extractor::new([]);
+        let tag = tag.cast("meshes");
+        let mut meshes = IndexMap::<String, Bound<PyAny>>::new();
+        let [] = EXTRACTOR.extract(&tag, value, Some(&mut meshes))?;
+
+        for (name, properties) in meshes.iter() {
+            Self::check(name)
+                .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
+            let tag = tag.extend(name, Some("mesh"), None);
+            let shape = MeshShape::try_from_any(&tag, properties)?;
+            Self::define(name.to_string(), shape)
+                .map_err(|why| tag.bad().why(why.to_string()).to_err(ValueError))?;
+        }
+
+        Ok(Self)
+    }
+}
+
+impl ToPyObject for MeshShape {
+    fn to_object(&self, py: Python) -> PyObject {
+        let mut references = 0;
+        if self.algorithm.map(|algorithm| algorithm == Algorithm::Bvh).unwrap_or(true) {
+            if let Some(mesh) = MESHES.read().unwrap().get(&self.definition) {
+                references += Arc::strong_count(&mesh.facets) - 1;
+            }
+        }
+        if self.algorithm.map(|algorithm| algorithm == Algorithm::Voxels).unwrap_or(true) {
+            if let Some(solid) = TESSELLATED_SOLIDS.read().unwrap().get(&self.definition) {
+                references += Arc::strong_count(&solid.solid) - 1;
+            }
+        }
+        let references = references.to_object(py);
+
+        let algorithm = self.algorithm
+            .map(|algorithm| algorithm.to_str())
+            .to_object(py);
+
+        match &self.definition.map {
+            Some(map) => Namespace::new(py, &[
+                ("path", self.definition.path.to_object(py)),
+                ("scale", self.definition.scale.to_object(py)),
+                ("padding", map.padding.map(|padding| padding.into_inner()).to_object(py)),
+                ("origin", map.origin.map(|origin| {
+                    let origin: [f64; 3] = std::array::from_fn(|i| origin[i].into_inner());
+                    origin
+                }).to_object(py)),
+                ("regular", map.regular.to_object(py)),
+                ("algorithm", algorithm),
+                ("references", references),
+            ]).unwrap().unbind(),
+            None => Namespace::new(py, &[
+                ("path", self.definition.path.to_object(py)),
+                ("scale", self.definition.scale.to_object(py)),
+                ("algorithm", algorithm),
+                ("references", references),
+            ]).unwrap().unbind(),
+        }
+    }
 }

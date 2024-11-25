@@ -31,10 +31,11 @@ To illustrate, a 1 |nbsp| cm\ :sup:`3` cubic box shape writes,
 
 .. topic:: Objects names
 
-   Proper names (i.e. designating specific volumes, materials, etc.) must be
-   capitalised and comprise solely alpha-numeric characters. Thus, proper names
-   are typically `CamelCased`. Conversely, common names (designating properties,
-   shape types, etc.) adhere to the `snake_case` syntax.
+   The objects proper names (i.e. designating specific volumes, materials, etc.)
+   must be capitalised and comprise solely alpha-numeric characters. Thus,
+   names are typically upper `CamelCased`. Conversely, common names
+   (designating properties, shape types, etc.) adhere to the `snake_case`
+   syntax.
 
 Substitution rules
 ------------------
@@ -99,9 +100,10 @@ A geometry definition starts with a root volume, for instance as follows,
    ..
 
 There can be only one root volume in a geometry. However, the geometry
-:external:py:class:`dict` might contain an additional :python:`"materials"` key,
-for describing the geometry materials. The corresponding structure is summarised
-below, in :numref:`tab-geometry-items`.
+:external:py:class:`dict` might contain the additional :python:`"materials"` and
+:python:`"meshes"` keys, for describing the geometry materials and specific
+triangle meshes. The corresponding structure is summarised below, in
+:numref:`tab-geometry-items`.
 
 .. _tab-geometry-items:
 
@@ -118,6 +120,9 @@ below, in :numref:`tab-geometry-items`.
      - 
    * - :python:`"materials"`
      - :python:`dict` (:numref:`tab-materials-items`)
+     - :python:`None`
+   * - :python:`"meshes"`
+     - :python:`dict` (:numref:`tab-meshes-items`)
      - :python:`None`
 
 .. _pathname:
@@ -192,6 +197,9 @@ see :ref:`geometry:Shape definition`.
    * - :python:`"materials"`
      - :python:`dict` (:numref:`tab-materials-items`)
      - :python:`None`
+   * - :python:`"meshes"`
+     - :python:`dict` (:numref:`tab-meshes-items`)
+     - :python:`None`
 
 .. topic:: Positioning properties.
 
@@ -204,12 +212,13 @@ see :ref:`geometry:Shape definition`.
    The daughter volumes are included directly with the volume properties. They
    are identified by their `CamelCase` syntax.
 
-.. topic:: Materials definitions.
+.. topic:: Materials and meshes definitions.
 
-   Materials can be defined together with the volume properties, should this be
-   required. It should be noted, however, that materials exist on a global level
-   within `Geant4`_, regardless of their definition scope (see the `Materials
-   definition`_ section for further information).
+   Materials and meshes can be defined together with the volume properties,
+   should this be required. It should be noted, however, that they exist on a
+   global level, regardless of their definition scope (see the `Materials
+   <Materials definition_>`_ and `Meshes <Meshes definition_>`_ definition
+   sections for further information).
 
 
 Roles
@@ -368,9 +377,7 @@ The available shape types are described below. Calzone only exports a limited
 number of the `G4VSolids <G4VSolid_>`_ defined by `Geant4`_, namely the
 :ref:`box <geometry:Box shape>`, :ref:`cylinder <geometry:Cylinder shape>` and
 :ref:`sphere <geometry:Sphere shape>` shapes. For more complex use cases,
-:ref:`meshes <geometry:Mesh shape>` should be employed, for which Calzone has
-its own implementation.
-
+:ref:`meshes <geometry:Mesh shape>` should be employed.
 
 .. note::
 
@@ -472,6 +479,8 @@ Mesh shape
 
 A triangle mesh defined from a data file (*path* property) with the specified
 length *units*.
+
+.. _tab-mesh-items:
 
 .. list-table:: Mesh items.
    :width: 75%
@@ -592,6 +601,52 @@ A sphere (`G4Orb`_ or `G4Sphere`_), centred on the origin, and defined by its
    angular span of the spherical shape (in deg). By default, the sphere is
    closed, i.e. it spans the whole azimuth angle ([0, 360] deg), and the whole
    zenith angle ([0, 180] deg).
+
+
+Meshes definition
+-----------------
+
+Mesh shapes can be explicitly assigned a name, enabling cross-referencing. This
+is achieved by first defining a mesh name along with its attributes under the
+:python:`meshes` field (in accordance with :numref:`tab-meshes-items` below).
+Subsequently, the designated mesh name can be utilized as a shape value in
+volume definitions, in lieu of a dictionary description. For instance,
+
+.. code:: toml
+
+   [meshes]
+   Screw = { path = "/path/to/screw.stl", units = "mm" }
+
+   [LeftScrew]
+   material = "Steel"
+   mesh = "Screw"
+   position = [ -3.0, 0.0, 0.0]
+
+   [RightScrew]
+   material = "Steel"
+   mesh = "Screw"
+   position = [  3.0, 0.0, 0.0]
+
+
+.. _tab-meshes-items:
+
+.. list-table:: Meshes items.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Key
+     - Value type
+     - Default value
+   * - :python:`MeshName`
+     - :python:`dict` (:numref:`tab-mesh-items`)
+     - :python:`None`
+
+.. topic:: Meshes scope
+
+   Meshes are shared across all geometries, even when anonymous. Calzone takes
+   care of sharing mesh data, instead of duplicating them.
+
 
 Materials definition
 --------------------

@@ -5,6 +5,7 @@ use crate::utils::error::ErrorKind::{Exception, IndexError, NotImplementedError,
     ValueError};
 use crate::utils::float::f64x3;
 use crate::utils::io::DictLike;
+use crate::utils::namespace::Namespace;
 use crate::utils::numpy::{PyArray, PyArrayMethods};
 use cxx::SharedPtr;
 use enum_variants_strings::EnumVariantsStrings;
@@ -434,13 +435,14 @@ struct GeometryDefinition {
 
 impl GeometryDefinition {
     pub fn new(definition: DictLike, file: Option<&Path>) -> PyResult<Self> {
-        const EXTRACTOR: Extractor<1> = Extractor::new([
+        const EXTRACTOR: Extractor<2> = Extractor::new([
             Property::optional_any("materials"),
+            Property::optional_any("meshes"),
         ]);
 
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
         let tag = Tag::new("geometry", "", file);
-        let [materials] = EXTRACTOR.extract(
+        let [materials, meshes] = EXTRACTOR.extract(
             &tag, &definition, Some(&mut remainder)
         )?;
 
@@ -451,6 +453,13 @@ impl GeometryDefinition {
             let err = Error::new(ValueError).what("geometry").why(&why);
             return Err(err.into());
         }
+
+        let meshes: Option<Bound<PyAny>> = meshes.into();
+        if let Some(meshes) = meshes {
+            let tag = Tag::new("", "", file.as_deref());
+            mesh::NamedMesh::try_from_any(&tag, &meshes)?;
+        }
+
         let (name, volume) = remainder.iter().next().unwrap();
         let tag = Tag::new("", name.as_str(), file.as_deref());
         let volume = volume::Volume::try_from_any(&tag, &volume)?;
@@ -937,4 +946,55 @@ impl SolidProperties {
             has_surface_generation: false,
         }
     }
+}
+
+
+// ===============================================================================================
+//
+// Define & describe interface.
+//
+// ===============================================================================================
+
+/// Define materials and meshes.
+#[pyfunction]
+#[pyo3(signature=(*, materials=None, meshes=None))]
+pub fn define(materials: Option<DictLike>, meshes: Option<DictLike>) -> PyResult<()> {
+    if let Some(materials) = materials {
+        let tag = Tag::new("", "materials", None);
+        let materials = MaterialsDefinition::try_from_dict(&tag, &materials)?;
+        materials.build()?;
+    }
+    if let Some(meshes) = meshes {
+        let tag = Tag::new("", "meshes", None);
+        mesh::NamedMesh::try_from_dict(&tag, &meshes)?;
+    }
+    Ok(())
+}
+
+/// Describe a material or a mesh.
+#[pyfunction]
+#[pyo3(signature=(*, material=None, mesh=None))]
+pub fn describe(py: Python, material: Option<&str>, mesh: Option<&str>) -> PyResult<PyObject> {
+    let material = material
+        .map(|material| ffi::describe_material(material).to_object(py));
+    let mesh = mesh
+        .map(|mesh| match mesh::NamedMesh::describe(mesh) {
+            Some(mesh) => mesh.to_object(py),
+            None => py.None(),
+        });
+
+    let result = match material {
+        Some(material) => match mesh {
+            Some(mesh) => Namespace::new(py, &[
+                ("material", material),
+                ("mesh", mesh),
+            ])?.unbind(),
+            None => material,
+        },
+        None => match mesh {
+            Some(mesh) => mesh,
+            None => py.None(),
+        }
+    };
+    Ok(result)
 }

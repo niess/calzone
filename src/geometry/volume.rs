@@ -1,4 +1,4 @@
-use crate::utils::error::ErrorKind::{IOError, NotImplementedError, ValueError};
+use crate::utils::error::ErrorKind::{KeyError, IOError, NotImplementedError, ValueError};
 use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::extract::{extract, Extractor, Vector, Padding, Property, PropertyValue, Tag,
                             TryFromBound};
@@ -15,7 +15,7 @@ use std::cmp::Ordering::{Equal, Greater};
 use std::ffi::OsStr;
 use std::path::Path;
 use super::{ffi, MaterialsDefinition};
-use super::mesh::{MapParameters, MeshDefinition, MeshHandle, TessellatedSolidHandle};
+use super::mesh::{MapParameters, MeshDefinition, MeshHandle, NamedMesh, TessellatedSolidHandle};
 
 
 // ===============================================================================================
@@ -49,16 +49,16 @@ pub enum Shape {
     Mesh(MeshShape),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct MeshShape {
-    definition: MeshDefinition,
-    algorithm: Option<Algorithm>,
+    pub definition: MeshDefinition,
+    pub algorithm: Option<Algorithm>,
     #[serde(skip)]
     applied: ffi::TSTAlgorithm,
 }
 
 
-#[derive(Clone, Copy, Default, EnumVariantsStrings, Deserialize, Serialize)]
+#[derive(Clone, Copy, Default, EnumVariantsStrings, Deserialize, Serialize, PartialEq, Eq)]
 #[enum_variants_strings_transform(transform="lower_case")]
 pub enum Algorithm {
     Bvh,
@@ -337,7 +337,7 @@ impl TryFromBound for Volume {
             .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
 
         // Extract base properties.
-        const EXTRACTOR: Extractor<8> = Extractor::new([
+        const EXTRACTOR: Extractor<9> = Extractor::new([
             Property::optional_str("material"),
             Property::optional_strs("role"),
             Property::optional_vec("position"),
@@ -345,14 +345,15 @@ impl TryFromBound for Volume {
             Property::optional_dict("disentangle"),
             Property::optional_strs("subtract"),
             Property::optional_any("materials"),
+            Property::optional_any("meshes"),
             Property::optional_any("include"),
         ]);
 
         let py = value.py();
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, role, position, rotation, disentangle, subtract, materials, include] =
-            EXTRACTOR.extract(&tag, value, Some(&mut remainder))?;
+        let [material, role, position, rotation, disentangle, subtract, materials, meshes,
+             include] = EXTRACTOR.extract(&tag, value, Some(&mut remainder))?;
 
         let name = tag.name().to_string();
         let material: Option<String> = material.into();
@@ -365,6 +366,12 @@ impl TryFromBound for Volume {
 
         // Use the default material, if not specified.
         let material = material.unwrap_or_else(|| DEFAULT_MATERIAL.to_string());
+
+        // Extract meshes.
+        let meshes: Option<Bound<PyAny>> = meshes.into();
+        if let Some(meshes) = meshes {
+            NamedMesh::try_from_any(&tag, &meshes)?;
+        }
 
         // Parse role(s).
         let (_, tag) = tag.resolve(value)?;
@@ -686,7 +693,20 @@ impl TryFromBound for MeshShape {
                 regular = reg.into();
                 path.into()
             },
-            Ok(path) => path,
+            Ok(path) => {
+                if !path.contains('.') {
+                    match NamedMesh::describe(&path) {
+                        Some(shape) => return Ok(shape),
+                        None => {
+                            let why = format!("undefined '{}'", path);
+                            let err = tag.bad().what("mesh").why(why)
+                                .to_err(KeyError);
+                            return Err(err)
+                        }
+                    }
+                }
+                path
+            },
         };
 
         let path = match tag.file() {
@@ -730,7 +750,11 @@ impl TryFromBound for MeshShape {
                 let map = MapParameters::new(padding, origin, regular);
                 Some(map)
             },
-            _ => return Err(PyNotImplementedError::new_err("")),
+            Some(extension) => {
+                let msg = format!("bad file format '{}'", extension);
+                return Err(PyNotImplementedError::new_err(msg))
+            },
+            None => return Err(PyNotImplementedError::new_err("missing file format")),
         };
         let path = path.canonicalize()
             .map_err(|msg| {

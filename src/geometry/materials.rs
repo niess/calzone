@@ -14,23 +14,6 @@ use std::collections::{HashMap, HashSet};
 pub mod gate;
 mod hash;
 
-/// Define Geant4 material(s).
-#[pyfunction]
-#[pyo3(signature=(definition, /))]
-pub fn define(definition: DictLike) -> PyResult<()> {
-    let tag = Tag::new("", "materials", None);
-    let materials = MaterialsDefinition::try_from_dict(&tag, &definition)?;
-    materials.build()?;
-    Ok(())
-}
-
-/// Describe a Geant4 material.
-#[pyfunction]
-#[pyo3(signature=(material, /))]
-pub fn describe(py: Python, material: &str) -> PyObject {
-    ffi::describe_material(material).to_object(py)
-}
-
 
 // ===============================================================================================
 //

@@ -12,10 +12,9 @@ mod utils;
 
 // XXX Add a logo.
 // XXX Add unit tests.
-// XXX Add examples (incuding FreeCAD script).
+// XXX Add examples (including FreeCAD script).
 // XXX Update Geant4 version.
 // XXX Binary dist for OSX (and Windows?).
-// XXX Add a meshes interface.
 
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
@@ -68,8 +67,8 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
 
     // Register function(s).
     module.add_function(wrap_pyfunction!(utils::data::download, module)?)?;
-    module.add_function(wrap_pyfunction!(geometry::materials::define, module)?)?;
-    module.add_function(wrap_pyfunction!(geometry::materials::describe, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::define, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::describe, module)?)?;
     module.add_function(wrap_pyfunction!(simulation::source::particles, module)?)?;
 
     // Register constant(s).
