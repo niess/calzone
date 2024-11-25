@@ -606,8 +606,9 @@ Python interface
 
    .. autoattribute:: sample_particles
 
-      Must be a :python:`bool`, or :python:`None`. If :python:`False` (the
-      default), then particles sampling is disabled at all volumes boundaries.
+      Must be a :python:`bool`, or :python:`None`. If :python:`False`, then
+      particles sampling is disabled at all volumes boundaries. By default,
+      particles sampling is enabled.
 
    .. autoattribute:: secondaries
 

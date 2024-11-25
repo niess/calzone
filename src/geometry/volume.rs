@@ -1,4 +1,4 @@
-use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
+use crate::utils::error::ErrorKind::{IOError, NotImplementedError, ValueError};
 use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::extract::{extract, Extractor, Vector, Padding, Property, PropertyValue, Tag,
                             TryFromBound};
@@ -732,7 +732,14 @@ impl TryFromBound for MeshShape {
             },
             _ => return Err(PyNotImplementedError::new_err("")),
         };
-        let path = path.canonicalize()?; // XXX Map the error.
+        let path = path.canonicalize()
+            .map_err(|msg| {
+                let why = format!("{}: {}", path.display(), msg);
+                tag.bad()
+                    .what("path")
+                    .why(why)
+                    .to_err(IOError)
+            })?;
 
         let definition = MeshDefinition::new(path, scale, map);
         let applied = ffi::TSTAlgorithm::default();

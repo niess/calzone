@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::create_exception;
 use pyo3::exceptions::{
-    PyException, PyFileNotFoundError, PyIndexError, PyKeyboardInterrupt, PyKeyError, PyMemoryError,
-    PyNotImplementedError, PyTypeError, PyValueError
+    PyException, PyFileNotFoundError, PyIndexError, PyIOError, PyKeyboardInterrupt, PyKeyError,
+    PyMemoryError, PyNotImplementedError, PyTypeError, PyValueError
 };
 use pyo3::ffi::PyErr_CheckSignals;
 use super::ffi;
@@ -34,6 +34,7 @@ pub enum ErrorKind {
     FileNotFoundError,
     Geant4Exception,
     IndexError,
+    IOError,
     KeyboardInterrupt,
     KeyError,
     MemoryError,
@@ -145,6 +146,7 @@ impl<'a> From<&Error<'a>> for PyErr {
             ErrorKind::FileNotFoundError => PyErr::new::<PyFileNotFoundError, _>(msg),
             ErrorKind::Geant4Exception => PyErr::new::<Geant4Exception, _>(msg),
             ErrorKind::IndexError => PyErr::new::<PyIndexError, _>(msg),
+            ErrorKind::IOError => PyErr::new::<PyIOError, _>(msg),
             ErrorKind::KeyboardInterrupt => PyErr::new::<PyKeyboardInterrupt, _>(msg),
             ErrorKind::KeyError => PyErr::new::<PyKeyError, _>(msg),
             ErrorKind::MemoryError => PyErr::new::<PyMemoryError, _>(msg),
@@ -186,6 +188,9 @@ impl ffi::Error {
             ffi::ErrorType::IndexError => {
                 Err(PyIndexError::new_err(self.message.clone()))
             },
+            ffi::ErrorType::IOError => {
+                Err(PyIOError::new_err(self.message.clone()))
+            },
             ffi::ErrorType::KeyboardInterrupt => {
                 Err(PyKeyboardInterrupt::new_err(Self::KEYBOARD_INTERUPT))
             },
@@ -205,6 +210,7 @@ impl ffi::Error {
             ffi::ErrorType::FileNotFoundError => Some(self.message.as_str()),
             ffi::ErrorType::Geant4Exception => Some(self.message.as_str()),
             ffi::ErrorType::IndexError => Some(self.message.as_str()),
+            ffi::ErrorType::IOError => Some(self.message.as_str()),
             ffi::ErrorType::KeyboardInterrupt => Some(Self::KEYBOARD_INTERUPT),
             ffi::ErrorType::MemoryError => Some(Self::MEMORY_ERROR),
             ffi::ErrorType::ValueError => Some(self.message.as_str()),

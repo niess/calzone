@@ -85,7 +85,7 @@ impl Simulation {
             .map(|random| Ok(random.clone().unbind()))
             .unwrap_or_else(|| Py::new(py, Random::new(None, None)?))?;
         let sample_deposits = sample_deposits.or_else(|| Some(SamplerMode::Brief));
-        let sample_particles = sample_particles.unwrap_or(false);
+        let sample_particles = sample_particles.unwrap_or(true);
         let secondaries = secondaries.unwrap_or(true);
         let tracking = tracking.unwrap_or(false);
         let simulation = Self {

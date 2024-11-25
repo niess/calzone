@@ -41,7 +41,7 @@ pub fn collect_meshes() {
 
 #[derive(Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct MeshDefinition {
-    path: PathBuf, // XXX this is fragile w.r.t. serialization.
+    path: PathBuf,
     scale: OrderedFloat<f64>,
     map: Option<MapParameters>,
 }

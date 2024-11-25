@@ -21,7 +21,7 @@ particles = simulation.particles() \
     .inside(source) \
     .generate(N)
 
-deposits = simulation.run(particles)
+result = simulation.run(particles)
 
 # =============================================================================
 #
@@ -29,7 +29,7 @@ deposits = simulation.run(particles)
 #
 # =============================================================================
 
-n = deposits[scintillator.path].size
+n = result.deposits[scintillator.path].size
 source_volume = source.volume()
 
 litre = 1E-03 # cm3 to litre

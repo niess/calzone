@@ -15,7 +15,7 @@ mod utils;
 // XXX Add examples (incuding FreeCAD script).
 // XXX Update Geant4 version.
 // XXX Binary dist for OSX (and Windows?).
-// XXX Sample particles (by default?, perf. impact?).
+// XXX Add a meshes interface.
 
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();

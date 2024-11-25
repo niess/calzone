@@ -21,7 +21,7 @@ below,
 
    simulation = calzone.Simulation("geometry.toml")
    particles = calzone.particles(10000, pid="e-", energy=0.5, position=(0,0,1))
-   deposits = simulation.run(particles)
+   deposits = simulation.run(particles).deposits
 
 Furthermore, Calzone features an :doc:`interactive display <display>` that
 enables users to navigate through the Monte Carlo geometry and to inspect Monte

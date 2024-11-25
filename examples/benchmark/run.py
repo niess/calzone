@@ -13,7 +13,6 @@ PREFIX = Path(__file__).parent
 simulation = calzone.Simulation(PREFIX / "geometry.toml")
 detector = simulation.geometry.find("Detector")
 detector.role = "catch_ingoing"
-simulation.sample_particles = True
 simulation.secondaries = False
 
 N = 1000000

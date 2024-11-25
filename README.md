@@ -17,7 +17,7 @@ import calzone
 
 simulation = calzone.Simulation("geometry.toml")
 particles = calzone.particles(10000, pid="e-", energy=0.5, position=(0,0,1))
-deposits = simulation.run(particles)
+deposits = simulation.run(particles).deposits
 ```
 
 
