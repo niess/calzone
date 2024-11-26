@@ -18,6 +18,7 @@ def test_Box():
 
     assert A.solid == "G4Box"
     assert_allclose(A.aabb(), [3 * [-HW], 3 * [HW]])
+    assert_allclose(A.surface_area, 6 * (2.0 * HW)**2)
     assert_allclose(A.origin(), numpy.zeros(3))
     r0 = { "position": numpy.zeros(3) }
     assert(A.side(r0) == 1)
@@ -155,3 +156,33 @@ def test_meshes():
     Stl = calzone.describe(mesh="Stl")
     assert(Stl.references == 2)
     assert(Stl.path == str((PREFIX / "assets/cube.stl").resolve()))
+
+
+def test_Sphere():
+    """Test the sphere shape."""
+
+    RADIUS = 1.0
+    data = { "A": { "sphere": RADIUS }}
+    geometry = calzone.Geometry(data)
+    A = geometry["A"]
+
+    assert A.solid == "G4Orb"
+    assert_allclose(A.aabb(), [3 * [-RADIUS], 3 * [RADIUS]])
+    assert_allclose(A.surface_area, 4 * numpy.pi * RADIUS**2)
+    assert_allclose(A.origin(), numpy.zeros(3))
+    r0 = { "position": numpy.zeros(3) }
+    assert(A.side(r0) == 1)
+    r0 = { "position": numpy.full(3, 2 * RADIUS) }
+    assert(A.side(r0) == -1)
+
+    THICKNESS = 0.1
+    data = { "A": { "sphere": { "radius": RADIUS, "thickness": THICKNESS }}}
+    geometry = calzone.Geometry(data)
+    A = geometry["A"]
+
+    assert A.solid == "G4Sphere"
+    assert_allclose(A.aabb(), [3 * [-RADIUS], 3 * [RADIUS]])
+    assert_allclose(
+        A.surface_area,
+        4 * numpy.pi * (RADIUS**2 + (RADIUS - THICKNESS)**2)
+    )

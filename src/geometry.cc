@@ -394,8 +394,8 @@ static G4VSolid * build_solids(
                         shape.zenith_section[0]) / 180.0) * CLHEP::pi;
                     solid = new Sphere(
                         std::string(pathname),
-                        shape.radius * CLHEP::cm,
                         rmin * CLHEP::cm,
+                        shape.radius * CLHEP::cm,
                         phi0,
                         dphi,
                         theta0,
