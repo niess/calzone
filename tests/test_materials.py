@@ -100,45 +100,45 @@ def dump(obj, path):
 def test_define():
     """Test defining materials from various sources (to Geant4)."""
 
-    calzone.define(MATERIALS)
+    calzone.define(materials=MATERIALS)
 
     path = dump(MATERIALS, "materials.json")
-    calzone.define(path)
+    calzone.define(materials=path)
 
     if toml is not None:
         path = dump(MATERIALS, "materials.toml")
-        calzone.define(path)
+        calzone.define(materials=path)
 
     if yaml is not None:
         path = dump(MATERIALS, "materials.yaml")
-        calzone.define(path)
+        calzone.define(materials=path)
 
 
 def test_describe():
     """Test materials description (from Geant4)."""
 
-    calzone.define(MATERIALS) # custom materials.
+    calzone.define(materials=MATERIALS) # custom materials.
 
     # Check materials base properties.
     for category in ("molecules", "mixtures"):
         for k, v in MATERIALS[category].items():
             for attr in ("density", "state"):
-                desc = calzone.describe(k)
+                desc = calzone.describe(material=k)
                 assert getattr(desc, attr) == v[attr]
 
     # Check molecules composition (defined by mole weight).
-    desc0 = calzone.describe("G4_WATER")
-    desc1 = calzone.describe("H2O")
-    desc2 = calzone.describe("Water")
+    desc0 = calzone.describe(material="G4_WATER")
+    desc1 = calzone.describe(material="H2O")
+    desc2 = calzone.describe(material="Water")
     assert desc0 == desc1
     assert desc0 == desc2
 
     # Check mixtures composition (defined by mass weight).
     for mixture, data in MATERIALS["mixtures"].items():
-        desc = calzone.describe(mixture)
+        desc = calzone.describe(material=mixture)
         composition = defaultdict(lambda: 0.0)
         for material, weight in data["composition"].items():
-            d = calzone.describe(material)
+            d = calzone.describe(material=material)
             for k, v in d.composition:
                 composition[k] += v * weight
 

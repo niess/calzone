@@ -14,6 +14,10 @@ def test_Box():
     assert A.solid == "G4Box"
     assert_allclose(A.aabb(), [3 * [-HW], 3 * [HW]])
     assert_allclose(A.origin(), numpy.zeros(3))
+    r0 = { "position": numpy.zeros(3) }
+    assert(A.side(r0) == 1)
+    r0 = { "position": numpy.full(3, 2 * HW) }
+    assert(A.side(r0) == -1)
 
     data["A"]["box"] = [2 * HW, 4 * HW, 6 * HW]
     expected = HW * numpy.arange(1.0, 4.0)
@@ -31,10 +35,10 @@ def test_Box():
     assert_allclose(A.aabb(), [-expected, expected])
 
 
-def test_cylinder():
+def test_Cylinder():
     """Test the cylinder shape."""
 
-    HW, RADIUS = 2.0, 1.0
+    HW, RADIUS, THICKNESS = 2.0, 1.0, 0.1
     data = { "A": { "cylinder": { "length": 2 * HW, "radius": RADIUS }}}
     geometry = calzone.Geometry(data)
     A = geometry["A"]
@@ -43,11 +47,19 @@ def test_cylinder():
     expected = numpy.array([RADIUS, RADIUS, HW])
     assert_allclose(A.aabb(), [-expected, expected])
     assert_allclose(A.origin(), numpy.zeros(3))
-    assert_allclose(A.surface_area, 2 * numpy.pi * RADIUS * (RADIUS + 2 * HW))
+    S0 = 2 * numpy.pi * RADIUS * (RADIUS + 2 * HW)
+    assert_allclose(A.surface_area, S0)
+    r0 = { "position": numpy.zeros(3) }
+    assert(A.side(r0) == 1)
 
-    data["A"]["cylinder"]["thickness"] = 0.1
+    data["A"]["cylinder"]["thickness"] = THICKNESS
     A = calzone.Geometry(data)["A"]
-    assert_allclose(A.surface_area, 2 * numpy.pi * RADIUS * (RADIUS + 2 * HW))
+    ri = RADIUS - THICKNESS
+    assert_allclose(
+        A.surface_area,
+        S0 + 2 * numpy.pi * ri * (2 * HW - ri)
+    )
+    assert(A.side(r0) == -1)
 
 
 def test_Envelope():
@@ -86,3 +98,9 @@ def test_Envelope():
     expected = [-(padding[::2] + HW), (padding[1::2] + HW)]
     A = calzone.Geometry(data)["A"]
     assert_allclose(A.aabb(), expected)
+
+
+def test_Mesh():
+    """Test the mesh shape."""
+
+    pass
