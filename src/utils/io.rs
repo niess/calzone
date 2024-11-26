@@ -1,4 +1,5 @@
 use crate::geometry::materials::gate::load_gate_db;
+use obj::{load_obj as parse_obj, Obj};
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyFileNotFoundError, PyNotImplementedError};
 use pyo3::sync::GILOnceCell;
@@ -6,7 +7,7 @@ use pyo3::types::{PyDict, PyString};
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::{BufReader, BufWriter, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
@@ -165,10 +166,25 @@ impl<'py> ToString for PathString<'py> {
 
 // ===============================================================================================
 //
-// Stl loaders & writers.
+// Generic mesh loader.
 //
 // ===============================================================================================
 
+pub fn load_mesh(path: &Path) -> Result<Vec<f32>, String> {
+    match path.extension().and_then(OsStr::to_str) {
+        Some("obj") => load_obj(path),
+        Some("stl") => load_stl(path),
+        Some(other) => Err(format!("{}: bad '{}' format", path.display(), other)),
+        None => Err(format!("{}: missing format", path.display())),
+    }
+}
+
+
+// ===============================================================================================
+//
+// Stl loaders & writers.
+//
+// ===============================================================================================
 
 pub fn dump_stl(facets: &[f32], path: &Path) -> PyResult<()> {
     let file = File::create(path)?;
@@ -191,7 +207,7 @@ pub fn dump_stl(facets: &[f32], path: &Path) -> PyResult<()> {
     Ok(())
 }
 
-pub fn load_stl(path: &Path) -> Result<Vec<f32>, String> {
+fn load_stl(path: &Path) -> Result<Vec<f32>, String> {
     let bad_format = || format!("{}: bad STL format)", path.display());
 
     let bytes = std::fs::read(path)
@@ -215,4 +231,28 @@ pub fn load_stl(path: &Path) -> Result<Vec<f32>, String> {
         }
     }
     Ok(values)
+}
+
+
+// ===============================================================================================
+//
+// Obj loader.
+//
+// ===============================================================================================
+
+fn load_obj(path: &Path) -> Result<Vec<f32>, String> {
+    let input = File::open(path)
+        .and_then(|file| Ok(BufReader::new(file)))
+        .map_err(|_| format!("could not read '{}'", path.display()))?;
+    let model: Obj = parse_obj(input)
+        .map_err(|msg| format!("{}: {}", msg, path.display()))?;
+
+    let mut data: Vec<f32> = Vec::with_capacity(3 * model.indices.len());
+    for index in model.indices {
+        let r = &model.vertices[index as usize].position;
+        for j in 0..3 {
+            data.push(r[j]);
+        }
+    }
+    Ok(data)
 }

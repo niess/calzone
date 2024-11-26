@@ -722,7 +722,7 @@ impl TryFromBound for MeshShape {
             },
         };
         let map = match path.extension().and_then(OsStr::to_str) {
-            Some("stl") => {
+            Some("obj") | Some("stl") => {
                 if padding.is_some() {
                     let err = tag.bad()
                         .what("padding")

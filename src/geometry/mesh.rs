@@ -7,7 +7,7 @@ use crate::utils::error::ErrorKind::{MemoryError, ValueError};
 use crate::utils::extract::{Extractor, Tag, TryFromBound};
 use crate::utils::float::f64x3;
 use crate::utils::namespace::Namespace;
-use crate::utils::io::{DictLike, load_stl};
+use crate::utils::io::{DictLike, load_mesh};
 use enum_variants_strings::EnumVariantsStrings;
 use indexmap::IndexMap;
 use nalgebra::{Point3, Vector3};
@@ -114,7 +114,7 @@ impl MeshDefinition {
                 let padding = params.padding.map(|padding| padding.into());
                 map.build_mesh(py, params.regular, origin, padding)?
             },
-            None => load_stl(self.path.as_path())
+            None => load_mesh(self.path.as_path())
                 .map_err(|msg| Error::new(ValueError).why(&msg).to_err())?,
         };
 

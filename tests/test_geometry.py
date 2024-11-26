@@ -1,6 +1,11 @@
 import calzone
+from pathlib import Path
+
 import numpy
 from numpy.testing import assert_allclose
+
+
+PREFIX = Path(__file__).parent
 
 
 def test_Box():
@@ -103,4 +108,50 @@ def test_Envelope():
 def test_Mesh():
     """Test the mesh shape."""
 
-    pass
+    data = { "A": { "mesh": str(PREFIX / "assets/cube.stl") } }
+    geometry = calzone.Geometry(data)
+    A = geometry["A"]
+    assert_allclose(A.surface_area, 6 * 4.0)
+    r0 = { "position": numpy.zeros(3) }
+    assert(A.side(r0) == 1)
+    r0 = { "position": numpy.full(3, 1.0) }
+    assert(A.side(r0) == 0)
+    r0 = { "position": numpy.full(3, 2.0) }
+    assert(A.side(r0) == -1)
+
+    data = { "A": { "mesh": {
+        "path": str(PREFIX / "assets/cube.stl"), "units": "m"
+    }}}
+    geometry = calzone.Geometry(data)
+    A = geometry["A"]
+    assert_allclose(A.surface_area, 6 * 4E+04)
+
+    data = { "A": { "mesh": str(PREFIX / "assets/cube.stl") } }
+    geometry = calzone.Geometry(data)
+    A = geometry["A"]
+    assert_allclose(A.surface_area, 6 * 4.0)
+
+
+def test_meshes():
+    """Test named meshes."""
+
+    data = {
+        "meshes": {
+            "Obj": str(PREFIX / "assets/cube.obj"),
+            "Stl": str(PREFIX / "assets/cube.stl"),
+        },
+        "A": {
+            "B": { "mesh": "Stl", "position": [+5.0, 0, 0] },
+            "C": { "mesh": "Stl", "position": [-5.0, 0, 0] },
+            "D": { "mesh": "Obj" },
+        }
+    }
+    geometry = calzone.Geometry(data)
+    geometry.check()
+
+    Obj = calzone.describe(mesh="Obj")
+    assert(Obj.references == 1)
+    assert(Obj.path == str((PREFIX / "assets/cube.obj").resolve()))
+    Stl = calzone.describe(mesh="Stl")
+    assert(Stl.references == 2)
+    assert(Stl.path == str((PREFIX / "assets/cube.stl").resolve()))

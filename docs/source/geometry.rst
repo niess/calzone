@@ -500,12 +500,13 @@ length *units*.
      - :python:`str`
      - :python:`"cm"`
 
-The actual shape depends on the data file format. If the file is a 3D `STL`_
-model, then the mesh is directly imported. Alternatively, the data can also be
-a surface described by a Digital Elevation Model (`DEM`_). In this case,
-elevation values are assumed to be along the z-axis, and the surface is closed
-by adding side and bottom faces. The additional properties described in
-:numref:`tab-topography-items` control the generated 3D shape.
+The actual shape depends on the data file format. If the file is a native 3D
+model (in `OBJ`_ or `STL`_ format), then the mesh is directly
+imported. Alternatively, the data can also be a surface described by a Digital
+Elevation Model (`DEM`_). In this case, elevation values are assumed to be along
+the z-axis, and the surface is closed by adding side and bottom faces. The
+additional properties described in :numref:`tab-topography-items` control the
+generated 3D shape.
 
 .. topic:: Algorithm
 
@@ -517,9 +518,9 @@ by adding side and bottom faces. The additional properties described in
    solution, though it requires more memory (which prevents using this method
    with large meshes).
 
-   If no *algorithm* is specified, :python:`"voxels"` is used for `STL`_ meshes
-   and :python:`"bvh"` for `DEMs <DEM_>`_. See also the :py:attr:`algorithm
-   <calzone.GeometryBuilder.algorithm>` attribute of the
+   If no *algorithm* is specified, :python:`"voxels"` is used for native 3D
+   meshes and :python:`"bvh"` for `DEMs <DEM_>`_. See also the
+   :py:attr:`algorithm <calzone.GeometryBuilder.algorithm>` attribute of the
    :py:class:`GeometryBuilder <calzone.GeometryBuilder>` class, which allows for
    the global override of the mesh traversal algorithm across the entire
    geometry.
@@ -904,6 +905,7 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. _Geant4: https://geant4.web.cern.ch/docs/
 .. _Examples: https://github.com/niess/calzone/tree/master/examples/
 .. _NIST: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html?highlight=nist#
+.. _OBJ: https://en.wikipedia.org/wiki/Wavefront_.obj_file
 .. _OpenGate: http://www.opengatecollaboration.org/
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _TOML: https://toml.io/en/
