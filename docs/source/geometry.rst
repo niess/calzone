@@ -359,6 +359,9 @@ sets the name of the included root volume.
    * - :python:`"path"`
      - :python:`str`
      - 
+   * - :python:`"name"`
+     - :python:`str`
+     - :python:`None`
    * - :python:`"position"`
      - :python:`[float; 3]`
      - :python:`numpy.zeros(3)`

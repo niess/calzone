@@ -92,8 +92,8 @@ Optional dependencies
 ---------------------
 
 Calzone might require some optional dependencies to be installed, depending on
-your desired format for encoding geometries, and on your Python version. These
-are listed in :numref:`tab-optional-dependencies` below.
+your desired format for encoding maps and geometries, and on your Python
+version. These are listed in :numref:`tab-optional-dependencies` below.
 
 .. _tab-optional-dependencies:
 
@@ -102,9 +102,15 @@ are listed in :numref:`tab-optional-dependencies` below.
    :widths: auto
    :header-rows: 1
 
-   * - Geometry format
+   * - Format
      - Python version
      - Required package
+   * - `GeoTIFF`_
+     - 3.7, or more
+     - `geotiff <PyGeotiff_>`_
+   * - `PNG`_
+     - 3.7, or more
+     - `Pillow`_
    * - `TOML`_
      - 3.10, or less
      - `tomli`_
@@ -121,8 +127,12 @@ are listed in :numref:`tab-optional-dependencies` below.
 
 .. _BevyEngine: https://bevyengine.org/
 .. _Geant4: https://geant4.web.cern.ch/docs/
+.. _GeoTIFF: https://en.wikipedia.org/wiki/GeoTIFF
+.. _PyGeotiff: https://github.com/KipCrossing/geotiff
 .. _GitHub: https://github.com/niess/calzone
 .. _GitHub-Display: https://github.com/niess/calzone-display
+.. _Pillow: https://python-pillow.org/
+.. _PNG: https://en.wikipedia.org/wiki/PNG
 .. _PyPI: https://pypi.org/project/calzone/
 .. _PyYAML: https://pypi.org/project/PyYAML/
 .. _Rust toolchain: https://www.rust-lang.org/tools/install

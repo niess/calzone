@@ -1,11 +1,31 @@
 import calzone
 from pathlib import Path
+from tempfile import TemporaryDirectory
+import xml.etree.ElementTree as ET
 
 import numpy
 from numpy.testing import assert_allclose
 
 
 PREFIX = Path(__file__).parent
+
+TMPDIR = TemporaryDirectory()
+
+
+def test_algorithm():
+    """Test meshes algorithm."""
+
+    data = {"A": {"mesh": { "path": str(PREFIX / "assets/cube.obj") }}}
+
+    A = calzone.Geometry(data)["A"]
+    assert(A.solid == "G4TessellatedSolid")
+
+    data["A"]["mesh"]["algorithm"] = "bvh"
+    A = calzone.Geometry(data)["A"]
+    assert(A.solid == "Mesh")
+
+    A = calzone.GeometryBuilder(data, algorithm="voxels").build()["A"]
+    assert(A.solid == "G4TessellatedSolid")
 
 
 def test_Box():
@@ -106,6 +126,79 @@ def test_Envelope():
     assert_allclose(A.aabb(), expected)
 
 
+def test_Geometry():
+    """Test the Geometry interface."""
+
+    data = {"A": {"B": {"box": 1.0}}}
+    geometry = calzone.Geometry(data)
+
+    assert geometry["A"] == geometry.root
+    assert isinstance(geometry["A"], calzone.Volume)
+    assert geometry.find("B").path == geometry["A.B"].path
+
+    geometry = geometry.export()
+    assert len(geometry.sectors) == 2
+
+
+def test_GeometryBuilder():
+    """Test the geometry builder."""
+
+    data = { "A": {
+        "box": 1.0,
+        "B": { "sphere": 1.0 },
+        "C": { "mesh": str(PREFIX / "assets/cube.obj") },
+    }}
+    geometry = calzone.GeometryBuilder(data)    \
+        .delete("A.B")                          \
+        .modify("A", material="G4_Al")          \
+        .place({"D": {"box": 0.5}}, mother="A") \
+        .move("A.C", "A.D.C")                   \
+        .build()
+
+    A = geometry["A"]
+    assert(A.daughters == ("A.D",))
+    assert(A.material == "G4_Al")
+
+    D = geometry["A.D"]
+    assert(D.daughters == ("A.D.C",))
+    assert(D.material == "G4_AIR")
+    assert(D.solid == "G4Box")
+
+
+def test_Map():
+    """Test the Map interface."""
+
+    z = numpy.full((2, 2), 1.0)
+    m = calzone.Map.from_array(z, (-1, 1), (-1, 1))
+
+    assert(m.crs == None)
+    assert(m.nx == 2)
+    assert(m.ny == 2)
+
+    path = Path(TMPDIR.name) / "cube.png"
+    m.dump(path)
+
+    m = calzone.Map(path)
+    assert(m.crs == None)
+    assert(m.nx == 2)
+    assert(m.ny == 2)
+    assert((m.z == numpy.ones((2, 2))).all())
+
+    data = {"A": {"mesh": {
+        "path": str(path),
+        "padding": 2.0,
+    }}}
+    A = calzone.Geometry(data)["A"]
+    assert_allclose(A.surface_area, 6 * 4.0)
+
+    path = Path(TMPDIR.name) / "cube.stl"
+    m.dump(path, padding=2.0)
+
+    data["A"]["mesh"] = str(path)
+    A = calzone.Geometry(data)["A"]
+    assert_allclose(A.surface_area, 6 * 4.0)
+
+
 def test_Mesh():
     """Test the mesh shape."""
 
@@ -186,3 +279,43 @@ def test_Sphere():
         A.surface_area,
         4 * numpy.pi * (RADIUS**2 + (RADIUS - THICKNESS)**2)
     )
+    assert_allclose(A.origin(), numpy.zeros(3))
+    r0 = { "position": numpy.zeros(3) }
+    assert(A.side(r0) == -1)
+    r0 = { "position": numpy.full(3, 2 * RADIUS) }
+    assert(A.side(r0) == -1)
+
+
+def test_Volume():
+    """Test the Volume interface."""
+
+    data = {"A": {
+        "material": "G4_Al",
+        "B": {"sphere": 1.0, "position": (0.0, 0.0, 1.0)}
+    }}
+    geometry = calzone.Geometry(data)
+
+    A = geometry["A"]
+    assert A.daughters == ("A.B",)
+    assert A.mother == None
+    assert A.solid == "G4Box"
+    assert A.role == None
+    assert A.name == "A"
+    assert A.path == "A"
+    assert (A.origin() == numpy.zeros(3)).all()
+    coordinates =  { "position": numpy.array((0.0, 0.0, 1.0)) }
+    assert A.side(coordinates) == -1
+    assert A.side(coordinates, include_daughters=True) == 1
+
+    path = Path(TMPDIR.name) / "A.gdml"
+    A.dump(path)
+    assert ET.parse(path).getroot() is not None
+
+    B = geometry["A.B"]
+    assert B.daughters == tuple()
+    assert B.mother == "A"
+    assert B.solid == "G4Orb"
+    assert B.role == None
+    assert B.name == "B"
+    assert B.path == "A.B"
+    assert (B.origin("A") == (0, 0, 1)).all()

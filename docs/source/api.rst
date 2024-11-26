@@ -106,10 +106,14 @@ Python interface
       provided (as returned by the :py:meth:`Simulation.run` method), this
       information will be superimposed on the geometry display.
 
-   .. automethod:: export()
+   .. method:: export()
 
       Export the Geant4 geometry as a `goupil.ExternalGeometry
       <ExternalGeometry_>`_.
+
+      .. note::
+
+         This methods requires the `goupil`_ module to be installed.
 
    .. automethod:: find
 
@@ -754,6 +758,7 @@ Python interface
 .. _G4VPhysicalVolume: https://geant4.kek.jp/Reference/11.2.0/classG4VPhysicalVolume.html
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
 .. _Geotiff: https://github.com/KipCrossing/geotiff
+.. _Goupil: https://goupil.readthedocs.io/en/latest/
 .. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
 .. _OpenGate: http://www.opengatecollaboration.org/
 .. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf

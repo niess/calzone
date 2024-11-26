@@ -103,7 +103,7 @@ impl Map {
 
         let z = py.import_bound("numpy")
             .and_then(|m| m.getattr("asarray"))
-            .and_then(|f| f.call1((z, "f32")))?;
+            .and_then(|f| f.call1((z, "f4")))?;
 
         let map = Self {
             nx,
@@ -144,7 +144,7 @@ impl Map {
                 if let Some(kwargs) = kwargs {
                     const EXTRACTOR: Extractor<3> = Extractor::new([
                         Property::optional_vec("origin"),
-                        Property::optional_f64("extra_depth"),
+                        Property::optional_f64("padding"),
                         Property::optional_bool("regular"),
                     ]);
                     let tag = Tag::new("dump", "", None);
@@ -644,9 +644,8 @@ impl Map {
             zmin,
             zmax,
         );
-        let info = py.import_bound("PIL")?
-            .getattr("PngImagePlugin")
-            .and_then(|m| m.getattr("PngInfo"))
+        let info = py.import_bound("PIL.PngImagePlugin")?
+            .getattr("PngInfo")
             .and_then(|c| c.call0())?;
         info.call_method1("add_text", ("Comment", meta))?;
 
