@@ -454,7 +454,7 @@ Python interface
 
 .. autoclass:: calzone.Physics
 
-   .. method:: __new__(default_cut=None, em_model=None, had_model=None)
+   .. method:: __new__(em_model=None, *, default_cut=None, had_model=None)
 
       Create a new set of Geant4 physics settings.
 

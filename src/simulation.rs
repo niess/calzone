@@ -5,7 +5,7 @@ use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::namespace::Namespace;
 use crate::utils::numpy::{PyArray, PyArrayMethods};
-use crate::utils::io::{DictLike, PathString};
+use crate::utils::io::DictLike;
 use cxx::SharedPtr;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
@@ -162,8 +162,8 @@ impl Simulation {
 enum GeometryArg<'py> {
     #[pyo3(transparent, annotation = "Geometry")]
     Geometry(Bound<'py, Geometry>),
-    #[pyo3(transparent, annotation = "str")]
-    String(PathString<'py>),
+    #[pyo3(transparent, annotation = "dict|str")]
+    Data(DictLike<'py>),
 }
 
 impl<'py> TryFrom<GeometryArg<'py>> for Py<Geometry> {
@@ -172,10 +172,9 @@ impl<'py> TryFrom<GeometryArg<'py>> for Py<Geometry> {
     fn try_from(value: GeometryArg<'py>) -> Result<Py<Geometry>, Self::Error> {
         match value {
             GeometryArg::Geometry(geometry) => Ok(geometry.unbind()),
-            GeometryArg::String(path) => {
-                let py = path.0.py();
-                let path = DictLike::String(path);
-                let geometry = Geometry::new(path)?;
+            GeometryArg::Data(data) => {
+                let py = data.py();
+                let geometry = Geometry::new(data)?;
                 Py::new(py, geometry)
             },
         }

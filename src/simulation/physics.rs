@@ -31,10 +31,11 @@ impl Physics {
 #[pymethods]
 impl Physics {
     #[new]
+    #[pyo3(signature=(em_model=None, *, default_cut=None, had_model=None))]
     pub fn new(
         em_model: Option<&str>,
+        default_cut: Option<f64>,
         had_model: Option<&str>,
-        default_cut: Option<f64>
     ) -> PyResult<Self> {
         let mut physics = Self (ffi::Physics::default());
         if let Some(em_model) = em_model {
