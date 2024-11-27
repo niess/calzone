@@ -11,7 +11,6 @@ mod utils;
 
 
 // XXX Add a logo.
-// XXX Add unit tests.
 // XXX Add examples (including FreeCAD script).
 // XXX Update Geant4 version.
 // XXX Binary dist for OSX (and Windows?).

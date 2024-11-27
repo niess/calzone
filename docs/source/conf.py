@@ -8,6 +8,7 @@ highlight_language = "python3"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosectionlabel",
+    "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
 ]
 

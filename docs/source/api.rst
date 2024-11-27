@@ -27,7 +27,8 @@ Python interface
    containing the material or the mesh properties, or :python:`None` if the
    material or the mesh is undefined. For example
 
-   >>> calzone.describe(material="G4_AIR").composition
+   >>> calzone.describe(material="G4_AIR")    # doctest: +ELLIPSIS
+   namespace(density=0.0012047899999999999, state='gas', composition=[...])
 
 ----
 
@@ -161,6 +162,7 @@ Python interface
       volume nested inside the root :python:`"Environment"` one.
 
       >>> builder.delete("Environment.Detector")
+      <calzone.GeometryBuilder object at ...>
 
    .. automethod:: modify
 
@@ -171,6 +173,7 @@ Python interface
       :python:`"Environment"` volume.
 
       >>> builder.modify("Environment", shape={"box": 1.0})
+      <calzone.GeometryBuilder object at ...>
 
    .. automethod:: move
 
@@ -178,7 +181,8 @@ Python interface
       :ref:`pathnames <pathname>`. For instance, the following renames the
       :python:`"Detector"` volume,
 
-      >>> builder.move("Environment.Detector", "Environment.Scintillator")
+      >>> builder.move("Environment.Terrain", "Environment.Ground")
+      <calzone.GeometryBuilder object at ...>
 
       .. note:: the root volume cannot be moved, nor replaced, with this method.
 
@@ -221,7 +225,7 @@ Python interface
       file (in TIFF, or PNG format). For instance, the following loads
       topography data from a GeoTIFF file,
 
-      >>> topography = calzone.Map("topography.tif")
+      >>> topography = calzone.Map("topography.tif") # doctest: +SKIP
 
    .. automethod:: dump
 
@@ -230,6 +234,13 @@ Python interface
       *kwargs* can be provided in order to customise the 3D shape (see
       :numref:`tab-topography-items`). For instance, the following exports the
       map as a PNG image (including topography metadata).
+
+      .. doctest::
+         :hide:
+
+         >>> z = numpy.zeros((2, 2))
+         >>> x0, x1, y0, y1 = -1, 1, -1, 1
+         >>> topography = calzone.Map.from_array(z, [x0, x1], [y0, y1])
 
       >>> topography.dump("topography.png")
 
@@ -358,6 +369,13 @@ Python interface
    with a power-law energy distribution (between 10 |nbsp| keV and 10 |nbsp|
    MeV).
 
+   .. doctest::
+      :hide:
+
+      >>> simulation = calzone.Simulation("geometry.toml")
+      >>> generator = simulation.particles()
+      >>> N = 1
+
    >>> particles = simulation.particles()      \
    ...     .on(volume, direction="ingoing")    \
    ...     .powerlaw(1E-02, 1E+01)             \
@@ -381,6 +399,7 @@ Python interface
       direction as upgoing along the (Oz) axis.
 
       >>> generator.direction([0, 0, 1])
+      <calzone.ParticlesGenerator object at ...>
 
    .. automethod:: energy
 
@@ -388,6 +407,7 @@ Python interface
       particles to 1 |nbsp| MeV.
 
       >>> generator.energy(1)
+      <calzone.ParticlesGenerator object at ...>
 
    .. automethod:: generate
 
@@ -422,6 +442,7 @@ Python interface
       position 1 |nbsp| m above the origin.
 
       >>> generator.position([0, 0, 1E+02])
+      <calzone.ParticlesGenerator object at ...>
 
    .. automethod:: powerlaw
 
@@ -449,6 +470,7 @@ Python interface
       ...     (0.5, 1), # First line, at 0.5 MeV.
       ...     (1.0, 1), # Second line, at 1.0 MeV.
       ... ])
+      <calzone.ParticlesGenerator object at ...>
 
 ----
 
