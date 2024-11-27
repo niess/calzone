@@ -394,15 +394,16 @@ impl ParticlesSampler {
         &mut self,
         volume: *const ffi::G4VPhysicalVolume,
         event: usize,
+        tid: i32,
         particle: ffi::Particle,
         weight: f64,
         random_index: &[u64; 2],
     ) {
         self.samples.entry(volume)
-            .and_modify(|e| e.push(event, particle, weight, random_index))
+            .and_modify(|e| e.push(event, tid, particle, weight, random_index))
             .or_insert_with(|| {
                 let mut cell = ParticlesCell::new();
-                cell.push(event, particle, weight, random_index);
+                cell.push(event, tid, particle, weight, random_index);
                 cell
             });
     }
@@ -430,9 +431,16 @@ impl ParticlesCell {
         Ok(samples)
     }
 
-    fn push(&mut self, event: usize, state: ffi::Particle, weight: f64, random_index: &[u64; 2]) {
+    fn push(
+        &mut self,
+        event: usize,
+        tid: i32,
+        state: ffi::Particle,
+        weight: f64,
+        random_index: &[u64; 2]
+    ) {
         let random_index = *random_index;
-        let sample = ffi::SampledParticle { event, state, weight, random_index };
+        let sample = ffi::SampledParticle { event, tid, state, weight, random_index };
         self.samples.push(sample);
     }
 }

@@ -176,6 +176,7 @@ pub fn initialise(py: Python) -> PyResult<()> {
             ("direction", "3f8"),
             ("weight", "f8"),
             ("random_index", "2u8"),
+            ("tid", "i4"),
         ];
         dtype
             .call1((arg, true))?

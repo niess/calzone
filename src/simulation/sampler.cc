@@ -43,11 +43,12 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
         auto && action = this->roles.outgoing;
         if ((action == Action::Catch) ||
             (action == Action::Record)) {
-            auto && point = step->GetPostStepPoint();
-            auto && volume = point->GetPhysicalVolume();
+            auto && volume = step->GetPreStepPoint()->GetPhysicalVolume();
+            auto && tid = track->GetTrackID();
             auto && pid = track
                 ->GetParticleDefinition()
                 ->GetPDGEncoding();
+            auto && point = step->GetPostStepPoint();
             auto && r = point->GetPosition() / CLHEP::cm;
             auto && u = point->GetMomentumDirection();
             Particle particle = {
@@ -56,7 +57,7 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
                 { r.x(), r.y(), r.z() },
                 { u.x(), u.y(), u.z() },
             };
-            RUN_AGENT->push_particle(volume, std::move(particle));
+            RUN_AGENT->push_particle(volume, tid, std::move(particle));
         }
         if ((action == Action::Catch) ||
             (action == Action::Kill)) {

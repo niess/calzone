@@ -32,6 +32,7 @@ pub struct Random {
 #[pymethods]
 impl Random {
     #[new]
+    #[pyo3(signature=(seed=None, *, index=None))]
     pub fn new(seed: Option<u128>, index: Option<Index>) -> PyResult<Self> {
         let rng = Pcg64Mcg::new(0xCAFEF00DD15EA5E5);
         let mut random = Self { rng, seed: 0, index: 0 };

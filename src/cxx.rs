@@ -266,6 +266,7 @@ pub mod ffi {
         state: Particle,
         weight: f64,
         random_index: [u64; 2],
+        tid: i32,
     }
 
     // ===========================================================================================
@@ -506,6 +507,7 @@ pub mod ffi {
         unsafe fn push_particle(
             self: &mut RunAgent,
             volume: *const G4VPhysicalVolume,
+            tid: i32,
             mut particle: Particle,
         );
         fn push_track(self: &mut RunAgent, mut track: Track);

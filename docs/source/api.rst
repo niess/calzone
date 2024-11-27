@@ -510,7 +510,7 @@ Python interface
       `Mcg128Xsl64`_), which has excellent performances for Monte Carlo
       applications.
 
-   .. method:: __new__(seed=None)
+   .. method:: __new__(seed=None, *, index=None)
 
       Create a new pseudo-random stream.
 
@@ -557,7 +557,7 @@ Python interface
       attributes, described below. For instance, the following creates a new
       simulation interface with :py:attr:`tracking` enabled.
 
-      >>> Simulation = calzone.simulation("geometry.toml", tracking=True)
+      >>> Simulation = calzone.Simulation("geometry.toml", tracking=True)
 
    .. automethod:: particles
 

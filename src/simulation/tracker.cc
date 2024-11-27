@@ -141,6 +141,7 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
             );
             if (sensitive != nullptr) {
                 auto && track = step->GetTrack();
+                auto && tid = track->GetTrackID();
                 auto && action = sensitive->roles.ingoing;
                 if ((action == Action::Catch) ||
                     (action == Action::Record)) {
@@ -155,7 +156,7 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
                         { r.x(), r.y(), r.z() },
                         { u.x(), u.y(), u.z() },
                     };
-                    RUN_AGENT->push_particle(volume, std::move(particle));
+                    RUN_AGENT->push_particle(volume, tid, std::move(particle));
                 }
                 if ((action == Action::Catch) ||
                     (action == Action::Kill)) {

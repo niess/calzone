@@ -430,6 +430,7 @@ impl ParticlesGenerator {
         // Loop over events.
         for (event, primary) in particles.iter_mut().enumerate() {
             primary.event = event;
+            primary.tid = 1;
             primary.random_index = random.index();
             let particle = &mut primary.state;
 

@@ -415,10 +415,11 @@ impl<'a> RunAgent<'a> {
     pub fn push_particle(
         &mut self,
         volume: *const ffi::G4VPhysicalVolume,
+        tid: i32,
         particle: ffi::Particle,
     ) {
         if let Some(particles) = self.particles.as_mut() {
-            particles.push(volume, self.index - 1, particle, self.weight, &self.random_index)
+            particles.push(volume, self.index - 1, tid, particle, self.weight, &self.random_index)
         }
     }
 
