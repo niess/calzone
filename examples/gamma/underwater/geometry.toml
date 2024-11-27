@@ -6,4 +6,4 @@ material = "G4_WATER"
 sphere = 1E+02
 material = "G4_WATER"
 
-Detector = "detector.toml"
+include = { name = "Detector", path = "detector.toml" }

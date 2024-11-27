@@ -1,11 +1,12 @@
+[Detector]
 cylinder = { length = 82.500, radius = 10.000 }
 material = "G4_POLYVINYLIDENE_FLUORIDE"
 
-[Inside]
+[Detector.Inside]
 cylinder = { length = 81.310, radius = 9.405 }
 material = "G4_AIR"
 
-[Inside.PMT]
+[Detector.Inside.PMT]
 cylinder = { length = 12.540, radius = 2.935 }
 position = [ 0.0, 0.0, -16.805 ]
 material = "PMTBulk"
@@ -15,17 +16,17 @@ density = 0.09
 state = "solid"
 composition = { O = 0.599, Si = 0.248, Na = 0.102, Ca = 0.051 }
 
-[Inside.Protection]
+[Detector.Inside.Protection]
 cylinder = { length = 5.485, radius = 2.935 }
 position = [ 0.0, 0.0, -25.8175 ]
 material = "G4_Al"
 
-[Inside.Protection.Reflector]
+[Detector.Inside.Protection.Reflector]
 cylinder = { length = 5.200, radius = 2.650 }
 position = [ 0.0, 0.0, 0.1425 ]
 material = "G4_ALUMINUM_OXIDE"
 
-[Inside.Protection.Reflector.Scintillator]
+[Detector.Inside.Protection.Reflector.Scintillator]
 cylinder = { length = 5.100, radius = 2.550 }
 position = [ 0.0, 0.0, 0.050 ]
 material = "G4_SODIUM_IODIDE"
