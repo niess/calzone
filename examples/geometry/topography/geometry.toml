@@ -1,0 +1,9 @@
+[Environment]
+envelope = { shape = "box", padding = [ 0, 0, 0, 0, 0, 1e5 ] }
+
+[Environment.Terrain]
+mesh = { path = "meshes/terrain.png", units = "m", padding = 100 }
+material = "SomeRock"
+
+[materials.molecules]
+SomeRock = { density = 2.0, state = "solid", composition = { Na = 1 }}
