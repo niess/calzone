@@ -84,14 +84,27 @@ static HashedMaterial get_hashed_material(const rust::String & name) {
         return MATERIALS.at(name);
     } catch (std::out_of_range & _) {}
 
-    // Fallback to NIST database.
-    auto nist = G4NistManager::Instance();
-    HashedMaterial hashed = {
-        nist->FindOrBuildMaterial(std::string(name)),
-        0x0
-    };
+    G4Material * material = nullptr;
+    if (name == "StandardRock") {
+        // Create StandardRock.
+        auto RockElement = new G4Element("StandardRock",
+            "StandardRock", 11., 22. *CLHEP::g / CLHEP::mole);
+        material = new G4Material("StandardRock",
+            2.65 * CLHEP::g/CLHEP::cm3, 2, kStateSolid);
+        // The rock element is added two times to ensure that the density effect
+        // is properly recomputed. Otherwise, depending on Geant4 version, this
+        // might not be the case for single element materials.
+        material->AddElement(RockElement, 1);
+        material->AddElement(RockElement, 1);
+        auto * parameters = material->GetIonisation();
+        parameters->SetMeanExcitationEnergy(136.4 * CLHEP::eV);
+    } else {
+        // Fallback to NIST database.
+        auto nist = G4NistManager::Instance();
+        material = nist->FindOrBuildMaterial(std::string(name));
+    }
 
-    return hashed;
+    return { material, 0x0 };
 }
 
 G4Material * get_material(const rust::String & name) {

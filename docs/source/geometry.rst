@@ -664,8 +664,9 @@ other materials.
 
    A collection of standard atomic elements and materials is readily available
    from the Geant4 `NIST`_ database. For example, :python:`"G4_WATER"`,
-   :python:`"G4_AIR"`, etc. Depending on your application, you may not need to
-   define your own materials.
+   :python:`"G4_AIR"`, etc. In addition, Calzone also predefines
+   :python:`"StandardRock"` (following the `PDG <StandardRock_>`_ ). Thus,
+   depending on your application, you may not need to define your own materials.
 
 .. tip::
 
@@ -910,6 +911,7 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. _NIST: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html?highlight=nist#
 .. _OBJ: https://en.wikipedia.org/wiki/Wavefront_.obj_file
 .. _OpenGate: http://www.opengatecollaboration.org/
+.. _StandardRock: https://pdg.lbl.gov/2024/AtomicNuclearProperties/HTML/standard_rock.html
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _TOML: https://toml.io/en/
 .. _Voxels: https://en.wikipedia.org/wiki/Voxel

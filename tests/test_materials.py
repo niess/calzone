@@ -144,3 +144,9 @@ def test_describe():
 
         for k, v in desc.composition:
             assert composition[k] == v
+
+    # Check standard rock.
+    desc = calzone.describe(material="StandardRock")
+    assert desc.density == 2.65
+    assert desc.state == "solid"
+    assert desc.composition == [("StandardRock", 1.0),]

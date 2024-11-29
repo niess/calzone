@@ -5,5 +5,5 @@ envelope = { shape = "box", padding = [ 0, 0, 0, 0, 0, 1e5 ] }
 mesh = { path = "meshes/terrain.png", units = "m", padding = 100 }
 material = "SomeRock"
 
-[materials.molecules]
-SomeRock = { density = 2.0, state = "solid", composition = { Na = 1 }}
+[materials.mixtures]
+SomeRock = { density = 2.0, state = "solid", composition = { StandardRock = 1 }}
