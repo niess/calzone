@@ -344,7 +344,6 @@ pub mod ffi {
 
         fn borrow_volume(self: &GeometryBorrow, name: &str) -> SharedPtr<VolumeBorrow>;
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
-        fn dump(self: &GeometryBorrow, path: &str) -> SharedPtr<Error>;
         fn find_volume(self: &GeometryBorrow, stem: &str) -> SharedPtr<VolumeBorrow>;
         fn set_goupil(self: &GeometryBorrow);
 
@@ -362,7 +361,6 @@ pub mod ffi {
         fn describe_tessellated_solid(self: &VolumeBorrow) -> &Box<TessellatedSolidHandle>;
         fn describe_transform(self: &VolumeBorrow) -> TransformInfo;
         fn describe_tubs(self: &VolumeBorrow) -> TubsInfo;
-        fn dump(self: &VolumeBorrow, path: &str) -> SharedPtr<Error>;
         fn eq(self: &VolumeBorrow, other: &VolumeBorrow) -> bool;
         fn generate_onto(
             self: &VolumeBorrow,

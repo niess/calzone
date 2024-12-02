@@ -136,8 +136,13 @@ def test_Geometry():
     assert isinstance(geometry["A"], calzone.Volume)
     assert geometry.find("B").path == geometry["A.B"].path
 
-    geometry = geometry.export()
-    assert len(geometry.sectors) == 2
+    try:
+        import goupil
+    except ImportError:
+        pass
+    else:
+        geometry = geometry.export()
+        assert len(geometry.sectors) == 2
 
 
 def test_GeometryBuilder():
@@ -306,10 +311,6 @@ def test_Volume():
     coordinates =  { "position": numpy.array((0.0, 0.0, 1.0)) }
     assert A.side(coordinates) == -1
     assert A.side(coordinates, include_daughters=True) == 1
-
-    path = Path(TMPDIR.name) / "A.gdml"
-    A.dump(path)
-    assert ET.parse(path).getroot() is not None
 
     B = geometry["A.B"]
     assert B.daughters == tuple()

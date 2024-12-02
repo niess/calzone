@@ -7,7 +7,6 @@
 // fmt library.
 #include <fmt/core.h>
 // Geant4 interface.
-#include "G4GDMLParser.hh"
 #include "G4NistManager.hh"
 #include "G4PVPlacement.hh"
 #include "G4SmartVoxelHeader.hh"
@@ -782,23 +781,6 @@ std::shared_ptr<Error> GeometryBorrow::check(int resolution) const {
     return get_error();
 }
 
-static std::shared_ptr<Error> dump_gdml(
-    rust::Str path,
-    const G4VPhysicalVolume * volume
-) {
-    clear_error();
-    G4GDMLParser parser;
-    auto buffer = std::cout.rdbuf();
-    std::cout.rdbuf(nullptr); // Disable cout temporarly.
-    parser.Write(std::string(path), volume);
-    std::cout.rdbuf(buffer);
-    return get_error();
-}
-
-std::shared_ptr<Error> GeometryBorrow::dump(rust::Str path) const {
-    return dump_gdml(path, this->data->world);
-}
-
 size_t GeometryBorrow::id() const {
     return this->data->id;
 }
@@ -1130,10 +1112,6 @@ TubsInfo VolumeBorrow::describe_tubs() const {
         displacement.y(),
         displacement.z()
     };
-}
-
-std::shared_ptr<Error> VolumeBorrow::dump(rust::Str path) const {
-    return dump_gdml(path, this->volume);
 }
 
 bool VolumeBorrow::eq(const VolumeBorrow & other) const {

@@ -45,7 +45,6 @@ struct GeometryBorrow {
 
     // Geant4 interface.
     std::shared_ptr<Error> check(int resolution) const;
-    std::shared_ptr<Error> dump(rust::Str) const;
     size_t id() const;
     G4VPhysicalVolume * world() const;
 
@@ -84,7 +83,6 @@ struct VolumeBorrow {
     const rust::Box<MeshHandle> & describe_mesh() const;
     TransformInfo describe_transform() const;
     TubsInfo describe_tubs() const;
-    std::shared_ptr<Error> dump(rust::Str) const;
     bool eq(const VolumeBorrow & other) const;
     std::array<double, 6> generate_onto(
         RandomContext &,

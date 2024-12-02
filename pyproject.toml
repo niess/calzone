@@ -36,7 +36,6 @@ target = "calzone.calzone"
 # Build options for Python wheels.
 [tool.cibuildwheel.linux]
 before-all = """
-yum install -y xerces-c-devel && \
 curl -sSf https://sh.rustup.rs -o rustup.sh && \
 sh rustup.sh -y && \
 curl -sSf -L https://github.com/niess/calzone/releases/download/geant4/geant4-11.2.2-manylinux2014-x86_64.tgz -o geant4.tgz && \

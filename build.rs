@@ -88,7 +88,6 @@ fn main() {
     }
 
     println!("cargo:rustc-link-search={}", geant4_lib.display());
-    println!("cargo:rustc-link-lib=G4gdml");
     println!("cargo:rustc-link-lib=G4physicslists");
 }
 

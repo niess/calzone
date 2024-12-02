@@ -7,7 +7,6 @@
 #include "simulation/source.h"
 #include "simulation/tracker.h"
 // Geant4 interface.
-#include "G4GDMLParser.hh"
 #include "G4RunManager.hh"
 #include "G4UImanager.hh"
 #include "Randomize.hh"

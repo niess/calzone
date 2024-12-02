@@ -8,7 +8,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 bvh = "0.9"
-convert_case = "0.6"
 cxx = "1.0"
 derive_more = "0.99"
 enum-variants-strings = "0.3"

@@ -688,14 +688,6 @@ Python interface
       provided (as returned by the :py:meth:`Simulation.run` method), this
       information will be superimposed on the geometry display.
 
-   .. method:: dump(path=None)
-
-      Dump the volume geometry to a `GDML`_ file.
-
-      If *path* is :python:`None`, then the geometry is dumped to
-      :python:`f"{self.name}.gdml"`. Note that contrary to Geant4, this method
-      erases any existing `GDML`_ file with the same name.
-
    .. automethod:: origin
 
       As previously (see the :py:meth:`aabb` method), the *frame* argument

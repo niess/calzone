@@ -1,10 +1,9 @@
-use convert_case::{Case, Casing};
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::{Exception, IndexError, NotImplementedError, TypeError,
     ValueError};
 use crate::utils::float::f64x3;
-use crate::utils::io::{DictLike, PathString};
+use crate::utils::io::DictLike;
 use crate::utils::namespace::Namespace;
 use crate::utils::numpy::{PyArray, PyArrayMethods};
 use cxx::SharedPtr;
@@ -17,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use super::cxx::ffi;
 use std::collections::HashMap;
 use std::path::Path;
-use temp_dir::TempDir;
 
 mod bytes;
 mod goupil;
@@ -659,26 +657,6 @@ impl Volume {
                 display_func.call1(args)?;
             },
         }
-        Ok(())
-    }
-
-    /// Dump the volume geometry to a GDML file.
-    fn dump(&self, path: Option<PathString>) -> PyResult<()> {
-        let tmp = TempDir::new()?;
-        let path = path
-            .map(|path| path.to_string())
-            .unwrap_or_else(|| {
-                let name = self.get_name().to_case(Case::Snake);
-                format!("{}.gdml", name)
-            });
-        let tmp_path = tmp
-            .child("volume.gdml")
-            .display()
-            .to_string();
-        self.volume
-            .dump(tmp_path.as_str())
-            .to_result()?;
-        std::fs::copy(&tmp_path, path)?;
         Ok(())
     }
 
