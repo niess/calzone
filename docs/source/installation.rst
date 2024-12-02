@@ -56,7 +56,7 @@ Calzone source is available from `GitHub`_, e.g. as
 
 .. code:: bash
 
-   git clone https://github.com/niess/calzone
+   git clone --recursive https://github.com/niess/calzone
 
 To build Calzone from source, you will require the `Rust toolchain`_ and have
 `Geant4`_ pre-installed with C++17 and GDML enabled, but with multithreading

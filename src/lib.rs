@@ -11,7 +11,6 @@ mod utils;
 
 
 // XXX Add a logo.
-// XXX Update Geant4 version.
 // XXX Binary dist for OSX (and Windows?).
 
 

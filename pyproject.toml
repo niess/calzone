@@ -39,7 +39,7 @@ before-all = """
 yum install -y xerces-c-devel && \
 curl -sSf https://sh.rustup.rs -o rustup.sh && \
 sh rustup.sh -y && \
-curl -sSf -L https://github.com/niess/calzone/releases/download/geant4/geant4-11.2.1-manylinux2014-x86_64.tgz -o geant4.tgz && \
+curl -sSf -L https://github.com/niess/calzone/releases/download/geant4/geant4-11.2.2-manylinux2014-x86_64.tgz -o geant4.tgz && \
 tar -xzf geant4.tgz\
 """
 repair-wheel-command = """
