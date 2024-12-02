@@ -10,10 +10,6 @@ mod simulation;
 mod utils;
 
 
-// XXX Add a logo.
-// XXX Binary dist for OSX (and Windows?).
-
-
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
 // Fetch the Geant4 version (exported by the build script).

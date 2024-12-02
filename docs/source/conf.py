@@ -41,7 +41,15 @@ rst_prolog = """
 """
 
 html_theme = "sphinx_book_theme"
+html_theme_options = {
+    "logo": {
+        "text": f"Calzone {release} documentation",
+        "image_light": "_static/images/logo.svg",
+        "image_dark": "_static/images/logo.svg",
+    }
+}
 html_static_path = ["_static"]
 html_css_files = [
     'css/custom.css',
 ]
+html_favicon = "_static/images/logo.svg"
