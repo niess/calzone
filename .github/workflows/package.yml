@@ -1,0 +1,73 @@
+name: Package
+on:
+  workflow_dispatch:
+    inputs:
+      sdist:
+        description: 'Build sdist'
+        required: true
+        type: boolean
+        default: true
+      wheel:
+        description: 'Build wheel'
+        required: true
+        type: boolean
+        default: true
+      upload:
+        description: 'Upload to PyPI'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  build_sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    if: ${{ inputs.sdist }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifact-sdist
+          path: dist/*.tar.gz
+
+  build_wheel:
+    name: Build wheel (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+    if: ${{ inputs.wheel }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build wheel
+        uses: pypa/cibuildwheel@v2.16
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifact-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+
+  upload:
+    name: Upload to PyPI
+    needs: [build_wheel, build_sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    if: ${{ inputs.upload }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
