@@ -444,7 +444,17 @@ impl GeometryDefinition {
             &tag, &definition, Some(&mut remainder)
         )?;
 
-        let (_, file) = definition.resolve(file)?;
+        let (_, new_file) = definition.resolve(file)?;
+        if let Some(ref new_file) = new_file {
+            if let Some(file) = file {
+                if new_file == file {
+                    let why = format!("recursion: '{}'", file.display());
+                    let err = Error::new(ValueError).what("geometry").why(&why);
+                    return Err(err.into());
+                }
+            }
+        }
+        let file = new_file;
 
         if remainder.len() != 1 {
             let why = format!("expected 1 root volume, found {}", remainder.len());
