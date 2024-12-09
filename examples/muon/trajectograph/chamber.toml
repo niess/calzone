@@ -1,0 +1,67 @@
+[Chamber]
+material = "G4_Al"
+box = [ 52.65, 36.0, 1.27 ]
+
+[Chamber.Inside]
+box = [ 51.45, 34.8, 1.21 ]
+material = "G4_AIR"
+
+[Chamber.Inside.Support]
+material = "ChamberGas"
+box = [ 51.00, 34.35, 0.12 ]
+position = [ 0.0, 0.0, 0.4095 ]
+
+[materials.molecules]
+C2H2F4 = { density = 0.00425, state = "gas" }
+C4H10 = { density = 0.00251, state = "gas" }
+SF6 = { density = 0.0067, state = "gas" }
+
+[materials.mixtures.ChamberGas]
+density = 4.13E-03
+state = "gas"
+composition = { C2H2F4 = 0.93, C4H10 = 0.05, SF6 = 0.02 }
+
+[Chamber.Inside.Chips]
+material = "G4_SILICON_DIOXIDE"
+box = [ 51.00, 34.35, 0.17 ]
+position = [ 0.0, 0.0, 0.2645 ]
+
+[Chamber.Inside.Pads]
+material = "G4_Cu"
+box = [ 51.00, 34.35, 0.0035 ]
+position = [ 0.0, 0.0, 0.17775 ]
+
+[Chamber.Inside.AnodeMylar]
+material = "G4_MYLAR"
+box = [ 51.00, 34.35, 0.0050 ]
+position = [ 0.0, 0.0, 0.1735 ]
+
+[Chamber.Inside.AnodeCoating]
+material = "G4_GRAPHITE"
+box = [ 51.00, 34.35, 0.0010 ]
+position = [ 0.0, 0.0, 0.1705 ]
+
+[Chamber.Inside.AnodeGlass]
+material = "G4_Pyrex_Glass"
+box = [ 51.00, 34.35, 0.11 ]
+position = [ 0.0, 0.0, 0.115 ]
+
+[Chamber.Inside.SensitiveGap]
+material = "ChamberGas"
+box = [ 49.9824, 33.3216, 0.12 ]
+role = "record_deposits"
+
+[Chamber.Inside.CathodeGlass]
+material = "G4_Pyrex_Glass"
+box = [ 51.00, 34.35, 0.11 ]
+position = [ 0.0, 0.0, -0.115 ]
+
+[Chamber.Inside.CathodeCoating]
+material = "G4_GRAPHITE"
+box = [ 51.00, 34.35, 0.0010 ]
+position = [ 0.0, 0.0, -0.1705 ]
+
+[Chamber.Inside.CathodeMylar]
+material = "G4_MYLAR"
+box = [ 51.00, 34.35, 0.0050 ]
+position = [ 0.0, 0.0, -0.1735 ]

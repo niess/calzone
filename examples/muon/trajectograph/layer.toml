@@ -1,0 +1,12 @@
+[Layer]
+material = "G4_AIR"
+envelope = "box"
+
+include = [
+    { name = "Chamber00", path = "chamber.toml", position = [ -26.325, -36.0, 0.0 ] },
+    { name = "Chamber01", path = "chamber.toml", position = [ -26.325,   0.0, 0.0 ] },
+    { name = "Chamber02", path = "chamber.toml", position = [ -26.325,  36.0, 0.0 ] },
+    { name = "Chamber10", path = "chamber.toml", position = [  26.325, -36.0, 0.0 ], rotation = [ 0.0, 0.0, 180.0 ] },
+    { name = "Chamber11", path = "chamber.toml", position = [  26.325,   0.0, 0.0 ], rotation = [ 0.0, 0.0, 180.0 ] },
+    { name = "Chamber12", path = "chamber.toml", position = [  26.325,  36.0, 0.0 ], rotation = [ 0.0, 0.0, 180.0 ] },
+]

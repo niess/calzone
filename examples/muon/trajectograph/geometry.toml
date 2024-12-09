@@ -1,0 +1,11 @@
+[Detector]
+include = [
+    { name = "Layer0", path = "layer.toml", position = [ 0.0, -90.0, 0.0 ], rotation = [ 90.0, 0.0, 0.0 ] },
+    { name = "Layer1", path = "layer.toml", position = [ 0.0, -30.0, 0.0 ], rotation = [ 90.0, 0.0, 0.0 ] },
+    { name = "Layer2", path = "layer.toml", position = [ 0.0,  30.0, 0.0 ], rotation = [ 90.0, 0.0, 0.0 ] },
+    { name = "Layer3", path = "layer.toml", position = [ 0.0,  90.0, 0.0 ], rotation = [ 90.0, 0.0, 0.0 ] },
+]
+
+[Detector.Scatterer]
+material = "G4_Pb"
+box = [ 120.0, 10.0, 130.0 ]

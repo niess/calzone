@@ -693,7 +693,7 @@ Python interface
       The provided *points* must be a 3d :external:py:class:`numpy.ndarray`. For
       instance,
 
-      >>> end = volume.local_coordinates(deposits.line["end"]) # doctest: +IGNORE
+      >>> end = volume.local_coordinates(deposits.line["end"]) # doctest: +SKIP
 
       returns the local coordinates of line deposits end-points.
 
