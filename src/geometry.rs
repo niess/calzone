@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::{Exception, IndexError, NotImplementedError, TypeError,
@@ -668,6 +670,49 @@ impl Volume {
             },
         }
         Ok(())
+    }
+
+    /// Compute point(s) local coordinates.
+    #[pyo3(signature=(points,/))]
+    fn local_coordinates<'py>(
+        &self,
+        py: Python,
+        points: &PyArray<f64>,
+    ) -> PyResult<PyObject> {
+        let shape = points.shape();
+        let dim = shape.last().unwrap_or(&0);
+        if dim != &3 {
+            let why = format!("expected a 3d-array, found a {}d-array", dim);
+            let err = Error::new(TypeError).what("points").why(&why);
+            return Err(err.to_err())
+        }
+
+        let transform = self.volume.compute_transform("");
+        let result = if shape.len() == 1 {
+            let point = [
+                points.get(0)?,
+                points.get(1)?,
+                points.get(2)?,
+            ];
+            let v = self.volume.local_coordinates(&point, &transform);
+            v.into_py(py)
+        } else {
+            let result = PyArray::<f64>::empty(py, &shape)?;
+            for i in 0..(result.size() / 3) {
+                let point = [
+                    points.get(3 * i + 0)?,
+                    points.get(3 * i + 1)?,
+                    points.get(3 * i + 2)?,
+                ];
+                let v = self.volume.local_coordinates(&point, &transform);
+                result.set(3 * i + 0, v[0])?;
+                result.set(3 * i + 1, v[1])?;
+                result.set(3 * i + 2, v[2])?;
+            }
+            result.into_any().unbind()
+        };
+
+        Ok(result)
     }
 
     /// Return the side of elements w.r.t. this volume.

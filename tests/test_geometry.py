@@ -320,3 +320,9 @@ def test_Volume():
     assert B.name == "B"
     assert B.path == "A.B"
     assert (B.origin("A") == (0, 0, 1)).all()
+
+    point = numpy.zeros(3)
+    assert_allclose(B.local_coordinates(point), [0.0, 0.0, -1.0])
+    points = numpy.zeros((4, 3))
+    expected = numpy.tile([0.0, 0.0, -1.0], 4).reshape(points.shape)
+    assert_allclose(B.local_coordinates(points), expected)

@@ -918,10 +918,10 @@ std::unique_ptr<G4AffineTransform> VolumeBorrow::compute_transform(
 
     while (!volumes.empty()) {
         current = volumes.back();
-        *transform *= G4AffineTransform(
+        *transform = G4AffineTransform(
             current->GetRotation(),
             current->GetTranslation()
-        );
+        ) * *transform;
         volumes.pop_back();
     }
 
@@ -1192,6 +1192,25 @@ EInside VolumeBorrow::inside(
         }
     }
     return EInside::kInside;
+}
+
+std::array<double, 3> VolumeBorrow::local_coordinates(
+    const std::array<double, 3> & point_,
+    const G4AffineTransform & transform
+) const {
+    G4ThreeVector point(
+        point_[0] * CLHEP::cm,
+        point_[1] * CLHEP::cm,
+        point_[2] * CLHEP::cm
+    );
+    if (transform.IsTranslated() || transform.IsRotated()) {
+        point = transform.InverseTransformPoint(point);
+    }
+    return {
+        point.x() / CLHEP::cm,
+        point.y() / CLHEP::cm,
+        point.z() / CLHEP::cm
+    };
 }
 
 

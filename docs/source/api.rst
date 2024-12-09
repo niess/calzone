@@ -688,11 +688,20 @@ Python interface
       provided (as returned by the :py:meth:`Simulation.run` method), this
       information will be superimposed on the geometry display.
 
+   .. automethod:: local_coordinates
+
+      The provided *points* must be a 3d :external:py:class:`numpy.ndarray`. For
+      instance,
+
+      >>> end = volume.local_coordinates(deposits.line["end"]) # doctest: +IGNORE
+
+      returns the local coordinates of line deposits end-points.
+
    .. automethod:: origin
 
-      As previously (see the :py:meth:`aabb` method), the *frame* argument
-      specifies the reference volume. Note that depending on the underlying
-      `G4VSolid`_, the origin might or might not be at the volume centre.
+      As for the :py:meth:`aabb` method, the *frame* argument specifies the
+      reference volume. Note that depending on the underlying `G4VSolid`_, the
+      origin might or might not be at the volume centre.
 
    .. automethod:: side
 

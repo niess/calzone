@@ -374,6 +374,11 @@ pub mod ffi {
             transform: &G4AffineTransform,
             include_daughters: bool
         ) -> EInside;
+        fn local_coordinates(
+            self: &VolumeBorrow,
+            point: &[f64; 3],
+            transform: &G4AffineTransform,
+        ) -> [f64; 3];
 
         fn clear_roles(self: &VolumeBorrow);
         fn get_roles(self: &VolumeBorrow) -> Roles;

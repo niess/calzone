@@ -94,6 +94,10 @@ struct VolumeBorrow {
         const G4AffineTransform &,
         bool
     ) const;
+    std::array<double, 3> local_coordinates(
+        const std::array<double, 3> &,
+        const G4AffineTransform &
+    ) const;
 
     // Roles interface.
     void clear_roles() const;
