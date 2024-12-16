@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/calzone/badge/?version=latest)](https://calzone.readthedocs.io/en/latest/?badge=latest)
+
 # Calzone
 (**CAL**orimeter **ZONE**)
 
@@ -21,12 +23,28 @@ deposits = simulation.run(particles).deposits
 ```
 
 
+## Installation
+
+Binary distributions of Calzone are available from [PyPI][PyPI], for Linux
+`x86_64`, e.g. as
+
+```bash
+pip3 install calzone
+```
+
+Alternatively, in order to build Calzone from the source, a working
+[Geant4][Geant4] installation is required. Please refer to the online
+[documentation][INSTALLATION] for further instructions.
+
+
 ## License
 The Calzone source is distributed under the **GNU LGPLv3** license. See the
 provided [LICENSE](LICENSE) and [COPYING.LESSER](COPYING.LESSER) files.
 
 
+[INSTALLATION]: https://calzone.readthedocs.io/en/latest/installation.html
 [JSON]: https://www.json.org/json-en.html
 [Geant4]: https://geant4.web.cern.ch/docs/
+[PyPI]: https://pypi.org/project/calzone/
 [TOML]: https://toml.io/en/
 [YAML]: https://yaml.org/

@@ -30,4 +30,5 @@ tar = "0.4"
 temp-dir = "0.1"
 
 [build-dependencies]
+indoc = "2"
 cxx-build = "1.0"

@@ -1,3 +1,4 @@
+use indoc::indoc;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,7 +11,14 @@ fn main() {
     let geant4_prefix = match command {
         Ok(output) => {
             let geant4_prefix = String::from_utf8(output.stdout)
-                .expect("could not parse Geant4 prefix")
+                .expect(indoc!("
+
+                    =============================================
+                    ==                                         ==
+                    ==    Could not parse **Geant4** prefix    ==
+                    ==                                         ==
+                    =============================================
+                "))
                 .trim()
                 .to_string();
             export_geant4_version("geant4-config");
@@ -19,7 +27,14 @@ fn main() {
         Err(_) => {
             let prefix = "geant4";
             if !Path::new(prefix).is_dir() {
-                panic!("could not locate Geant4");
+                panic!(indoc!("
+
+                    ====================================================
+                    ==                                                ==
+                    ==    Could not locate **Geant4** installation    ==
+                    ==                                                ==
+                    ====================================================
+                "));
             }
             let geant4_config = format!("{prefix}/bin/geant4-config");
             export_geant4_version(&geant4_config);
