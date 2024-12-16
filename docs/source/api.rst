@@ -214,16 +214,17 @@ Python interface
 
    This class manages a regular grid of topography elevation values, e.g. from a
    Digital Elevation Model (DEM). Data are exposed as a mutable
-   :external:py:class:`numpy.ndarray`, and can be exported as a 2D image (in PNG
-   format), or as a 3D model (in STL format).
+   :external:py:class:`numpy.ndarray`, and can be exported as a 2D image (in
+   `Turtle`_ / `PNG`_ [NBCM20]_ format), or as a 3D model (in `STL`_ format).
 
    .. method:: __new__(data)
 
       Create a new map instance from a grid of elevation values.
 
-      The *data* can be provided as a `GeoTiff`_ object, or loaded from an image
-      file (in TIFF, or PNG format). For instance, the following loads
-      topography data from a GeoTIFF file,
+      The *data* can be provided as a `geotiff
+      <https://github.com/KipCrossing/geotiff>`__ object, or loaded from an
+      image file (in `GeoTIFF`_, or `PNG`_ format). For instance, the following
+      loads topography data from a `GeoTIFF`_ file,
 
       >>> topography = calzone.Map("topography.tif") # doctest: +SKIP
 
@@ -233,7 +234,7 @@ Python interface
       :python:`".png"` or :python:`".stl"`. When exporting as STL, optional
       *kwargs* can be provided in order to customise the 3D shape (see
       :numref:`tab-topography-items`). For instance, the following exports the
-      map as a PNG image (including topography metadata).
+      map as a `PNG`_ image (including topography metadata).
 
       .. doctest::
          :hide:
@@ -780,13 +781,16 @@ Python interface
 .. _G4VExceptionHandler: https://geant4.kek.jp/Reference/11.2.0/classG4VExceptionHandler.html
 .. _G4VPhysicalVolume: https://geant4.kek.jp/Reference/11.2.0/classG4VPhysicalVolume.html
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
-.. _Geotiff: https://github.com/KipCrossing/geotiff
+.. _GeoTIFF: https://fr.wikipedia.org/wiki/GeoTIFF
 .. _Goupil: https://goupil.readthedocs.io/en/latest/
 .. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
 .. _OpenGate: http://www.opengatecollaboration.org/
 .. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
+.. _PNG: https://en.wikipedia.org/wiki/PNG
+.. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
 .. _TOML: https://toml.io/en/
+.. _Turtle: https://github.com/niess/turtle
 .. _Voxels: https://en.wikipedia.org/wiki/Voxel
 .. _WikipediaPCG: https://en.wikipedia.org/wiki/Permuted_congruential_generator
 .. _YAML: https://yaml.org/
