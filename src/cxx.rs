@@ -502,6 +502,8 @@ pub mod ffi {
         unsafe fn push_deposit(
             self: &mut RunAgent,
             volume: *const G4VPhysicalVolume,
+            pid: i32,
+            energy: f64,
             step_deposit: f64,
             point_deposit: f64,
             start: &G4ThreeVector,

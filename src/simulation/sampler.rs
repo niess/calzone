@@ -205,6 +205,8 @@ impl Deposits {
         &mut self,
         volume: *const ffi::G4VPhysicalVolume,
         event: usize,
+        pid: i32,
+        energy: f64,
         total_deposit: f64,
         point_deposit: f64,
         start: &ffi::G4ThreeVector,
@@ -214,11 +216,14 @@ impl Deposits {
     ) {
         self.values.entry(volume)
             .and_modify(|e| e.push(
-                event, total_deposit, point_deposit, start, end, weight, random_index
+                event, pid, energy, total_deposit, point_deposit, start, end, weight, random_index
             ))
             .or_insert_with(|| {
                 let mut cell = DepositsCell::new(self.mode);
-                cell.push(event, total_deposit, point_deposit, start, end, weight, random_index);
+                cell.push(
+                    event, pid, energy, total_deposit, point_deposit, start, end, weight,
+                    random_index
+                );
                 cell
             });
     }
@@ -282,6 +287,8 @@ impl DepositsCell {
     fn push(
         &mut self,
         event: usize,
+        pid: i32,
+        energy: f64,
         total_deposit: f64,
         point_deposit: f64,
         start: &ffi::G4ThreeVector,
@@ -302,13 +309,14 @@ impl DepositsCell {
                 let random_index = *random_index;
                 if line_deposit > 0.0 {
                     let deposit = LineDeposit {
-                        event, start, end, value: line_deposit, weight, random_index
+                        event, pid, energy, start, end, value: line_deposit, weight, random_index
                     };
                     deposits.line.push(deposit);
                 }
                 if point_deposit > 0.0 {
                     let deposit = PointDeposit {
-                        event, position: end, value: point_deposit, weight, random_index
+                        event, pid, energy, position: end, value: point_deposit, weight,
+                        random_index
                     };
                     deposits.point.push(deposit);
                 }
@@ -328,6 +336,8 @@ impl DepositsCell {
 #[repr(C)]
 pub struct LineDeposit {
     event: usize,
+    pid: i32,
+    energy: f64,
     value: f64,
     start: [f64; 3],
     end: [f64; 3],
@@ -339,6 +349,8 @@ pub struct LineDeposit {
 #[repr(C)]
 pub struct PointDeposit {
     event: usize,
+    pid: i32,
+    energy: f64,
     value: f64,
     position: [f64; 3],
     weight: f64,

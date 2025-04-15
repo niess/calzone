@@ -399,6 +399,8 @@ impl<'a> RunAgent<'a> {
     pub fn push_deposit(
         &mut self,
         volume: *const ffi::G4VPhysicalVolume,
+        pid: i32,
+        energy: f64,
         total_deposit: f64,
         point_deposit: f64,
         start: &ffi::G4ThreeVector,
@@ -406,8 +408,8 @@ impl<'a> RunAgent<'a> {
     ) {
         if let Some(deposits) = self.deposits.as_mut() {
             deposits.push(
-                volume, self.index - 1, total_deposit, point_deposit, start, end, self.weight,
-                &self.random_index
+                volume, self.index - 1, pid, energy, total_deposit, point_deposit, start, end,
+                self.weight, &self.random_index
             )
         }
     }

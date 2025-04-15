@@ -20,10 +20,14 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
             if (particle->GetPDGCharge() == 0.0) {
                 point_deposit = deposit;
             }
+            int pid = particle->GetPDGEncoding();
+            double energy = pre->GetKineticEnergy();
             auto start = pre->GetPosition() / CLHEP::cm;
             auto end = post->GetPosition() / CLHEP::cm;
 
-            RUN_AGENT->push_deposit(volume, deposit, point_deposit, start, end);
+            RUN_AGENT->push_deposit(
+                volume, pid, energy, deposit, point_deposit, start, end
+            );
         }
     }
 
