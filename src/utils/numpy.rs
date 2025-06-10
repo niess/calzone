@@ -131,6 +131,7 @@ pub fn initialise(py: Python) -> PyResult<()> {
     let dtype_line_deposit: PyObject = {
         let arg = [
             ("event", "u8"),
+            ("tid", "i4"),
             ("pid", "i4"),
             ("energy", "f8"),
             ("value", "f8"),
@@ -159,6 +160,7 @@ pub fn initialise(py: Python) -> PyResult<()> {
     let dtype_point_deposit: PyObject = {
         let arg = [
             ("event", "u8"),
+            ("tid", "i4"),
             ("pid", "i4"),
             ("energy", "f8"),
             ("value", "f8"),

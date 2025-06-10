@@ -15,18 +15,20 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
             auto && pre = step->GetPreStepPoint();
             auto && post = step->GetPostStepPoint();
             auto && volume = pre->GetPhysicalVolume();
+            auto && track = step->GetTrack();
             double point_deposit = 0.0;
-            auto particle = step->GetTrack()->GetParticleDefinition();
+            auto particle = track->GetParticleDefinition();
             if (particle->GetPDGCharge() == 0.0) {
                 point_deposit = deposit;
             }
+            int tid = track->GetTrackID();
             int pid = particle->GetPDGEncoding();
             double energy = pre->GetKineticEnergy();
             auto start = pre->GetPosition() / CLHEP::cm;
             auto end = post->GetPosition() / CLHEP::cm;
 
             RUN_AGENT->push_deposit(
-                volume, pid, energy, deposit, point_deposit, start, end
+                volume, tid, pid, energy, deposit, point_deposit, start, end
             );
         }
     }
