@@ -104,7 +104,7 @@ exemplified by, but not limited to, [Gamos][GAMOS] [@Arce:2014], [Gate][GATE]
 
 In the context of geosciences, we encountered specific issues that were not
 addressed by [Geant4][GEANT4], and only partially addressed by some of its
-derivatives. These issues, which motivated the development of
+derivatives. Some of these issues, which motivated the development of
 [Calzone][Calzone], are discussed hereafter.
 
 
@@ -119,44 +119,33 @@ The precision of MCPT computations is contingent upon the accuracy of the
 geometry description. In the context of geosciences, the aforementioned geometry
 includes the particle detector, which is depicted in a mechanical diagram (using
 a [CAD][CAD] software), as well as the study site, which is usually represented
-by a Digital Elevation Model ([DEM][DEM]). However, these data are not
-understood by [Geant4][GEANT4] by default, so they need to be transcribed. A
-generic method for transcribing composite data into [Geant4][GEANT4] geometry
-primitives is to delineate volumes of the same material (terrain, sensor,
-mechanical support, etc.) using surfaces approximated by triangular meshes. For
-instance, the [FreeCAD][FREECAD] software is able to export the detector parts
-as [STL][STL] files, which could then be re-read and transcribed into
-[`G4TessellatedSolids`][G4TS] using the [CADMesh][CADMESH] interface layer
-[@Poole:2012]. [Calzone][CALZONE] streamlines this process by defining a
-geometry format that serves as an intermediary. This format uses standard
-objects, including `dict`, `float`, `list`, and `str`, and integrates various
-mesh formats, such as [OBJ][OBJ], [STL][STL], [GeoTiff][GEOTIFF] and
-[Turtle][TURTLE]/[PNG][PNG] [@Niess:2020]. [Calzone][CALZONE] then translates
-this data into [Geant4][GEANT4] objects. During this process, [Calzone][CALZONE]
-takes care of sharing mesh data instead of copying it if the same mesh is used
-more than once.
+by a Digital Elevation Model ([DEM][DEM]). These data are not natively
+understood by [Geant4][GEANT4], requiring transcription. A generic approach is
+to delineate volumes of the same material (terrain, sensor, mechanical support,
+etc.) using surfaces approximated by triangular meshes. For instance, the
+[FreeCAD][FREECAD] software is able to export the detector parts as [STL][STL]
+files, which could then be re-read and transcribed into
+[`G4TessellatedSolids`][G4TS] (e.g., using [CADMesh][CADMESH] [@Poole:2012]).
+[Calzone][CALZONE] streamlines this process by defining a geometry format that
+serves as an intermediary. This format uses standard objects, including `dict`,
+`float`, `list`, and `str`, and integrates various mesh formats, such as
+[OBJ][OBJ], [STL][STL], [GeoTiff][GEOTIFF] and [Turtle][TURTLE]/[PNG][PNG]
+[@Niess:2020]. [Calzone][CALZONE] then translates this data into
+[Geant4][GEANT4] objects.
 
 ## Mesh specialisation
 
 The process of meshing a [DEM][DEM] with triangular facets introduces specific
-issues. To clarify this point, it should be noted that the Monte Carlo traversal
-of mesh structures requires optimisations in order to be a viable option. The
-[Geant4][GEANT4] software uses a [voxelisation][VOXEL] algorithm that
-subdivides the mesh volume into smaller units. This algorithm is effective for
-particles travelling short distances in terms of mesh extension, which is the
-case for many [Geant4][GEANT4] applications. However, this approach scales
-poorly. A [DEM][DEM] typically comprises millions of nodes. In this case, the
-[`G4TessellatedSolid`][G4TS] initialisation time (~hours) and its memory
-footprint (~100 GB) become prohibitive (see, for example, [@Niess:2020]).
-Furthermore, some particles of interest for geophysical applications (e.g.,
-[$\gamma$][GAMMA] and [$\mu$][MUON]) are likely to travel over extensive
-portions of the [DEM][DEM] without interacting, which renders voxelisation an
-inefficient approach. [Calzone][CALZONE] addresses these issues by defining an
-additional `Mesh` object using a Bounding Volume Hierarchy ([BVH][BVH])
-algorithm that partitions the surface of the mesh, rather than its volume. The
-user may then select the desired algorithm for each mesh. The default approach
-is to use a surface [BVH][BVH] for [DEMs][DEM], while [voxelisation][VOXEL] is
-used otherwise (i.e. a [`G4TessellatedSolid`][G4TS]).
+issues. To optimise the geometry traversal, the [Geant4][GEANT4] software uses a
+[voxelisation][VOXEL] algorithm. This method scales poorly for [DEMs][DEM] that
+typically comprises millions of nodes (see e.g., [@Niess:2020]), and is
+inefficient for long-range particles (the like [$\gamma$][GAMMA] and
+[$\mu$][MUON]). Thus, [Calzone][CALZONE] defines a dedicated `Mesh` object that
+includes a Bounding Volume Hierarchy ([BVH][BVH]) algorithm (partitioning the
+surface of the mesh, rather than its volume). The user may then select the
+desired algorithm for each mesh. The default approach is to use a surface
+[BVH][BVH] for [DEMs][DEM], while [voxelisation][VOXEL] is used otherwise (i.e.
+a [`G4TessellatedSolid`][G4TS]).
 
 ## Interoperability with Goupil
 
@@ -167,65 +156,24 @@ ineffective. In a typical use case, only a few dozen out of a million of
 simulated particles leave a signal in the detector. It is therefore often
 necessary to rely on Importance Sampling ([IS][IS]) methods. One effective
 method in this context is to backward simulate the transport in the detector's
-far environment (see e.g. [@Niess:2018; @Niess:2022]). These optimisations
-render the simulation more complex, necessitating, in particular, the exposure
-of the [Geant4][GEANT4] Monte Carlo geometry to third-party tools. To this end,
-[Calzone][CALZONE] is capable of sharing geometries with [Goupil][GOUPIL]
-[@Niess:2024], a backward [gamma][GAMMA] transport engine. Further to this,
-[Calzone][CALZONE] and [Goupil][GOUPIL] particles (both represented by a
-[NumPy][NUMPY] [array][NDARRAY]) are interoperable.
+far environment (see e.g. [@Niess:2018; @Niess:2022]). To this end,
+[Calzone][CALZONE] is interoperable with [Goupil][GOUPIL] [@Niess:2024].
 
 ## Particles generator
 
 Another point of interest for MCPT applications is the modelling of particles
-sources. [Calzone][CALZONE] enables the injection of particles as a structured
-[`numpy.ndarray`][NDARRAY], thereby offering the possibility to delegate the
-source modelling to the [NumPy][NUMPY] ecosystem. Yet, [Calzone][CALZONE] also
-provides a geometry-aware [`ParticlesGenerator`][GENERATOR] object, which can,
-for instance, generate particles entering a specific geometry volume. Moreover,
-[Calzone's][CALZONE] [`ParticlesGenerator`][GENERATOR] consistently provides
-generation weights, which are essential for [IS][IS] methods.
-
-## Random stream
-
-Finally, yet not to be overlooked for Monte Carlo applications,
-[Calzone][CALZONE] offers an efficient [`Random`][RANDOM] object that implements
-a [PCG][PCG] algorithm [@Oneil:2014]. This Pseudo-Random Number Generator
-([PRNG][PRNG]) features jump-ahead functionality, enabling rapid navigation
-along the random stream (by setting the [`Random.index`][RANDOM_INDEX]
-attribute). Furthermore, [Calzone][CALZONE] guarantees that all simulation
-components use the same random stream, which does require some caution with
-[Geant4][GEANT4]. This ensures that [Calzone][CALZONE] simulations are fully
-reproducible. For instance, this allows users to re-simulate a selection of
-interesting Monte Carlo events, while logging the full detail of Monte Carlo
-tracks for visual inspection.
-
-# Interactive display
-
-In addition to its simulation capabilities, [Calzone][CALZONE] offers an
-interactive display, distributed as an extension package,
-([`calzone-display`][CALZONE_DISPLAY]). The display enables users to conduct a
-visual inspection of the Monte Carlo geometry by controlling a drone-like
-camera. However, it should be noted that the displayed geometry only provides an
-approximate reproduction of the actual [Geant4][GEANT4] geometry (for example,
-it is drawn in single precision, whereas [Geant4][GEANT4] uses double
-precision). For a comprehensive cross-check of the Monte Carlo geometry, we
-recommend additionally running a [Geant4][GEANT4] overlaps check (using the
-[`calzone.Geometry.check()`][GEOMETRY_CHECK] method).
-
-The interactive display can also overlay the detail of Monte Carlo tracks over
-the geometry, provided that those have been generated by turning on the
-[`Simulation.Tracking`][TRACKING] flag. This capability can be convenient for
-the interpretation of specific Monte Carlo events. For illustrative purposes,
-\autoref{fig:display-example} shows an example of a Monte Carlo event displayed
-with [`calzone-display`][CALZONE_DISPLAY].
+sources. For this purpose, [Calzone][CALZONE] provides a geometry-aware
+[`ParticlesGenerator`][GENERATOR] object, which can, for instance, generate
+particles entering a specific geometry volume. Moreover, [Calzone's][CALZONE]
+[`ParticlesGenerator`][GENERATOR] consistently provides generation weights,
+which are essential for [IS][IS] methods.
 
 
 # Software architecture
 
-The [Calzone][CALZONE] application has been developed in [Rust][RUST], with a
-[Python 3][PYTHON] user interface (using the [PyO3][PYO3] crate). Interfacing
-with [Geant4][GEANT4] was facilitated by the [Cxx](https://crates.io/crates/cxx)
+The [Calzone][CALZONE] application was developed in [Rust][RUST], with a [Python
+3][PYTHON] user interface (using the [PyO3][PYO3] crate). Interfacing with
+[Geant4][GEANT4] was facilitated by the [Cxx](https://crates.io/crates/cxx)
 crate. The interactive visualisation was implemented using the
 [Bevy](https://bevyengine.org/) game engine.
 
@@ -240,10 +188,11 @@ this project. All authors contributed to the preparation of this manuscript.
 
 # Acknowledgements
 
-This research was financed by XXX. This is Laboratory of Excellence ClerVolc
-contribution no XXX. In addition, we gratefully acknowledge support from the
-Mésocentre Clermont-Auvergne of the Université Clermont Auvergne for providing
-computing resources needed for validating this work.
+This is contribution no. XXX of the ClerVolc program of the International
+Research Center for Disaster Sciences and Sustainable Development of the
+University of Clermont Auvergne. In addition, We gratefully acknowledge support
+from the Mésocentre Clermont-Auvergne of the Université Clermont Auvergne for
+providing computing resources needed for validating this work.
 
 
 # References
@@ -266,7 +215,6 @@ computing resources needed for validating this work.
 [GEANT4_PHYSICS]: https://geant4.web.cern.ch/collaboration/working_groups/physicsList/
 [GEANT4PY]: https://github.com/koichi-murakami/g4python/
 [GENERATOR]: https://calzone.readthedocs.io/en/latest/api.html#calzone.ParticlesGenerator
-[GEOMETRY_CHECK]: https://calzone.readthedocs.io/en/latest/api.html#calzone.Geometry.check
 [GEOTIFF]: https://fr.wikipedia.org/wiki/GeoTIFF
 [GOUPIL]: https://github.com/niess/goupil/
 [GRAS]: https://space-env.esa.int/software-tools/gras/
@@ -279,18 +227,13 @@ computing resources needed for validating this work.
 [NDARRAY]: https://numpy.org/doc/2.1/reference/generated/numpy.ndarray.html
 [NUMPY]: https://numpy.org/
 [OBJ]: https://en.wikipedia.org/wiki/Wavefront_.obj_file
-[PCG]: https://en.wikipedia.org/wiki/Permuted_congruential_generator
 [PNG]: (https://en.wikipedia.org/wiki/PNG
-[PRNG]: https://en.wikipedia.org/wiki/Pseudorandom_number_generator
 [PYO3]: https://crates.io/crates/pyo3/
 [PYTHON]: https://www.python.org/
-[RANDOM]: https://calzone.readthedocs.io/en/latest/api.html#calzone.Random
-[RANDOM_INDEX]: https://calzone.readthedocs.io/en/latest/api.html#calzone.Random.index
 [RUST]: https://www.rust-lang.org/
 [STL]: https://en.wikipedia.org/wiki/STL_(file_format)
 [TOML]: https://toml.io/en/
 [TOPAS]: https://www.topasmc.org/
-[TRACKING]: https://calzone.readthedocs.io/en/latest/api.html#calzone.Simulation.tracking
 [TURTLE]: https://github.com/niess/turtle/
 [VOXEL]: https://en.wikipedia.org/wiki/Voxel
 [YAML]: https://yaml.org/
