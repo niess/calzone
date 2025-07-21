@@ -25,7 +25,12 @@ illustrated below,
    import calzone
 
    simulation = calzone.Simulation("geometry.toml")
-   particles = calzone.particles(10000, pid="e-", energy=0.5, position=(0,0,1))
+   particles = calzone.particles(
+       10000,
+       pid="e-",
+       energy=0.5,       # MeV
+       position=(0,0,1)  # cm
+   )
    deposits = simulation.run(particles).deposits
 
 Calzone encourages the use of meshes to describe the Monte Carlo geometry.

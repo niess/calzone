@@ -27,8 +27,8 @@ Python interface
    containing the material or the mesh properties, or :python:`None` if the
    material or the mesh is undefined. For example
 
-   >>> calzone.describe(material="G4_AIR")    # doctest: +ELLIPSIS
-   namespace(density=0.0012047899999999999, state='gas', composition=[...])
+   >>> calzone.describe(material="G4_AIR").density    # doctest: +ELLIPSIS
+   0.0012047899999999999
 
 ----
 

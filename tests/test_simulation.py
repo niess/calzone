@@ -1,6 +1,7 @@
 import calzone
 import numpy
 from numpy.testing import assert_allclose
+import pytest
 
 
 def test_particles():
@@ -109,6 +110,7 @@ def test_Random():
     assert (rng.uniform01(5) == v[5:]).all()
 
 
+@pytest.mark.requires_data
 def test_Simulation():
     """Test the Simulation interface."""
 
