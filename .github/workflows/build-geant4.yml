@@ -1,0 +1,120 @@
+name: Build Geant4
+on:
+  push:
+    branches:
+      - geant4
+
+env:
+  GEANT4_VERSION: '11.3.0'
+  GEANT4_OPTIONS: '-DCMAKE_CXX_STANDARD=17 -DGEANT4_BUILD_MULTITHREADED=OFF'
+  MACOSX_DEPLOYMENT_TARGET: '11.0'
+
+jobs:
+  build_geant4:
+    name: Build Geant4 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            tag: manylinux2014_x86_64
+          - os: ubuntu-24.04-arm
+            tag: manylinux2014_aarch64
+          - os: macos-13
+            tag: macosx_11_0_x86_64  # match MACOSX_DEPLOYMENT_TARGET
+          - os: macos-latest
+            tag: macosx_11_0_arm64   # match MACOSX_DEPLOYMENT_TARGET
+          - os: windows-latest
+            tag: win_amd64
+
+    steps:
+      - name: Download Geant4 source
+        run: |
+          import tarfile
+          from urllib.request import urlretrieve
+
+          filename = 'geant4-v${{ env.GEANT4_VERSION }}.tar.gz'
+          url = 'https://gitlab.cern.ch/geant4/geant4/-/archive/v${{ env.GEANT4_VERSION }}/' + filename
+          urlretrieve(url, filename)
+
+          with tarfile.open(filename) as tar:
+              tar.extractall()
+
+        shell: python
+
+      - name: Build Geant4 (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          docker run -v $PWD:/pwd quay.io/pypa/${{ matrix.tag }} bash -c "
+              mkdir -p /pwd/build && \
+              cd /pwd/build && \
+              cmake /pwd/geant4-v${{ env.GEANT4_VERSION }} -DCMAKE_INSTALL_PREFIX=/pwd/geant4 ${{ env.GEANT4_OPTIONS }} && \
+              make -j4 && \
+              make install
+          "
+
+      - name: Build Geant4 (OSX)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          mkdir -p build
+          cd build
+          cmake ../geant4-v${GEANT4_VERSION} -DCMAKE_INSTALL_PREFIX=$PWD/../geant4 ${GEANT4_OPTIONS}
+          make -j4
+          make install
+
+      - name: Build Geant4 (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_INSTALL_PREFIX="%CD%\..\geant4" %GEANT4_OPTIONS% "..\geant4-v%GEANT4_VERSION%"
+          cmake --build . --config Release
+          cmake --build . --config Release --target install
+        shell: cmd
+
+      - name: Package install
+        run: |
+          import tarfile
+          import os.path
+
+          libdir = 'geant4/lib64'
+          if not os.path.exists(libdir):
+              libdir = 'geant4/lib'
+
+          with tarfile.open('geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}.tar.gz', 'w:gz') as tar:
+              tar.add('geant4/bin')
+              tar.add('geant4/include')
+              tar.add(libdir)
+
+        shell: python
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}.tar.gz
+          path: ./geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}.tar.gz
+
+  update_release:
+    name: Update release
+    needs: build_geant4
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: mini-bomba/create-github-release@v1.2.0
+        with:
+          name: 'Geant4 ${{ env.GEANT4_VERSION }}'
+          tag: 'geant4-${{ env.GEANT4_VERSION }}'
+          body: |
+            Geant4 ${{ env.GEANT4_VERSION }} binaries for Calzone.
+          files: |
+            ./geant4-${{ env.GEANT4_VERSION }}-*.tar.gz
+          clear_attachments: true
+          fail_on_no_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}
