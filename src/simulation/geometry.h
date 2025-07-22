@@ -21,5 +21,5 @@ private:
     GeometryImpl() = default;
 
     // User interface.
-    size_t geometry_id = 0;
+    std::uint64_t geometry_id = 0;
 };

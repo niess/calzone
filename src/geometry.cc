@@ -37,20 +37,20 @@ struct GeometryData {
 
     static GeometryData * get(const G4VPhysicalVolume *);
 
-    size_t id = 0;
+    std::uint64_t id = 0;
     G4VPhysicalVolume * world = nullptr;
     std::map<std::string, const G4VPhysicalVolume *> elements;
     std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> mothers;
 
 private:
-    size_t rc = 0;
+    std::uint64_t rc = 0;
     std::list <const G4VSolid *> orphans;
 
-    static size_t LAST_ID;
+    static std::uint64_t LAST_ID;
     static std::map<const G4VPhysicalVolume *, GeometryData *> INSTANCES;
 };
 
-size_t GeometryData::LAST_ID = 0;
+std::uint64_t GeometryData::LAST_ID = 0;
 std::map<const G4VPhysicalVolume *, GeometryData *> GeometryData::INSTANCES;
 
 static G4AffineTransform local_transform(const Volume & v) {
@@ -67,9 +67,9 @@ static G4AffineTransform local_transform(const Volume & v) {
         auto rowY = G4ThreeVector(m[1][0], m[1][1], m[1][2]);
         auto rowZ = G4ThreeVector(m[2][0], m[2][1], m[2][2]);
         rotation.setRows(rowX, rowY, rowZ);
-        return std::move(G4AffineTransform(rotation, translation));
+        return G4AffineTransform(rotation, translation);
     } else {
-        return std::move(G4AffineTransform(translation));
+        return G4AffineTransform(translation);
     }
 }
 
@@ -103,7 +103,7 @@ static G4VSolid * build_envelope(
             mi[2] = extent.GetZmin();
             mx[2] = extent.GetZmax();
         }
-        for (size_t i = 0; i < mi.size(); i++) {
+        for (std::uint64_t i = 0; i < mi.size(); i++) {
             if (mi[i] < min[i]) min[i] = mi[i];
             if (mx[i] > max[i]) max[i] = mx[i];
         }
@@ -186,10 +186,10 @@ G4TessellatedSolid * create_tessellated_solid(rust::Vec<float> facets) {
         clear_error();
     }
 
-    const size_t n = facets.size() / 9;
+    const std::uint64_t n = facets.size() / 9;
     float * data = facets.data();
     const float unit = (float)CLHEP::cm;
-    for (size_t i = 0; i < n; i++, data += 9) {
+    for (std::uint64_t i = 0; i < n; i++, data += 9) {
         float * v0 = data;
         float * v1 = v0 + 3;
         float * v2 = v1 + 3;
@@ -490,7 +490,7 @@ static G4LogicalVolume * build_volumes(
 
     // Set any sensitive detector.
     if (volume.sensitive()) {
-        auto sampler = new SamplerImpl(pathname, std::move(volume.roles()));
+        auto sampler = new SamplerImpl(pathname, volume.roles());
         logical->SetSensitiveDetector(sampler);
     }
 
@@ -734,8 +734,8 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
             if (endswith == 0) return volume;
         }
         auto && logical = volume->GetLogicalVolume();
-        size_t n = logical->GetNoDaughters();
-        for (size_t i = 0; i < n; i++) {
+        std::uint64_t n = logical->GetNoDaughters();
+        for (std::uint64_t i = 0; i < n; i++) {
             auto && daughter = logical->GetDaughter(i);
             auto result = inspect(daughter);
             if (result != nullptr) {
@@ -781,7 +781,7 @@ std::shared_ptr<Error> GeometryBorrow::check(int resolution) const {
     return get_error();
 }
 
-size_t GeometryBorrow::id() const {
+std::uint64_t GeometryBorrow::id() const {
     return this->data->id;
 }
 
@@ -805,7 +805,7 @@ static void optimise(G4VPhysicalVolume * physical) {
     const int MIN_VOXEL_VOLUMES_LEVEL_1 = 2; // from voxeldefs.hh.
 
     auto && volume = physical->GetLogicalVolume();
-    size_t n = volume->GetNoDaughters();
+    std::uint64_t n = volume->GetNoDaughters();
 
     auto && head = volume->GetVoxelHeader();
     if (head == nullptr) {
@@ -816,7 +816,7 @@ static void optimise(G4VPhysicalVolume * physical) {
         }
     }
 
-    for (size_t i = 0; i < n; i++) {
+    for (std::uint64_t i = 0; i < n; i++) {
         optimise(volume->GetDaughter(i));
     }
 }
@@ -952,8 +952,8 @@ double VolumeBorrow::compute_volume(bool include_daughters) const {
     auto && logical = this->volume->GetLogicalVolume();
     auto volume = logical->GetSolid()->GetCubicVolume();
     if (!include_daughters) {
-        size_t n = logical->GetNoDaughters();
-        for (size_t i = 0; i < n; i++) {
+        std::uint64_t n = logical->GetNoDaughters();
+        for (std::uint64_t i = 0; i < n; i++) {
             auto && daughter = logical->GetDaughter(i);
             volume -= daughter
                 -> GetLogicalVolume()
@@ -1027,12 +1027,16 @@ BoxInfo VolumeBorrow::describe_box() const {
     auto solid = static_cast<Box *>(result.first);
     auto displacement = result.second;
     return {
-        2.0 * solid->GetXHalfLength(),
-        2.0 * solid->GetYHalfLength(),
-        2.0 * solid->GetZHalfLength(),
-        displacement.x(),
-        displacement.y(),
-        displacement.z()
+        {
+            2.0 * solid->GetXHalfLength(),
+            2.0 * solid->GetYHalfLength(),
+            2.0 * solid->GetZHalfLength()
+        },
+        {
+            displacement.x(),
+            displacement.y(),
+            displacement.z()
+        }
     };
 }
 
@@ -1044,9 +1048,11 @@ OrbInfo VolumeBorrow::describe_orb() const {
     auto displacement = result.second;
     return {
         solid->GetRadius(),
-        displacement.x(),
-        displacement.y(),
-        displacement.z()
+        {
+            displacement.x(),
+            displacement.y(),
+            displacement.z()
+        }
     };
 }
 
@@ -1089,10 +1095,12 @@ TransformInfo VolumeBorrow::describe_transform() const {
         }
     }
     return {
-        translation.x(), translation.y(), translation.z(),
-        rotation.xx(), rotation.xy(), rotation.xz(),
-        rotation.yx(), rotation.yy(), rotation.yz(),
-        rotation.zx(), rotation.zy(), rotation.zz()
+        { translation.x(), translation.y(), translation.z() },
+        {
+            rotation.xx(), rotation.xy(), rotation.xz(),
+            rotation.yx(), rotation.yy(), rotation.yz(),
+            rotation.zx(), rotation.zy(), rotation.zz()
+        }
     };
 }
 
@@ -1108,9 +1116,11 @@ TubsInfo VolumeBorrow::describe_tubs() const {
         2.0 * solid->GetZHalfLength(),
         solid->GetStartPhiAngle(),
         solid->GetDeltaPhiAngle(),
-        displacement.x(),
-        displacement.y(),
-        displacement.z()
+        {
+            displacement.x(),
+            displacement.y(),
+            displacement.z()
+        }
     };
 }
 
@@ -1164,8 +1174,8 @@ EInside VolumeBorrow::inside(
     }
 
     auto && logical = this->volume->GetLogicalVolume();
-    size_t n = logical->GetNoDaughters();
-    for (size_t i = 0; i < n; i++) {
+    std::uint64_t n = logical->GetNoDaughters();
+    for (std::uint64_t i = 0; i < n; i++) {
         auto && daughter = logical->GetDaughter(i);
         auto && translation = daughter->GetTranslation();
         auto && rotation = daughter->GetRotation();

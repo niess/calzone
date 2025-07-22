@@ -30,11 +30,11 @@ std::istream & RandomImpl::get (std::istream &) {
     exit(EXIT_FAILURE);
 }
 
-std::array<size_t, 2> RandomImpl::GetIndex() const {
+std::array<std::uint64_t, 2> RandomImpl::GetIndex() const {
     return this->context->index();
 }
 
-void RandomImpl::SetIndex(std::array<size_t, 2> index) {
+void RandomImpl::SetIndex(std::array<std::uint64_t, 2> index) {
     return this->context->set_index(index);
 }
 

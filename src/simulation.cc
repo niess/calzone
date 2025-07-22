@@ -75,10 +75,10 @@ std::shared_ptr<Error> run_simulation(
 
     // Process events in bunches (in order to check for Ctrl+C).
     constexpr int bunch_size = 100;
-    const size_t n = agent.events();
-    const size_t a = n / bunch_size;
+    const std::uint64_t n = agent.events();
+    const std::uint64_t a = n / bunch_size;
     const int b = n % bunch_size;
-    for (size_t i = 0; i <= a; i++) {
+    for (std::uint64_t i = 0; i <= a; i++) {
         int r = (i < a) ? bunch_size : b;
         if (r > 0) {
             manager->BeamOn(r);

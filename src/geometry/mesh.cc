@@ -99,7 +99,7 @@ G4double Mesh::DistanceToOut(
     G4bool * validNormal,
     G4ThreeVector * normal
 ) const {
-    long index;
+    std::int64_t index;
     auto && distance = this->mesh->distance_to_out(
         position, direction, index
     );

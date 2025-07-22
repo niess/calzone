@@ -45,7 +45,7 @@ struct GeometryBorrow {
 
     // Geant4 interface.
     std::shared_ptr<Error> check(int resolution) const;
-    size_t id() const;
+    std::uint64_t id() const;
     G4VPhysicalVolume * world() const;
 
     // Goupil interface.

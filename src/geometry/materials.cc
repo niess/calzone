@@ -238,10 +238,10 @@ Mixture describe_material(rust::Str name) {
     }
     info.properties.density = material->GetDensity() / (CLHEP::g / CLHEP::cm3);
     info.properties.state = material->GetState();
-    const size_t n = material->GetNumberOfElements();
+    const std::uint64_t n = material->GetNumberOfElements();
     auto && elements = *material->GetElementVector();
     auto weights = material->GetFractionVector();
-    for (size_t i = 0; i < n; i++) {
+    for (std::uint64_t i = 0; i < n; i++) {
         MixtureComponent component = {
             rust::String(elements[i]->GetSymbol()),
             weights[i]
