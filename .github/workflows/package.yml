@@ -42,13 +42,28 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-latest, windows-latest]
 
     if: ${{ inputs.wheel }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Download Geant4 (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          import tarfile
+          from urllib.request import urlretrieve
+
+          filename = 'geant4-11.3.0-win_amd64.tar.gz'
+          url = 'https://github.com/niess/calzone/releases/download/geant4-11.3.0/' + filename
+          urlretrieve(url, filename)
+
+          with tarfile.open(filename) as tar:
+              tar.extractall()
+
+        shell: python
 
       - name: Build wheel
         uses: pypa/cibuildwheel@v2.23.3  # 2.23.3: supports Python 3.7.

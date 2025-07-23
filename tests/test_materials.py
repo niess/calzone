@@ -74,7 +74,7 @@ def dump(obj, path):
                     lines.append(f"{k} = {repr(v)}")
 
         recurse(obj)
-        content = os.linesep.join(lines)
+        content = "\n".join(lines)  # TOML linesep always is '\n'.
 
     elif path.suffix == ".yaml":
         lines = []

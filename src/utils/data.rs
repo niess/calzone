@@ -46,9 +46,15 @@ pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()
 }
 
 pub fn default_path() -> PathBuf {
-    let home = env::var("HOME").unwrap();
-    Path::new(&home)
-        .join(".local/share/calzone/data")
+    if cfg!(windows) {
+        let appdata = env::var("LOCALAPPDATA").unwrap();
+        Path::new(&appdata)
+            .join("calzone/data")
+    } else {
+        let home = env::var("HOME").unwrap();
+        Path::new(&home)
+            .join(".local/share/calzone/data")
+    }
 }
 
 struct DataSet {

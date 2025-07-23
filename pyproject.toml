@@ -36,8 +36,9 @@ target = "calzone.calzone"
 # Build options for Python wheels.
 [tool.cibuildwheel]
 test-command = [
-  "cd {project} && pytest --doctest-glob='*.rst' -v -m 'not requires_data'",
-  "cd {project}/examples/geometry/topography/ && python3 generate.py && test -f 'meshes/terrain.png'",
+  'pytest --doctest-glob="*.rst" -v -m "not requires_data" {project}/tests {project}/docs/source',
+  'python {project}/examples/geometry/topography/generate.py',
+  'test -f "{project}/examples/geometry/topography/meshes/terrain.png"',
 ]
 test-requires = [ "Pillow", "pytest" ]
 
@@ -45,7 +46,7 @@ test-requires = [ "Pillow", "pytest" ]
 before-all = """
 curl -sSf https://sh.rustup.rs -o rustup.sh && \
 sh rustup.sh -y && \
-curl -sSf -L https://github.com/niess/calzone/releases/download/geant4/geant4-11.3.0-manylinux2014_$(uname -m).tar.gz -o geant4.tar.gz && \
+curl -sSf -L https://github.com/niess/calzone/releases/download/geant4-11.3.0/geant4-11.3.0-manylinux2014_$(uname -m).tar.gz -o geant4.tar.gz && \
 tar -xzf geant4.tar.gz\
 """
 repair-wheel-command = """
@@ -58,7 +59,7 @@ manylinux-x86_64-image = "manylinux2014"
 
 [tool.cibuildwheel.macos]
 before-all = """
-curl -sSf -L https://github.com/niess/calzone/releases/download/geant4/geant4-11.3.0-macosx_11_0_$(uname -m).tar.gz -o geant4.tar.gz && \
+curl -sSf -L https://github.com/niess/calzone/releases/download/geant4-11.3.0/geant4-11.3.0-macosx_11_0_$(uname -m).tar.gz -o geant4.tar.gz && \
 tar -xzf geant4.tar.gz\
 """
 build = "cp38-macosx_*"
@@ -67,3 +68,8 @@ DYLD_LIBRARY_PATH=$PWD/geant4/lib64/:$PWD/geant4/lib/:$DYLD_LIBRARY_PATH \
 delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}
 """
 environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
+
+[tool.cibuildwheel.windows]
+before-all = "python3 -m pip install delvewheel"
+build = "cp39-win_amd64"
+repair-wheel-command = 'delvewheel repair --add-path "%CD%\geant4\bin;%CD%\geant4\lib" -w {dest_dir} -v {wheel}'

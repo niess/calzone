@@ -5,7 +5,12 @@ use std::process::Command;
 
 
 fn main() {
-    let command = Command::new("geant4-config")
+    const GEANT4_CONFIG: &str = if cfg!(windows) {
+        "geant4-config.cmd"
+    } else {
+        "geant4-config"
+    };
+    let command = Command::new(GEANT4_CONFIG)
         .arg("--prefix")
         .output();
     let geant4_prefix = match command {
@@ -21,7 +26,7 @@ fn main() {
                 "))
                 .trim()
                 .to_string();
-            export_geant4_version("geant4-config");
+            export_geant4_version(GEANT4_CONFIG);
             geant4_prefix
         },
         Err(_) => {
@@ -36,7 +41,8 @@ fn main() {
                     ====================================================
                 "));
             }
-            let geant4_config = format!("{prefix}/bin/geant4-config");
+            const SEP: char = std::path::MAIN_SEPARATOR;
+            let geant4_config = format!("{prefix}{SEP}bin{SEP}{GEANT4_CONFIG}");
             export_geant4_version(&geant4_config);
             prefix.to_string()
         },
@@ -80,7 +86,8 @@ fn main() {
         "src/simulation/tracker.h",
     ];
 
-    cxx_build::bridge("src/cxx.rs")
+    let mut bridge = cxx_build::bridge("src/cxx.rs");
+    bridge
         .std("c++17")
         .define("FMT_HEADER_ONLY", "")
         .include(&fmt_include)
@@ -89,8 +96,19 @@ fn main() {
         .include("src")
         .files(sources)
         .define("G4GOUPIL_INITIALISE", "g4goupil_initialise")
-        .file(&goupil_source)
-        .compile("geant4");
+        .file(&goupil_source);
+
+    #[cfg(windows)]
+    bridge
+        .define("_CONSOLE", "")
+        .define("_WIN32", "")
+        .define("WIN32", "")
+        .define("DOS", "")
+        .define("XPNET", "")
+        .define("_CRT_SECURE_NO_DEPRECATE", "")
+        .flags(["-GR", "-EHsc", "-Zm200", "-nologo"]);
+
+    bridge.compile("geant4");
 
     println!("cargo:rerun-if-changed=src/cxx.rs");
 
@@ -103,7 +121,14 @@ fn main() {
     }
 
     println!("cargo:rustc-link-search={}", geant4_lib.display());
-    println!("cargo:rustc-link-lib=G4physicslists");
+    const LIBS: [&str; 17] = [
+        "G4analysis", "G4physicslists", "G4run", "G4event", "G4tracking", "G4processes",
+        "G4digits_hits", "G4track", "G4particles", "G4geometry", "G4materials",
+        "G4graphics_reps", "G4intercoms", "G4global", "G4clhep", "G4ptl", "G4zlib"
+    ];
+    for lib in LIBS {
+        println!("cargo:rustc-link-lib={}", lib);
+    }
 }
 
 fn make_path(prefix: &str, locations: &[&str]) -> PathBuf {

@@ -1,4 +1,5 @@
 import calzone
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import xml.etree.ElementTree as ET
@@ -248,12 +249,21 @@ def test_meshes():
     geometry = calzone.Geometry(data)
     geometry.check()
 
+    def canonicalize(path):
+        return str((PREFIX / path).resolve())
+
+    def strip(path):
+        if (os.name == "nt") and path.startswith("\\\\?\\"):
+            return path[4:]
+        else:
+            return path
+
     Obj = calzone.describe(mesh="Obj")
     assert(Obj.references == 1)
-    assert(Obj.path == str((PREFIX / "assets/cube.obj").resolve()))
+    assert(strip(Obj.path) == canonicalize("assets/cube.obj"))
     Stl = calzone.describe(mesh="Stl")
     assert(Stl.references == 2)
-    assert(Stl.path == str((PREFIX / "assets/cube.stl").resolve()))
+    assert(strip(Stl.path) == canonicalize("assets/cube.stl"))
 
 
 def test_Sphere():
