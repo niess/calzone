@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-latest, windows-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-latest, windows-latest, windows-11-arm]
         include:
           - os: ubuntu-latest
             tag: manylinux2014_x86_64
@@ -27,6 +27,8 @@ jobs:
             tag: macosx_11_0_arm64   # match MACOSX_DEPLOYMENT_TARGET
           - os: windows-latest
             tag: win_amd64
+          - os: windows-11-arm
+            tag: win_arm64
 
     steps:
       - name: Download Geant4 source
@@ -49,7 +51,7 @@ jobs:
           docker run -v $PWD:/pwd quay.io/pypa/${{ matrix.tag }} bash -c "
               mkdir -p /pwd/build && \
               cd /pwd/build && \
-              cmake /pwd/geant4-v${{ env.GEANT4_VERSION }} -DCMAKE_INSTALL_PREFIX=/pwd/geant4 ${{ env.GEANT4_OPTIONS }} && \
+              cmake /pwd/geant4-v${{ env.GEANT4_VERSION }} -DCMAKE_INSTALL_PREFIX=/pwd/geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }} ${{ env.GEANT4_OPTIONS }} && \
               make -j4 && \
               make install
           "
@@ -59,7 +61,7 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          cmake ../geant4-v${GEANT4_VERSION} -DCMAKE_INSTALL_PREFIX=$PWD/../geant4 ${GEANT4_OPTIONS}
+          cmake ../geant4-v${GEANT4_VERSION} -DCMAKE_INSTALL_PREFIX=$PWD/../geant4-${GEANT4_VERSION}-${{ matrix.tag }} ${GEANT4_OPTIONS}
           make -j4
           make install
 
@@ -68,7 +70,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -DCMAKE_INSTALL_PREFIX="%CD%\..\geant4" %GEANT4_OPTIONS% "..\geant4-v%GEANT4_VERSION%"
+          cmake -DCMAKE_INSTALL_PREFIX="%CD%\..\geant4-%GEANT4_VERSION%-${{ matrix.tag }}" %GEANT4_OPTIONS% "..\geant4-v%GEANT4_VERSION%"
           cmake --build . --config Release
           cmake --build . --config Release --target install
         shell: cmd
@@ -78,13 +80,13 @@ jobs:
           import tarfile
           import os.path
 
-          libdir = 'geant4/lib64'
+          libdir = 'geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}/lib64'
           if not os.path.exists(libdir):
-              libdir = 'geant4/lib'
+              libdir = 'geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}/lib'
 
           with tarfile.open('geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}.tar.gz', 'w:gz') as tar:
-              tar.add('geant4/bin')
-              tar.add('geant4/include')
+              tar.add('geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}/bin')
+              tar.add('geant4-${{ env.GEANT4_VERSION }}-${{ matrix.tag }}/include')
               tar.add(libdir)
 
         shell: python
