@@ -8,6 +8,8 @@ use tar::Archive;
 use temp_dir::TempDir;
 
 
+const LINESEP: &str = if cfg!(windows) { "\r\n" } else { "\n" };
+
 fn main() {
     const GEANT4_CONFIG: &str = if cfg!(windows) {
         "geant4-config.cmd"
@@ -229,9 +231,8 @@ fn boxed(text: &str) -> String {
     let ruler = format!("{:=^width$}", "", width = n + 4);
     let blank = format!("=={:^width$}==", "", width = n);
     let text = format!("=={:^width$}==", text, width = n);
-    const SEP: &str = if cfg!(windows) { "\r\n" } else { "\n" };
     vec![
         "".to_owned(), ruler.clone(), blank.clone(), text, blank, ruler, "".to_owned(),
         "".to_owned()
-    ].join(SEP)
+    ].join(LINESEP)
 }

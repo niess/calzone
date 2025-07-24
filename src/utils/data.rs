@@ -1,8 +1,10 @@
+use crate::GEANT4_VERSION;
 use crate::utils::error::{ctrlc_catched, Error};
 use crate::utils::error::ErrorKind::{KeyboardInterrupt, ValueError};
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use pyo3::prelude::*;
+use regex::Regex;
 use reqwest::StatusCode;
 use std::borrow::Cow;
 use std::env;
@@ -16,19 +18,45 @@ use temp_dir::TempDir;
 #[pyfunction]
 #[pyo3(signature=(destination=None, *, verbose=None))]
 pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()> {
-    const DATASETS: [DataSet; 11] = [
-        DataSet { name: "G4ABLA", version: "3.3", patch: None },
-        DataSet { name: "G4EMLOW", version: "8.5", patch: None },
-        DataSet { name: "G4ENSDFSTATE", version: "2.3", patch: None },
-        DataSet { name: "G4INCL", version: "1.2", patch: None },
-        DataSet { name: "G4NDL", version: "4.7", patch: Some("1") },
-        DataSet { name: "G4PARTICLEXS", version: "4.0", patch: None },
-        DataSet { name: "G4PII", version: "1.3", patch: None },
-        DataSet { name: "G4SAIDDATA", version: "2.0", patch: None },
-        DataSet { name: "PhotonEvaporation", version: "5.7", patch: None },
-        DataSet { name: "RadioactiveDecay", version: "5.6", patch: None },
-        DataSet { name: "RealSurface", version: "2.2", patch: None },
+    const BASE_URL: &str = "https://geant4.web.cern.ch/download";
+    const NAMES: [&str; 12] = [
+        "G4ABLA", "G4CHANNELING", "G4EMLOW", "G4ENSDFSTATE", "G4INCL", "G4NDL", "G4PARTICLEXS",
+        "G4PII", "G4SAIDDATA", "PhotonEvaporation", "RadioactiveDecay", "RealSurface",
     ];
+
+    let url = format!("{}/{}.html", BASE_URL, GEANT4_VERSION);
+    let response = reqwest::blocking::get(&url)
+        .map_err(|err| {
+            let why = format!("{}: {}", url, err);
+            Error::new(ValueError)
+                .what("download")
+                .why(&why)
+                .to_err()
+        })?;
+    if response.status() != StatusCode::OK {
+        let status = response.status();
+        let reason = status
+            .canonical_reason()
+            .unwrap_or_else(|| status.as_str());
+        let why = format!("{}: {}", url, reason);
+        let err = Error::new(ValueError)
+            .what("download")
+            .why(&why)
+            .to_err();
+        return Err(err);
+    }
+    let content = response.text().unwrap();
+
+    let mut datasets = Vec::new();
+    for name in NAMES {
+        let pattern = format!("{}[.]([0-9][.][0-9])([.][0-9])?[.]tar[.]gz", name);
+        let re = Regex::new(&pattern).unwrap();
+        if let Some(captures) = re.captures(&content) {
+            let version = captures.get(1).unwrap().as_str();
+            let patch = captures.get(2).map(|patch| patch.as_str());
+            datasets.push(DataSet { name, version, patch })
+        }
+    }
 
     let destination = match destination {
         None => Cow::Owned(default_path()),
@@ -38,7 +66,7 @@ pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()
     let verbose = verbose.unwrap_or(false);
 
     std::fs::create_dir_all(&destination)?;
-    for dataset in DATASETS {
+    for dataset in datasets {
         dataset.download(&destination, verbose)?;
     }
 
@@ -57,13 +85,17 @@ pub fn default_path() -> PathBuf {
     }
 }
 
-struct DataSet {
-    name: &'static str,
-    version: &'static str,
-    patch: Option<&'static str>,
+struct DataSet<'a> {
+    name: &'a str,
+    version: &'a str,
+    patch: Option<&'a str>,
 }
 
-impl DataSet {
+impl<'a> DataSet<'a> {
+    fn dirname(&self) -> String {
+        format!("{}{}", self.name, self.version)
+    }
+
     fn download(&self, destination: &Path, verbose: bool) -> PyResult<()> {
         // Download tarball.
         const BASE_URL: &str = "https://cern.ch/geant4-data/datasets";
@@ -147,11 +179,10 @@ impl DataSet {
         // Extract data.
         if verbose {
             println!(
-                "extracting {} to {}/{}{}",
+                "extracting {} to {}/{}",
                 tarname,
                 destination.display(),
-                self.name,
-                self.version,
+                self.dirname(),
             );
         }
 
