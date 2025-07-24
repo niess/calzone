@@ -41,9 +41,7 @@ test-requires = [ "Pillow", "pytest" ]
 [tool.cibuildwheel.linux]
 before-all = """
 curl -sSf https://sh.rustup.rs -o rustup.sh && \
-sh rustup.sh -y && \
-curl -sSf -L https://github.com/niess/calzone/releases/download/geant4-11.3.0/geant4-11.3.0-manylinux2014_$(uname -m).tar.gz -o geant4.tar.gz && \
-tar -xzf geant4.tar.gz\
+sh rustup.sh -y\
 """
 repair-wheel-command = """
 LD_LIBRARY_PATH=$PWD/geant4/lib64/:$PWD/geant4/lib/:$LD_LIBRARY_PATH \
@@ -54,10 +52,6 @@ environment = "PATH=$HOME/.cargo/bin:$PATH"
 manylinux-x86_64-image = "manylinux2014"
 
 [tool.cibuildwheel.macos]
-before-all = """
-curl -sSf -L https://github.com/niess/calzone/releases/download/geant4-11.3.0/geant4-11.3.0-macosx_11_0_$(uname -m).tar.gz -o geant4.tar.gz && \
-tar -xzf geant4.tar.gz\
-"""
 build = "cp38-macosx_*"
 repair-wheel-command = """
 DYLD_LIBRARY_PATH=$PWD/geant4/lib64/:$PWD/geant4/lib/:$DYLD_LIBRARY_PATH \

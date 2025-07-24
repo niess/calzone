@@ -11,7 +11,7 @@ bvh = "0.9"
 cxx = "1.0"
 derive_more = "0.99"
 enum-variants-strings = "0.3"
-flate2 = "1.0"
+flate2.workspace = true
 getrandom = "0.2"
 indexmap = "2.2"
 indicatif = "0.17"
@@ -23,12 +23,21 @@ pyo3 = { version = "0.21", features = ["abi3", "extension-module"] }
 rand = "0.8"
 rand_pcg = "0.3"
 regex = "1.10"
-reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
 rmp-serde = "1.3"
+reqwest.workspace = true
 serde = { version = "1.0", features = [ "derive"] }
-tar = "0.4"
-temp-dir = "0.1"
+tar.workspace = true
+temp-dir.workspace = true
 
 [build-dependencies]
-indoc = "2"
 cxx-build = "1.0"
+flate2.workspace = true
+reqwest.workspace = true
+tar.workspace = true
+temp-dir.workspace = true
+
+[workspace.dependencies]
+flate2 = "1.0"
+reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
+tar = "0.4"
+temp-dir = "0.1"

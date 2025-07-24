@@ -1,7 +1,11 @@
-use indoc::indoc;
+use flate2::read::GzDecoder;
+use reqwest::StatusCode;
 use std::env;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tar::Archive;
+use temp_dir::TempDir;
 
 
 fn main() {
@@ -16,14 +20,7 @@ fn main() {
     let geant4_prefix = match command {
         Ok(output) => {
             let geant4_prefix = String::from_utf8(output.stdout)
-                .expect(indoc!("
-
-                    =============================================
-                    ==                                         ==
-                    ==    Could not parse **Geant4** prefix    ==
-                    ==                                         ==
-                    =============================================
-                "))
+                .expect(&boxed("Could not parse **Geant4** prefix"))
                 .trim()
                 .to_string();
             export_geant4_version(GEANT4_CONFIG);
@@ -32,14 +29,9 @@ fn main() {
         Err(_) => {
             let prefix = "geant4";
             if !Path::new(prefix).is_dir() {
-                panic!(indoc!("
-
-                    ====================================================
-                    ==                                                ==
-                    ==    Could not locate **Geant4** installation    ==
-                    ==                                                ==
-                    ====================================================
-                "));
+                if let Err(msg) = download_geant4() {
+                    panic!("{}", boxed(&msg))
+                }
             }
             const SEP: char = std::path::MAIN_SEPARATOR;
             let geant4_config = format!("{prefix}{SEP}bin{SEP}{GEANT4_CONFIG}");
@@ -146,9 +138,9 @@ fn export_geant4_version(geant4_config: &str) {
     let output = Command::new(geant4_config)
         .arg("--version")
         .output()
-        .expect("could not fetch Geant4 version");
+        .expect(&boxed("could not fetch Geant4 version"));
     let geant4_version = String::from_utf8(output.stdout)
-        .expect("could not parse Geant4 version")
+        .expect(&boxed("could not parse Geant4 version"))
         .trim()
         .to_string();
 
@@ -163,4 +155,83 @@ fn export_geant4_version(geant4_config: &str) {
             geant4_version,
         ),
     ).unwrap();
+}
+
+fn download_geant4() -> Result<(), String> {
+    const GEANT4_VERSION: &str = "11.3.0";
+    const BASE_URL: &str = "https://github.com/niess/calzone/releases/download/";
+
+    const TAG: &str =
+        if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+            "win_amd64"
+        } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            "macosx_11_0_arm64"
+        } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+            "macosx_11_0_x86_64"
+        } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+            "manylinux2014_aarch64"
+        } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+            "manylinux2014_x86_64"
+        } else {
+            panic!("unsupported os/arch")
+        };
+    let tarname = format!("geant4-{}-{}.tar.gz", GEANT4_VERSION, TAG);
+    let url = format!("{}/geant4-{}/{}", BASE_URL, GEANT4_VERSION, tarname);
+
+    let mut response = reqwest::blocking::get(&url)
+        .map_err(|err| format!("could not GET/ {} ({err})", url))?;
+    if response.status() != StatusCode::OK {
+        let status = response.status();
+        let reason = status
+            .canonical_reason()
+            .unwrap_or_else(|| status.as_str());
+        return Err(format!("failed to GET/ {} ({})", url, reason))
+    }
+
+    let length = response.headers()["content-length"]
+        .to_str()
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
+
+    let tmpdir = TempDir::new()
+        .map_err(|err| format!("{}", err))?;
+    let tarpath = tmpdir.child(&tarname);
+    let mut tarfile = std::fs::File::create(&tarpath)
+        .map_err(|err| format!("{}", err))?;
+    const CHUNK_SIZE: usize = 2048;
+    let mut buffer = [0_u8; CHUNK_SIZE];
+    let mut size = 0_usize;
+    loop {
+        let n = response.read(&mut buffer)
+            .map_err(|err| format!("{}", err))?;
+        if n > 0 {
+            tarfile.write(&buffer[0..n])
+                .map_err(|err| format!("{}", err))?;
+            size += n;
+            if size >= length { break }
+        }
+    }
+    drop(tarfile);
+
+    let tarfile = std::fs::File::open(&tarpath)
+        .map_err(|err| format!("{}", err))?;
+    let tar = GzDecoder::new(tarfile);
+    let mut archive = Archive::new(tar);
+    archive.unpack(".")
+        .map_err(|err| format!("{}", err))?;
+
+    Ok(())
+}
+
+fn boxed(text: &str) -> String {
+    let n = text.len() + 6;
+    let ruler = format!("{:=^width$}", "", width = n + 4);
+    let blank = format!("=={:^width$}==", "", width = n);
+    let text = format!("=={:^width$}==", text, width = n);
+    const SEP: &str = if cfg!(windows) { "\r\n" } else { "\n" };
+    vec![
+        "".to_owned(), ruler.clone(), blank.clone(), text, blank, ruler, "".to_owned(),
+        "".to_owned()
+    ].join(SEP)
 }
