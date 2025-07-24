@@ -53,6 +53,16 @@ jobs:
       - name: Build wheel
         uses: pypa/cibuildwheel@v2.23.3  # 2.23.3: supports Python 3.7.
 
+      - name: Test wheel
+        run: |
+          python3 -m venv ENV
+          source ENV/bin/activate
+          python -m pip install wheelhouse/*.whl
+          python -m pip install goupil Pillow pytest
+          mkdir test-{{ matrix.os }} && cd test-{{ matrix.os }}
+          python -m calzone download
+          python -m pytest --doctest-glob="*.rst" -v -m "not requires_display" ../tests ../docs/source
+
       - uses: actions/upload-artifact@v4
         with:
           name: artifact-${{ matrix.os }}

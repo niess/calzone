@@ -1,3 +1,4 @@
+use const_format::concatcp;
 use flate2::read::GzDecoder;
 use reqwest::StatusCode;
 use std::env;
@@ -7,6 +8,27 @@ use std::process::Command;
 use tar::Archive;
 use temp_dir::TempDir;
 
+
+const GEANT4_VERSION: &str = "11.3.2";
+
+const MACOSX_DEPLOYMENT_TARGET: &str = "11_0";
+
+const TAG: &str =
+    if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
+        "win_arm64"
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        "win_amd64"
+    } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        concatcp!("macosx_", MACOSX_DEPLOYMENT_TARGET, "_arm64")
+    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+        concatcp!("macosx_", MACOSX_DEPLOYMENT_TARGET, "_x86_64")
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        "manylinux2014_aarch64"
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        "manylinux2014_x86_64"
+    } else {
+        panic!("unsupported os/arch")
+    };
 
 const LINESEP: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 
@@ -29,8 +51,8 @@ fn main() {
             geant4_prefix
         },
         Err(_) => {
-            let prefix = "geant4";
-            if !Path::new(prefix).is_dir() {
+            let prefix = format!("geant4-{}-{}", GEANT4_VERSION, TAG);
+            if !Path::new(&prefix).is_dir() {
                 if let Err(msg) = download_geant4() {
                     panic!("{}", boxed(&msg))
                 }
@@ -38,7 +60,7 @@ fn main() {
             const SEP: char = std::path::MAIN_SEPARATOR;
             let geant4_config = format!("{prefix}{SEP}bin{SEP}{GEANT4_CONFIG}");
             export_geant4_version(&geant4_config);
-            prefix.to_string()
+            prefix
         },
     };
     let geant4_include = make_path(&geant4_prefix, &["include/Geant4"]);
@@ -160,23 +182,8 @@ fn export_geant4_version(geant4_config: &str) {
 }
 
 fn download_geant4() -> Result<(), String> {
-    const GEANT4_VERSION: &str = "11.3.0";
-    const BASE_URL: &str = "https://github.com/niess/calzone/releases/download/";
+    const BASE_URL: &str = "https://github.com/niess/calzone/releases/download";
 
-    const TAG: &str =
-        if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
-            "win_amd64"
-        } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-            "macosx_11_0_arm64"
-        } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
-            "macosx_11_0_x86_64"
-        } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
-            "manylinux2014_aarch64"
-        } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            "manylinux2014_x86_64"
-        } else {
-            panic!("unsupported os/arch")
-        };
     let tarname = format!("geant4-{}-{}.tar.gz", GEANT4_VERSION, TAG);
     let url = format!("{}/geant4-{}/{}", BASE_URL, GEANT4_VERSION, tarname);
 

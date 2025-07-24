@@ -34,10 +34,6 @@ where = ["src/python"]
 target = "calzone.calzone"
 
 # Build options for Python wheels.
-[tool.cibuildwheel]
-test-command = 'pytest --doctest-glob="*.rst" -v -m "not requires_data" {project}/tests {project}/docs/source'
-test-requires = [ "Pillow", "pytest" ]
-
 [tool.cibuildwheel.linux]
 before-all = """
 curl -sSf https://sh.rustup.rs -o rustup.sh && \
