@@ -2,6 +2,11 @@ name: Package
 on:
   workflow_dispatch:
     inputs:
+      geant4_version:
+        description: 'Geant4 version'
+        required: true
+        type: string
+        default: '11.3.2'
       sdist:
         description: 'Build sdist'
         required: true
@@ -17,6 +22,9 @@ on:
         required: true
         type: boolean
         default: false
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: '11.0'
 
 jobs:
   build_sdist:
@@ -42,7 +50,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, macos-14, windows-2022]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, macos-14, windows-2022, windows-11-arm]
+        include:
+          - os: ubuntu-24.04
+            tag: manylinux2014_x86_64
+          - os: ubuntu-24.04-arm
+            tag: manylinux2014_aarch64
+          - os: macos-13
+            tag: macosx_11_0_x86_64  # match MACOSX_DEPLOYMENT_TARGET
+          - os: macos-14
+            tag: macosx_11_0_arm64   # match MACOSX_DEPLOYMENT_TARGET
+          - os: windows-2022
+            tag: win_amd64
+          - os: windows-11-arm
+            tag: win_arm64
+
+    env:
+      GEANT4_PREFIX: 'geant4-${{ inputs.geant4_version }}-${{ matrix.tag }}'
 
     if: ${{ inputs.wheel }}
     steps:
@@ -50,18 +74,28 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Rust toolchain (Windows-11/arm64)
+        if: ${{ matrix.os == 'windows-11-arm' }}
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
       - name: Build wheel
         uses: pypa/cibuildwheel@v2.23.3  # 2.23.3: supports Python 3.7.
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '>=3.7'
+
       - name: Test wheel
+        shell: bash
         run: |
-          python3 -m venv ENV
-          source ENV/bin/activate
-          python -m pip install wheelhouse/*.whl
-          python -m pip install goupil Pillow pytest
-          mkdir test-{{ matrix.os }} && cd test-{{ matrix.os }}
-          python -m calzone download
-          python -m pytest --doctest-glob="*.rst" -v -m "not requires_display" ../tests ../docs/source
+          echo "Using $(which python)"
+          mkdir test-${{ matrix.tag }} && cd test-${{ matrix.tag }}
+          export PYTHONPATH="$PWD/packages"
+
+          python -s -m pip install ../wheelhouse/*.whl --target=packages
+          python -s -m pip install Pillow pytest --target=packages
+          python -s -m calzone download
+          python -s -m pytest --doctest-glob="*.rst" -v -m "not requires_display and not requires_goupil" ../tests ../docs/source
 
       - uses: actions/upload-artifact@v4
         with:

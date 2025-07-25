@@ -37,7 +37,12 @@ fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
     // Set data path.
     const DATA_KEY: &str = "GEANT4_DATA_DIR";
     if let Err(_) = env::var(DATA_KEY) {
-        env::set_var(DATA_KEY, utils::data::default_path());
+        // Note: we modify the env from within the C++ layer, because doing it from Rust does not
+        // seem to propagate down to the C++ layer, on Windows.
+        cxx::ffi::set_env(
+            DATA_KEY.to_owned(),
+            utils::data::default_path().to_string_lossy().into_owned(),
+        );
     }
 
     // Initialise interfaces.

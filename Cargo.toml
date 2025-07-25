@@ -30,7 +30,6 @@ tar.workspace = true
 temp-dir.workspace = true
 
 [build-dependencies]
-const_format = "0.2"
 cxx-build = "1.0"
 flate2.workspace = true
 reqwest.workspace = true

@@ -5,7 +5,7 @@ use super::ffi;
 impl Hash for ffi::MaterialProperties {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
-        unsafe { std::mem::transmute::<f64, u64>(self.density) }.hash(state);
+        f64::to_bits(self.density).hash(state);
         unsafe { std::mem::transmute::<ffi::G4State, u32>(self.state) }.hash(state);
     }
 }
@@ -13,7 +13,7 @@ impl Hash for ffi::MaterialProperties {
 impl Hash for ffi::MixtureComponent {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
-        unsafe { std::mem::transmute::<f64, u64>(self.weight) }.hash(state);
+        f64::to_bits(self.weight).hash(state);
     }
 }
 

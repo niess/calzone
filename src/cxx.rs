@@ -335,6 +335,9 @@ pub mod ffi {
         fn initialise_errors();
         fn get_error() -> SharedPtr<Error>;
 
+        // OS utilities.
+        fn set_env(name: String, value: String);
+
         // Geometry interface.
         type EInside;
         type G4AffineTransform;

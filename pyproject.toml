@@ -35,27 +35,30 @@ target = "calzone.calzone"
 
 # Build options for Python wheels.
 [tool.cibuildwheel.linux]
+build = [ "cp37-manylinux_x86_64", "cp37-manylinux_aarch64" ]
+manylinux-x86_64-image = "manylinux2014"
+
+environment = "PATH=$HOME/.cargo/bin:$PATH"
+environment-pass = [ "GEANT4_PREFIX" ]
 before-all = """
 curl -sSf https://sh.rustup.rs -o rustup.sh && \
 sh rustup.sh -y\
 """
 repair-wheel-command = """
-LD_LIBRARY_PATH=$PWD/geant4/lib64/:$PWD/geant4/lib/:$LD_LIBRARY_PATH \
+LD_LIBRARY_PATH=$PWD/$GEANT4_PREFIX/lib64/:$PWD/$GEANT4_PREFIX/lib/:$LD_LIBRARY_PATH \
 auditwheel repair -w {dest_dir} {wheel}\
 """
-build = [ "cp37-manylinux_x86_64", "cp37-manylinux_aarch64" ]
-environment = "PATH=$HOME/.cargo/bin:$PATH"
-manylinux-x86_64-image = "manylinux2014"
 
 [tool.cibuildwheel.macos]
-build = "cp38-macosx_*"
+build = [ "cp38-macosx_arm64", "cp38-macosx_x86_64" ]
+
 repair-wheel-command = """
-DYLD_LIBRARY_PATH=$PWD/geant4/lib64/:$PWD/geant4/lib/:$DYLD_LIBRARY_PATH \
+DYLD_LIBRARY_PATH=$PWD/$GEANT4_PREFIX/lib/:$DYLD_LIBRARY_PATH \
 delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}\
 """
-environment = { MACOSX_DEPLOYMENT_TARGET = "11.0" }
 
 [tool.cibuildwheel.windows]
+build = [ "cp39-win_amd64", "cp39-win_arm64" ]
+
 before-all = "python3 -m pip install delvewheel"
-build = "cp39-win_amd64"
-repair-wheel-command = 'delvewheel repair --add-path "%CD%\geant4\bin;%CD%\geant4\lib" -w {dest_dir} -v {wheel}'
+repair-wheel-command = 'delvewheel repair --add-path "%CD%\%GEANT4_PREFIX%\bin;%CD%\%GEANT4_PREFIX%\lib" -w {dest_dir} -v {wheel}'

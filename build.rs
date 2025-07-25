@@ -1,4 +1,3 @@
-use const_format::concatcp;
 use flate2::read::GzDecoder;
 use reqwest::StatusCode;
 use std::env;
@@ -9,28 +8,9 @@ use tar::Archive;
 use temp_dir::TempDir;
 
 
-const GEANT4_VERSION: &str = "11.3.2";
-
-const MACOSX_DEPLOYMENT_TARGET: &str = "11_0";
-
-const TAG: &str =
-    if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
-        "win_arm64"
-    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
-        "win_amd64"
-    } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        concatcp!("macosx_", MACOSX_DEPLOYMENT_TARGET, "_arm64")
-    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
-        concatcp!("macosx_", MACOSX_DEPLOYMENT_TARGET, "_x86_64")
-    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
-        "manylinux2014_aarch64"
-    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        "manylinux2014_x86_64"
-    } else {
-        panic!("unsupported os/arch")
-    };
-
 const LINESEP: &str = if cfg!(windows) { "\r\n" } else { "\n" };
+
+const MISSING_GEANT4: &str = "Could not locate **Geant4** install";
 
 fn main() {
     const GEANT4_CONFIG: &str = if cfg!(windows) {
@@ -51,16 +31,19 @@ fn main() {
             geant4_prefix
         },
         Err(_) => {
-            let prefix = format!("geant4-{}-{}", GEANT4_VERSION, TAG);
-            if !Path::new(&prefix).is_dir() {
-                if let Err(msg) = download_geant4() {
+            let geant4_prefix = env::var_os("GEANT4_PREFIX")
+                .expect(&boxed(MISSING_GEANT4));
+            let path = Path::new(&geant4_prefix);
+            if !path.is_dir() {
+                if let Err(msg) = download_geant4(&path) {
                     panic!("{}", boxed(&msg))
                 }
             }
+            let geant4_prefix = geant4_prefix.to_string_lossy().to_string();
             const SEP: char = std::path::MAIN_SEPARATOR;
-            let geant4_config = format!("{prefix}{SEP}bin{SEP}{GEANT4_CONFIG}");
+            let geant4_config = format!("{geant4_prefix}{SEP}bin{SEP}{GEANT4_CONFIG}");
             export_geant4_version(&geant4_config);
-            prefix
+            geant4_prefix
         },
     };
     let geant4_include = make_path(&geant4_prefix, &["include/Geant4"]);
@@ -87,6 +70,7 @@ fn main() {
         "src/simulation/tracker.cc",
         "src/utils/convert.cc",
         "src/utils/error.cc",
+        "src/utils/os.cc",
         "src/utils/units.cc",
     ];
 
@@ -181,20 +165,29 @@ fn export_geant4_version(geant4_config: &str) {
     ).unwrap();
 }
 
-fn download_geant4() -> Result<(), String> {
+fn download_geant4(geant4_prefix: &Path) -> Result<(), String> {
     const BASE_URL: &str = "https://github.com/niess/calzone/releases/download";
 
-    let tarname = format!("geant4-{}-{}.tar.gz", GEANT4_VERSION, TAG);
-    let url = format!("{}/geant4-{}/{}", BASE_URL, GEANT4_VERSION, tarname);
+    let dirname = geant4_prefix.file_name()
+        .and_then(|dirname| dirname.to_str())
+        .ok_or_else(|| MISSING_GEANT4.to_owned())?;
+    let items: Vec<_> = dirname.split('-').collect();
+    if (items.len() != 3) || (items[0] != "geant4") {
+        return Err(MISSING_GEANT4.to_owned())
+    }
+    let (version, tag) = (items[1], items[2]);
+
+    let tarname = format!("geant4-{}-{}.tar.gz", version, tag);
+    let url = format!("{}/geant4-{}/{}", BASE_URL, version, tarname);
 
     let mut response = reqwest::blocking::get(&url)
-        .map_err(|err| format!("could not GET/ {} ({err})", url))?;
+        .map_err(|err| format!("Could not GET/ {} ({err})", url))?;
     if response.status() != StatusCode::OK {
         let status = response.status();
         let reason = status
             .canonical_reason()
             .unwrap_or_else(|| status.as_str());
-        return Err(format!("failed to GET/ {} ({})", url, reason))
+        return Err(format!("Failed to GET/ {} ({})", url, reason))
     }
 
     let length = response.headers()["content-length"]
@@ -227,7 +220,11 @@ fn download_geant4() -> Result<(), String> {
         .map_err(|err| format!("{}", err))?;
     let tar = GzDecoder::new(tarfile);
     let mut archive = Archive::new(tar);
-    archive.unpack(".")
+    let destination = geant4_prefix
+        .parent()
+        .filter(|destination| destination != &Path::new(""))
+        .unwrap_or_else(|| Path::new("."));
+    archive.unpack(&destination)
         .map_err(|err| format!("{}", err))?;
 
     Ok(())

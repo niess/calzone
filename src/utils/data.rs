@@ -49,11 +49,11 @@ pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()
 
     let mut datasets = Vec::new();
     for name in NAMES {
-        let pattern = format!("{}[.]([0-9][.][0-9])([.][0-9])?[.]tar[.]gz", name);
+        let pattern = format!("{}[.]([0-9]+[.][0-9]+)([.]([0-9]+))?[.]tar[.]gz", name);
         let re = Regex::new(&pattern).unwrap();
         if let Some(captures) = re.captures(&content) {
             let version = captures.get(1).unwrap().as_str();
-            let patch = captures.get(2).map(|patch| patch.as_str());
+            let patch = captures.get(3).map(|patch| patch.as_str());
             datasets.push(DataSet { name, version, patch })
         }
     }
@@ -77,7 +77,7 @@ pub fn default_path() -> PathBuf {
     if cfg!(windows) {
         let appdata = env::var("LOCALAPPDATA").unwrap();
         Path::new(&appdata)
-            .join("calzone/data")
+            .join("calzone\\data")
     } else {
         let home = env::var("HOME").unwrap();
         Path::new(&home)
@@ -103,7 +103,7 @@ impl<'a> DataSet<'a> {
         let url = format!("{}/{}", BASE_URL, tarname);
         let mut response = reqwest::blocking::get(&url)
             .map_err(|err| {
-                let why = format!("{}: {}", self.name, err);
+                let why = format!("{}: {}", url, err);
                 Error::new(ValueError)
                     .what("download")
                     .why(&why)
@@ -114,7 +114,7 @@ impl<'a> DataSet<'a> {
             let reason = status
                 .canonical_reason()
                 .unwrap_or_else(|| status.as_str());
-            let why = format!("{}: {}", self.name, reason);
+            let why = format!("{}: {}", url, reason);
             let err = Error::new(ValueError)
                 .what("download")
                 .why(&why)
@@ -179,9 +179,10 @@ impl<'a> DataSet<'a> {
         // Extract data.
         if verbose {
             println!(
-                "extracting {} to {}/{}",
+                "extracting {} to {}{}{}",
                 tarname,
                 destination.display(),
+                std::path::MAIN_SEPARATOR,
                 self.dirname(),
             );
         }

@@ -171,3 +171,12 @@ void export_units(rust::Vec<UnitDefinition> & units);
 
 rust::Str as_str(const G4String &);
 std::array<double, 3> to_vec(const G4ThreeVector &);
+
+
+// ============================================================================
+//
+// OS utilities.
+//
+// ============================================================================
+
+void set_env(rust::String name, rust::String value);
