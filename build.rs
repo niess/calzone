@@ -1,4 +1,5 @@
 use flate2::read::GzDecoder;
+use regex::Regex;
 use reqwest::StatusCode;
 use std::env;
 use std::io::{Read, Write};
@@ -46,6 +47,8 @@ fn main() {
             geant4_prefix
         },
     };
+    export_geant4_datasets(&geant4_prefix);
+
     let geant4_include = make_path(&geant4_prefix, &["include/Geant4"]);
     let geant4_lib = make_path(&geant4_prefix, &["lib", "lib64"]);
 
@@ -155,14 +158,34 @@ fn export_geant4_version(geant4_config: &str) {
     let out_dir = env::var_os("OUT_DIR")
         .unwrap();
     let path = Path::new(&out_dir)
-        .join("geant4_version.rs");
-    std::fs::write(
-        &path,
-        format!(
-            "const GEANT4_VERSION: &str = \"{}\";",
-            geant4_version,
-        ),
-    ).unwrap();
+        .join("geant4_version.in");
+    std::fs::write(&path, format!("\"{}\"", geant4_version)).unwrap();
+}
+
+fn export_geant4_datasets(geant4_prefix: &str) {
+    let path = Path::new(geant4_prefix).join("bin").join("geant4.sh");
+    let content = std::fs::read_to_string(path)
+        .expect(&boxed("could not read $GEANT4_PREFIX/bin/geant4.sh"));
+
+    let re = Regex::new("# export G4[A-Z]+=[$]GEANT4_DATA_DIR/(G?4?[a-zA-Z]+)([0-9.]+)").unwrap();
+    let mut lines = Vec::new();
+    lines.push("&[".to_owned());
+    for captures in re.captures_iter(&content) {
+        let line = format!(
+            "    DataSet {{ name: \"{}\", version: \"{}\" }},",
+            captures.get(1).unwrap().as_str(),
+            captures.get(2).unwrap().as_str(),
+        );
+        lines.push(line);
+    }
+    lines.push("]".to_owned());
+    let lines = lines.join(LINESEP);
+
+    let out_dir = env::var_os("OUT_DIR")
+        .unwrap();
+    let path = Path::new(&out_dir)
+        .join("geant4_datasets.in");
+    std::fs::write(&path, lines).unwrap();
 }
 
 fn download_geant4(geant4_prefix: &Path) -> Result<(), String> {

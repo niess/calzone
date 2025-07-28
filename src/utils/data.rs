@@ -1,10 +1,8 @@
-use crate::GEANT4_VERSION;
 use crate::utils::error::{ctrlc_catched, Error};
 use crate::utils::error::ErrorKind::{KeyboardInterrupt, ValueError};
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use pyo3::prelude::*;
-use regex::Regex;
 use reqwest::StatusCode;
 use std::borrow::Cow;
 use std::env;
@@ -14,50 +12,14 @@ use tar::Archive;
 use temp_dir::TempDir;
 
 
+// Fetch the Geant4 datasets (exported by the build script).
+const DATASETS: &[DataSet] = include!(concat!(env!("OUT_DIR"), "/geant4_datasets.in"));
+
+
 /// Download Geant4 data.
 #[pyfunction]
 #[pyo3(signature=(destination=None, *, verbose=None))]
 pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()> {
-    const BASE_URL: &str = "https://geant4.web.cern.ch/download";
-    const NAMES: [&str; 12] = [
-        "G4ABLA", "G4CHANNELING", "G4EMLOW", "G4ENSDFSTATE", "G4INCL", "G4NDL", "G4PARTICLEXS",
-        "G4PII", "G4SAIDDATA", "PhotonEvaporation", "RadioactiveDecay", "RealSurface",
-    ];
-
-    let url = format!("{}/{}.html", BASE_URL, GEANT4_VERSION);
-    let response = reqwest::blocking::get(&url)
-        .map_err(|err| {
-            let why = format!("{}: {}", url, err);
-            Error::new(ValueError)
-                .what("download")
-                .why(&why)
-                .to_err()
-        })?;
-    if response.status() != StatusCode::OK {
-        let status = response.status();
-        let reason = status
-            .canonical_reason()
-            .unwrap_or_else(|| status.as_str());
-        let why = format!("{}: {}", url, reason);
-        let err = Error::new(ValueError)
-            .what("download")
-            .why(&why)
-            .to_err();
-        return Err(err);
-    }
-    let content = response.text().unwrap();
-
-    let mut datasets = Vec::new();
-    for name in NAMES {
-        let pattern = format!("{}[.]([0-9]+[.][0-9]+)([.]([0-9]+))?[.]tar[.]gz", name);
-        let re = Regex::new(&pattern).unwrap();
-        if let Some(captures) = re.captures(&content) {
-            let version = captures.get(1).unwrap().as_str();
-            let patch = captures.get(3).map(|patch| patch.as_str());
-            datasets.push(DataSet { name, version, patch })
-        }
-    }
-
     let destination = match destination {
         None => Cow::Owned(default_path()),
         Some(destination) => Cow::Borrowed(Path::new(destination)),
@@ -66,7 +28,7 @@ pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()
     let verbose = verbose.unwrap_or(false);
 
     std::fs::create_dir_all(&destination)?;
-    for dataset in datasets {
+    for dataset in DATASETS {
         dataset.download(&destination, verbose)?;
     }
 
@@ -88,7 +50,6 @@ pub fn default_path() -> PathBuf {
 struct DataSet<'a> {
     name: &'a str,
     version: &'a str,
-    patch: Option<&'a str>,
 }
 
 impl<'a> DataSet<'a> {
@@ -196,15 +157,11 @@ impl<'a> DataSet<'a> {
     }
 
     fn tarname(&self) -> String {
-        let patch = match self.patch {
-            None => "".to_string(),
-            Some(patch) => format!(".{}", patch),
-        };
         let name = if self.name.starts_with("G4") {
             Cow::Borrowed(self.name)
         } else {
             Cow::Owned(format!("G4{}", self.name))
         };
-        format!("{}.{}{}.tar.gz", name, self.version, patch)
+        format!("{}.{}.tar.gz", name, self.version)
     }
 }

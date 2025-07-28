@@ -12,8 +12,8 @@ mod utils;
 
 static FILE: GILOnceCell<String> = GILOnceCell::new();
 
-// Fetch the Geant4 version (exported by the build script).
-include!(concat!(env!("OUT_DIR"), "/geant4_version.rs"));
+// Geant4 version (exported by the build script).
+const GEANT4_VERSION: &str = include!(concat!(env!("OUT_DIR"), "/geant4_version.in"));
 
 
 /// CALorimeter ZONE (CalZone)
