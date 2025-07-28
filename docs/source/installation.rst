@@ -14,8 +14,7 @@ Installing Calzone
 From PyPI
 ---------
 
-Binary distributions of Calzone are available from `PyPI`_, for Linux (x86_64),
-as
+Binary distributions of Calzone are available from `PyPI`_, e.g. as
 
 .. code:: bash
 
@@ -36,17 +35,16 @@ import geometries (which can be done using :bash:`pip3 install`, as well).
 Geant4 data
 -----------
 
-In order to operate, Calzone requires 2 GB of Geant4 data tables, which are
-not included in the Python package. Once Calzone has been installed, these
-can be downloaded as
+In order to operate, Calzone requires 2 GB of Geant4 data tables, which are not
+included in the Python package. Once Calzone has been installed (or updated),
+these data can be downloaded (or updated) as
 
 .. code:: bash
 
    python3 -m calzone download
 
 Alternatively, the :bash:`G4_DATA_DIR` environment variable can be set to the
-location of already existing Geant4 data, e.g. from another Geant4
-installation.
+location of already existing Geant4 data, e.g. from another Geant4 installation.
 
 
 From source
