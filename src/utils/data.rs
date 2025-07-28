@@ -18,18 +18,36 @@ const DATASETS: &[DataSet] = include!(concat!(env!("OUT_DIR"), "/geant4_datasets
 
 /// Download Geant4 data.
 #[pyfunction]
-#[pyo3(signature=(destination=None, *, verbose=None))]
-pub fn download(destination: Option<&str>, verbose: Option<bool>) -> PyResult<()> {
+#[pyo3(signature=(destination=None, *, exclude=None, force=false, include=None, verbose=false))]
+pub fn download(
+    destination: Option<&str>,
+    exclude: Option<Vec<String>>,
+    force: Option<bool>,
+    include: Option<Vec<String>>,
+    verbose: Option<bool>,
+    ) -> PyResult<()> {
     let destination = match destination {
         None => Cow::Owned(default_path()),
         Some(destination) => Cow::Borrowed(Path::new(destination)),
     };
 
+    let force = force.unwrap_or(false);
     let verbose = verbose.unwrap_or(false);
 
+    let datasets = DATASETS
+        .iter()
+        .filter(|dataset| match include.as_ref() {
+            Some(include) => include.iter().any(|include| dataset.name == include),
+            None => true,
+        })
+        .filter(|dataset| match exclude.as_ref() {
+            Some(exclude) => exclude.iter().all(|exclude| dataset.name != exclude),
+            None => true,
+        });
+
     std::fs::create_dir_all(&destination)?;
-    for dataset in DATASETS {
-        dataset.download(&destination, verbose)?;
+    for dataset in datasets {
+        dataset.download(&destination, force, verbose)?;
     }
 
     Ok(())
@@ -57,7 +75,11 @@ impl<'a> DataSet<'a> {
         format!("{}{}", self.name, self.version)
     }
 
-    fn download(&self, destination: &Path, verbose: bool) -> PyResult<()> {
+    fn download(&self, destination: &Path, force: bool, verbose: bool) -> PyResult<()> {
+        if !force && destination.join(&self.dirname()).exists() {
+            return Ok(())
+        }
+
         // Download tarball.
         const BASE_URL: &str = "https://cern.ch/geant4-data/datasets";
         let tarname = self.tarname();

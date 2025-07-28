@@ -59,6 +59,21 @@ def main():
         nargs = "?"
     )
 
+    download.add_argument("-e", "--exclude",
+        help = "exclude a specific dataset.",
+        action = "append"
+    )
+
+    download.add_argument("-f", "--force",
+        help = "overwrite any existing data.",
+        action = "store_true"
+    )
+
+    download.add_argument("-i", "--include",
+        help = "include a specific dataset.",
+        action = "append"
+    )
+
     download.add_argument("-q", "--quiet",
         help = "mute the download status.",
         action = "store_true"
@@ -87,6 +102,9 @@ def main():
     elif args.command == "download":
         calzone.download(
             destination = args.destination,
+            exclude = args.exclude,
+            force = args.force,
+            include = args.include,
             verbose = not args.quiet
         )
 
