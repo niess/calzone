@@ -57,10 +57,10 @@ Calzone source is available from `GitHub`_, e.g. as
    git clone --recursive https://github.com/niess/calzone
 
 To build Calzone from source, you will require the `Rust toolchain`_ and have
-`Geant4`_ pre-installed with C++17 and GDML enabled, but with multithreading
-disabled. Once the Geant4 environment has been set up, Calzone will be built as
-a Rust shared library. For example, on Linux, the following commands builds the
-Calzone package in-source (under `src/python/calzone
+`Geant4`_ pre-installed with C++17 enabled, but with multithreading disabled.
+Once the Geant4 environment has been set up, Calzone will be built as a Rust
+shared library. For example, on Linux, the following commands builds the Calzone
+package in-source (under `src/python/calzone
 <https://github.com/niess/calzone/tree/master/src/python/calzone>`_).
 
 .. code:: bash
