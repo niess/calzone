@@ -35,9 +35,9 @@ denoted Monte Carlo Particles Transport (MCPT) herein. In particular, the
 an established MCPT `C++` library for simulating the passage of high-energy
 particles through matter.
 
-[Calzone][CALZONE] is a MCPT [Python][PYTHON] package built on top of
-[Geant4][GEANT4]. It was developed in the context of geosciences with the
-objective of studying the emission of radioactivity from volcanoes
+[Calzone][CALZONE] (CALorimeter ZONE) is a MCPT [Python][PYTHON] package built
+on top of [Geant4][GEANT4]. It was developed in the context of geosciences with
+the objective of studying the emission of radioactivity from volcanoes
 [@Terray:2020], and in particular to simulate the response of [gamma][GAMMA]
 spectrometers deployed in the field. To this end, [Calzone][CALZONE] was
 developed in conjunction with [Goupil][GOUPIL] [@Niess:2024], a backward
@@ -54,7 +54,12 @@ workflow is illustrated below,
 
 ```python
 simulation = calzone.Simulation("geometry.toml")
-particles = calzone.particles(10000, pid="gamma", energy=0.5, position=(0,0,1))
+particles = calzone.particles(
+    10000,
+    pid="gamma",
+    energy=0.5,       # MeV
+    position=(0,0,1)  # cm
+)
 deposits = simulation.run(particles).deposits
 ```
 
@@ -139,7 +144,7 @@ The process of meshing a [DEM][DEM] with triangular facets introduces specific
 issues. To optimise the geometry traversal, the [Geant4][GEANT4] software uses a
 [voxelisation][VOXEL] algorithm. This method scales poorly for [DEMs][DEM] that
 typically comprises millions of nodes (see e.g., [@Niess:2020]), and is
-inefficient for long-range particles (the like [$\gamma$][GAMMA] and
+inefficient for long-range particles (such as [$\gamma$][GAMMA] and
 [$\mu$][MUON]). Thus, [Calzone][CALZONE] defines a dedicated `Mesh` object that
 includes a Bounding Volume Hierarchy ([BVH][BVH]) algorithm (partitioning the
 surface of the mesh, rather than its volume). The user may then select the
@@ -161,7 +166,7 @@ far environment (see e.g. [@Niess:2018; @Niess:2022]). To this end,
 
 ## Particles generator
 
-Another point of interest for MCPT applications is the modelling of particles
+Another point of interest for MCPT applications is the modelling of particle
 sources. For this purpose, [Calzone][CALZONE] provides a geometry-aware
 [`ParticlesGenerator`][GENERATOR] object, which can, for instance, generate
 particles entering a specific geometry volume. Moreover, [Calzone's][CALZONE]
