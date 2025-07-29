@@ -64,6 +64,9 @@ jobs:
             tag: win_amd64
           - os: windows-11-arm
             tag: win_arm64
+          - markers: "not requires_display"
+          - markers: "not requires_display and not requires_goupil"
+            os: windows-2022
 
     env:
       GEANT4_PREFIX: 'geant4-${{ inputs.geant4_version }}-${{ matrix.tag }}'
@@ -94,8 +97,10 @@ jobs:
 
           python -s -m pip install ../wheelhouse/*.whl --target=packages
           python -s -m pip install Pillow pytest --target=packages
+          [[ "${{ matrix.os }}" == "windows-2022" ]] || \
+              python -s -m pip install goupil --target=packages
           python -s -m calzone download
-          python -s -m pytest --doctest-glob="*.rst" -v -m "not requires_display and not requires_goupil" ../tests ../docs/source
+          python -s -m pytest --doctest-glob="*.rst" -v -m "${{ matrix.markers }}" ../tests ../docs/source
 
       - uses: actions/upload-artifact@v4
         with:
