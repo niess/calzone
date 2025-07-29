@@ -9,22 +9,73 @@ conjunction with [Goupil][GOUPIL] [(Niess et al., 2024)][NVT24], a backward
 gamma transport engine, and is interoperable with the latter. Yet, both packages
 can be used entirely independently, if necessary.
 
-Please refer to the online [documentation][RTD] for further information.
+Please refer to the online [documentation][RTD] and the [examples][EXAMPLES] for
+further information.
 
 
 ## Installation
 
-Binary distributions of Calzone are available from [PyPI][PyPI], for Linux
-`x86_64`, e.g. as
+Binary distributions of Calzone are available from [PyPI][PyPI], e.g. as
 
 ```bash
-pip3 install calzone
+python -m pip install calzone
 ```
 
-Alternatively, in order to build Calzone from the source, a working
-[Geant4][Geant4] installation is required. Please refer to the corresponding
-[documentation][RTD_INSTALLATION] entry for further instructions.
+In addition, Calzone requires 2 GB of [Geant4][Geant4] data tables, which are
+not included in the Python package. Once Calzone has been installed, these can
+be downloaded as
 
+```bash
+python -m calzone download
+```
+
+Please refer to the [documentation][RTD_INSTALLATION] for alternative
+installation methods.
+
+
+## Quick start
+
+```toml
+# file: geometry.toml
+
+[Environment]
+sphere = 1E+05  # cm
+material = "G4_WATER"
+
+[Environment.Source]
+sphere = 1E+02  # cm
+material = "G4_WATER"
+
+[Environment.Source.Detector]
+cylinder = { length = 5.1, radius = 2.55 }  # cm
+material = "G4_SODIUM_IODIDE"
+role = "record_deposits"
+```
+
+```python
+# file: run.py
+
+import calzone
+
+# Instanciate a simulation engine (using a TOML geometry).
+# Requires installing `tomli` for Python < 3.11.
+simulation = calzone.Simulation("geometry.toml")
+
+# Generate primary particles.
+source = simulation.geometry.find("Source")
+energy = 1.0  # MeV
+primaries = simulation.particles()  \
+    .pid("gamma")                   \
+    .energy(energy)                 \
+    .inside(source)                 \
+    .generate(1000)
+
+# Run the simulation and fetch deposits.
+detector = simulation.geometry.find("Detector")
+deposits = simulation  \
+    .run(primaries)    \
+    .deposits[detector.path]
+```
 
 ## License
 The Calzone source is distributed under the **GNU LGPLv3** license. See the
@@ -34,6 +85,7 @@ Collaboration, which is under a [specific license][G4_LICENSE].
 
 
 [COPYING.LESSER]: https://github.com/niess/calzone/blob/master/COPYING.LESSER
+[EXAMPLES]: https://github.com/niess/calzone/blob/master/examples
 [JSON]: https://www.json.org/json-en.html
 [Geant4]: http://cern.ch/geant4
 [Goupil]: https://github.com/niess/goupil

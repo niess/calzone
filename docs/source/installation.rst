@@ -18,13 +18,13 @@ Binary distributions of Calzone are available from `PyPI`_, e.g. as
 
 .. code:: bash
 
-   pip3 install calzone
+   python -m pip install calzone
 
 or alternatively
 
 .. code:: bash
 
-   pip3 install calzone-display
+   python -m pip install calzone-display
 
 in order to install both Calzone and its interactive display.
 
@@ -41,7 +41,7 @@ these data can be downloaded (or updated) as
 
 .. code:: bash
 
-   python3 -m calzone download
+   python -m calzone download
 
 Alternatively, the :bash:`G4_DATA_DIR` environment variable can be set to the
 location of already existing Geant4 data, e.g. from another Geant4 installation.
