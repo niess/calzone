@@ -1,0 +1,42 @@
+# A style sheet for matplotlib generating figures with large LaTeX labels for
+# publications.
+#
+# Author: Valentin Niess (niess@in2p3.fr)
+
+# Set a 3/4 aspect ratio with automatic layout.
+figure.figsize: 8., 6.
+figure.autolayout: true
+
+# Use LaTeX fonts
+font.family: serif
+font.serif: ComputerModern
+text.usetex: true
+
+# Backend options (42: use TrueType fonts)
+pdf.fonttype: 42
+ps.fonttype: 42
+
+# Set large font sizes for paper figures
+axes.labelsize: 18
+axes.titlesize: 18
+axes.titlepad: 12
+xtick.labelsize: 16
+ytick.labelsize: 16
+axes.labelpad: 6
+legend.fontsize: 16
+legend.numpoints: 1
+legend.scatterpoints: 1
+
+# Set lines and ticks according to the `seaborn-paper` style sheet
+grid.linewidth: 0.8
+lines.linewidth: 1.4
+patch.linewidth: 0.24
+lines.markersize: 5.6
+lines.markeredgewidth: 0
+
+xtick.major.width: 0.8
+ytick.major.width: 0.8
+xtick.minor.width: 0.4
+ytick.minor.width: 0.4
+xtick.major.pad: 5.6
+ytick.major.pad: 5.6

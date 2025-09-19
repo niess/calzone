@@ -1,8 +1,8 @@
 [Environment]
-envelope = { shape = "box", padding = [ 0, 0, 0, 0, 0, 1e5 ] }
+envelope = { shape = "box", padding = [ 0, 0, 0, 0, 0, 3e4 ] }
 
 [Environment.Terrain]
-mesh = { path = "meshes/terrain.png", units = "m", padding = 100 }
+mesh = { path = "meshes/terrain.png", units = "m", padding = 200 }
 material = "SomeRock"
 
 [materials.mixtures]

@@ -10,6 +10,7 @@ extensions = [
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.doctest",
     "sphinx.ext.intersphinx",
+    "sphinx_subfigure",
 ]
 
 numfig = True
@@ -34,6 +35,10 @@ rst_prolog = """
 
 .. role:: python(code)
     :language: python
+    :class: highlight
+
+.. role:: toml(code)
+    :language: toml
     :class: highlight
 
 .. role:: underline

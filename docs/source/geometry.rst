@@ -9,11 +9,172 @@ A `Geant4`_ Monte Carlo geometry consists of a hierarchy of nested
 and :external:py:class:`str`) that have associated representations in common
 configuration languages, such as `JSON`_, `TOML`_ or `YAML`_.
 
-A comprehensive account of the Calzone geometry format is presented in the
-following sections, accompanied by `TOML`_ code examples. For a more pragmatic
-approach, one might alternatively consult the :bash:`examples/` folder, which is
-distributed with the Calzone `source <Examples_>`_.
+In the following section, we illustrate Calzone's geometry representation with
+some of the examples distributed with the `source <Examples_>`_. For a more
+comprehensive account of the Calzone geometry definition, please refer to the
+`Reference`_ section hereafter.
 
+.. note::
+
+   While Calzone supports various geometry formats, the examples provided in
+   this section are all in `TOML`_ format.
+
+----
+
+Examples
+********
+
+Flat air-soil interface
+-----------------------
+
+To begin with a basic example, let us consider a flat air-soil interface (as in
+the `gamma/benchmark <ExampleBenchmark_>`_ example). This is represented with
+Calzone using a :bash:`geometry.toml` file, with the following content
+
+.. literalinclude:: include/benchmark-geometry.toml
+   :language: toml
+   :lines: 1-8
+
+The root volume is defined by an axis-aligned cubic box of 2 km extension (i.e.
+:python:`2E+05` cm), named :toml:`Environment` and filled with :toml:`"G4_AIR"`
+(from the Geant4 `NIST`_ database). The root volume (:toml:`Environment`)
+contains a daughter volume (:toml:`Ground`), which is also of box shape, with a
+square base of 2 km sides and a height of 1 km. The origin (i.e. the box centre)
+of the :python:`Ground` volume is offset by 500 m along the z-axis w.r.t. its
+mother volume (as specified by the :toml:`position` attribute). As a result, the
+:toml:`Ground` volume occupies the lower half of the root volume.
+
+.. tip::
+
+   Calzone supports various volume shapes, not only boxes. Please refer to the
+   `Shape definition`_ section below for a description of the available volume
+   shapes.
+
+Following the same box logic, a second  :toml:`Detector` volume (:math:`20
+\times 20 \times 10 \, \mathrm{m}^3`) is placed within the root volume, with its
+base positioned 5 cm above the top of the ground volume. This is achieved as
+
+.. literalinclude:: include/benchmark-geometry.toml
+   :language: toml
+   :lines: 9-
+
+The resulting geometry is represented in :numref:`fig-benchmark-geometry` below.
+
+.. warning::
+
+   It is the user's responsibility to ensure that daughter volumes do not
+   collide with each other or with their mother volume. This can be tested by
+   running the :py:meth:`Geometry.check <calzone.Geometry.check>` method.
+
+.. subfigure:: AB
+   :gap: 8px
+   :layout-sm: A|B
+   :name: fig-benchmark-geometry
+   :subcaptions: above
+
+   .. image:: include/benchmark-geometry.svg
+      :alt: (A)
+
+   .. image:: include/benchmark-geometry.png
+      :alt: (B)
+
+   Representations of the `gamma/benchmark <ExampleBenchmark_>`_ example. (A)
+   Cross-section along the (xOz) plane. (B) Calzone display view.
+
+
+Including a topography
+----------------------
+
+Let us now consider a more realistic example, in which the air-soil interface is
+described by a Digital Elevation Model (`DEM`_), as in the `geometry/topography
+<ExampleTopography_>`_ example. The corresponding `TOML`_ geometry file is
+
+.. literalinclude:: include/topography-geometry.toml
+   :language: toml
+
+This example introduces two new shapes that are specific to Calzone. Firstly,
+the root volume is defined as a box-like `Envelope Shape`_. This is a dynamic
+shape whose extent adapts to its content. The :toml:`padding` attribute
+indicates that the envelope should reserve 300 m of additional space along the
+upward direction (i.e., along the z-axis), for the atmosphere above the ground.
+
+Secondly, the ground is represented by the :toml:`Terrain` volume using a `Mesh
+Shape`_. The corresponding mesh is built from the DEM specified in
+:toml:`"meshes/terrain.png"`, whose system of units is metres. The DEM describes
+a surface, :math:`z = f(x, y)`, which needs to be closed in order to be a valid
+Geant4 volume. This is achieved by completing the DEM surface with five
+axis-aligned flat faces in order to form a box-like base. In this situation, the
+:toml:`padding` attribute specifies that the bottom face should be located
+:python:`200` map units (i.e. metres) below the minimum height of the DEM
+surface. The resulting geometry is represented in
+:numref:`fig-topography-geometry` below.
+
+In addition, the :toml:`Terrain` uses a custom :toml:`"SomeRock"` material whose
+definition is inlined below. It is a derivative of the PDG `standard rock
+<StandardRock_>`_, with a lower density, e.g. representing a porous rock.
+
+.. subfigure:: AB
+   :gap: 8px
+   :layout-sm: A|B
+   :name: fig-topography-geometry
+   :subcaptions: above
+
+   .. image:: include/topography-geometry.svg
+      :alt: (A)
+
+   .. image:: include/topography-geometry.png
+      :alt: (B)
+
+   Representations of the `geometry/topography <ExampleTopography_>`_ example.
+   (A) Cross-section along the (xOz) plane. (B) Calzone display view.
+
+
+Replicating a volume
+--------------------
+
+Finally, let us consider the case of replicating a composite volume at different
+locations, as with the `muon/trajectograph <ExampleTrajectograph_>`_ example. In
+this use case, we consider a toy muography detector made of four identical
+detection planes (i.e. replicas) and a central lead-scatterer (to reject
+low-energy background particles). Replication is achieved by delegating the
+description of a single detection plane to an auxiliary file (`layer.toml
+<LayerDescription_>`_), which is `included <includes>`_ four times in the main
+geometry file, as below
+
+.. literalinclude:: include/trajectograph-geometry.toml
+   :language: toml
+
+Note that an included geometry may itself include sub-geometries. For instance,
+in the current example, a detection plane is composed of six identical sub-units
+(named muon chambers), as below
+
+.. literalinclude:: include/trajectograph-layer.toml
+   :language: toml
+
+where the `chamber.toml <ChamberDescription_>`_ file contains the geometry
+description of a muon chamber. The resulting geometry is represented in
+:numref:`fig-trajectograph-geometry` below.
+
+
+.. subfigure:: AB
+   :gap: 8px
+   :layout-sm: A|B
+   :name: fig-trajectograph-geometry
+   :subcaptions: above
+
+   .. image:: include/trajectograph-geometry.svg
+      :alt: (A)
+
+   .. image:: include/trajectograph-geometry.png
+      :alt: (B)
+
+   Representations of the `muon/trajectograph <ExampleTrajectograph_>`_ example.
+   (A) Cross-section along the (yOz) plane. (B) Calzone display view.
+
+----
+
+Reference
+*********
 
 Geometry objects
 ----------------
@@ -896,8 +1057,12 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. ============================================================================
 
 .. _BVH: https://en.wikipedia.org/wiki/Bounding_volume_hierarchy
+.. _ChamberDescription: https://github.com/niess/calzone/tree/master/examples/muon/trajectograph/chamber.toml
 .. _DEM: https://en.wikipedia.org/wiki/Digital_elevation_model
-.. _JSON: https://www.json.org/json-en.html
+.. _Examples: https://github.com/niess/calzone/tree/master/examples/
+.. _ExampleBenchmark: https://github.com/niess/calzone/tree/master/examples/gamma/benchmark
+.. _ExampleTrajectograph: https://github.com/niess/calzone/tree/master/examples/muon/trajectograph
+.. _ExampleTopography: https://github.com/niess/calzone/tree/master/examples/geometry/topography
 .. _G4Box: https://geant4.kek.jp/Reference/11.2.0/classG4Box.html
 .. _G4Element: https://geant4.kek.jp/Reference/11.2.0/classG4Element.html
 .. _G4Material: https://geant4.kek.jp/Reference/11.2.0/classG4Material.html
@@ -908,7 +1073,8 @@ Mixtures are specified by their *density* (in g/cm\ :sup:`3`) and their **mass**
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
 .. _Geant4: https://geant4.web.cern.ch/docs/
 .. _GeoTIFF: https://fr.wikipedia.org/wiki/GeoTIFF
-.. _Examples: https://github.com/niess/calzone/tree/master/examples/
+.. _JSON: https://www.json.org/json-en.html
+.. _LayerDescription: https://github.com/niess/calzone/tree/master/examples/muon/trajectograph/layer.toml
 .. _NIST: https://geant4-userdoc.web.cern.ch/UsersGuides/ForApplicationDeveloper/html/Appendix/materialNames.html?highlight=nist#
 .. _OBJ: https://en.wikipedia.org/wiki/Wavefront_.obj_file
 .. _OpenGate: http://www.opengatecollaboration.org/
