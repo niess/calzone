@@ -80,7 +80,7 @@ The [Geant4][GEANT4] software was designed as a generic toolkit, with the
 capability of being extended using the `C++` inheritance mechanism. The software
 is provided under an open-source
 [licence](https://geant4.web.cern.ch/download/license) and is subjected to
-rigorous [validation][GEANT4_PHYSICS] including comparisons with experimental
+rigorous [validation][GEANT4_VALIDATION] including comparisons with experimental
 data [@Allison:2016]. As a result, [Geant4][GEANT4] is employed in a multitude
 of [applications](https://geant4.web.cern.ch/about/#applications), including
 high-energy physics (its initial scope) and radiation studies (e.g. for medical
@@ -217,7 +217,7 @@ providing computing resources needed for validating this work.
 [GAMOS]: https://fismed.ciemat.es/GAMOS/
 [GATE]: http://www.opengatecollaboration.org/
 [GEANT4]: https://geant4.web.cern.ch/
-[GEANT4_PHYSICS]: https://geant4.web.cern.ch/collaboration/working_groups/physicsList/
+[GEANT4_VALIDATION]: https://geant4.web.cern.ch/collaboration/working_groups/physval-wg/
 [GEANT4PY]: https://github.com/koichi-murakami/g4python/
 [GENERATOR]: https://calzone.readthedocs.io/en/latest/api.html#calzone.ParticlesGenerator
 [GEOTIFF]: https://fr.wikipedia.org/wiki/GeoTIFF
