@@ -605,6 +605,13 @@ the xOy plane.
    cylindrical shape (in deg). By default, the cylinder is closed, i.e. it spans
    the whole azimuth angle ([0, 360] deg).
 
+.. figure:: include/cylinders.png
+
+   Examples of cylindrical shapes visualised with Calzone display. The gold
+   shapes are hollow cylinders, while the silver ones are plain cylinders. The
+   shapes on the right are cylindrical sections, while those on the left are
+   full cylinders.
+
 
 Envelope shape
 ~~~~~~~~~~~~~~
@@ -766,6 +773,12 @@ A sphere (`G4Orb`_ or `G4Sphere`_), centred on the origin, and defined by its
    angular span of the spherical shape (in deg). By default, the sphere is
    closed, i.e. it spans the whole azimuth angle ([0, 360] deg), and the whole
    zenith angle ([0, 180] deg).
+
+.. figure:: include/spheres.png
+
+   Examples of spherical shapes visualised with Calzone display. The gold shape
+   is a hollow sphere, while the silver ones are plain spheres. The shape on the
+   left is a full sphere, while those on the left are spherical sections.
 
 
 Meshes definition
