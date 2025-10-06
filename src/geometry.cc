@@ -854,19 +854,11 @@ std::array<double, 6> VolumeBorrow::compute_box(rust::Str frame) const {
     }
 
     auto solid = this->volume->GetLogicalVolume()->GetSolid();
-    if (transform->IsTranslated() || transform->IsRotated()) {
+    {
         auto limits = G4VoxelLimits();
         solid->CalculateExtent(kXAxis, limits, *transform, box[0], box[1]);
         solid->CalculateExtent(kYAxis, limits, *transform, box[2], box[3]);
         solid->CalculateExtent(kZAxis, limits, *transform, box[4], box[5]);
-    } else {
-        auto extent = solid->GetExtent();
-        box[0] = extent.GetXmin();
-        box[1] = extent.GetXmax();
-        box[2] = extent.GetYmin();
-        box[3] = extent.GetYmax();
-        box[4] = extent.GetZmin();
-        box[5] = extent.GetZmax();
     }
 
     for (auto && value: box) {

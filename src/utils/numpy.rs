@@ -93,7 +93,7 @@ unsafe impl Sync for ArrayInterface {}
 
 static ARRAY_INTERFACE: GILOnceCell<ArrayInterface> = GILOnceCell::new();
 
-fn api(py: Python) -> &ArrayInterface {
+fn api(py: Python<'_>) -> &ArrayInterface {
     ARRAY_INTERFACE
         .get(py)
         .expect("Numpy Array API not initialised")

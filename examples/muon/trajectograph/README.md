@@ -12,7 +12,7 @@ be visualised as
 calzone display geometry.toml
 ```
 
-Muons with an energy of 10 MeV are injected over the detector envelope, and the
+Muons with an energy of 10 GeV are injected over the detector envelope, and the
 resulting energy deposits in the [RPCs][RPC] gaps are printed, in the local
 coordinates of the chamber.
 

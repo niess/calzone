@@ -69,11 +69,6 @@ pub mod ffi {
     }
 
     #[derive(Deserialize, Serialize)]
-    struct MeshShape {
-        facets: Vec<f32>,
-    }
-
-    #[derive(Deserialize, Serialize)]
     #[repr(i32)]
     #[serde(transparent)]
     enum ShapeType {
