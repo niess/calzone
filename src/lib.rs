@@ -18,7 +18,8 @@ const GEANT4_VERSION: &str = include!(concat!(env!("OUT_DIR"), "/geant4_version.
 
 /// CALorimeter ZONE (CalZone)
 #[pymodule]
-fn calzone(module: &Bound<PyModule>) -> PyResult<()> {
+#[pyo3(name = "_core")]
+fn init(module: &Bound<PyModule>) -> PyResult<()> {
 
     // Set __file__.
     let py = module.py();

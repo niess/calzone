@@ -31,7 +31,7 @@ source = "https://github.com/niess/calzone"
 where = ["src/python"]
 
 [[tool.setuptools-rust.ext-modules]]
-target = "calzone.calzone"
+target = "calzone._core"
 
 # Build options for Python wheels.
 [tool.cibuildwheel.linux]
