@@ -6,12 +6,29 @@ Carlo :ref:`geometry <display:Volumes menu>` by controlling a drone-like
 :ref:`camera <display:The Drone>`. Furthermore, Monte Carlo :ref:`tracks
 <display:Tracks menu>` can be superimposed for a visual inspection.
 
+.. important::
+
+   The interactive display has a limited numeric accuracy of 32 bits. While this
+   approach provides a convenient overview of the geometry, for a robust
+   detection of overlapping volumes, the :py:meth:`Geometry.check
+   <calzone.Geometry.check>` method should be used instead.
+
 .. note::
 
    The interactive display is a standalone instance running in parallel with
    Python's main thread. However, there can only be one display instance per
    process. This means that launching a new display will overwrite any existing
    one (in the same process).
+
+.. figure:: include/display-example.png
+
+   Example of geometry and tracks, as visualised with the Calzone interactive
+   display. The `Volumes <Volumes menu_>`_ and `Tracks <Tracks menu_>`_ menus
+   are visible on the upper left corner. The `Drone camera <The Drone_>`_
+   statistics are indicated on the upper right panel. Sunlight `Lighting
+   <Lighting modes_>`_ is used with atmospheric scattering enabled. The
+   corresponding Location settings are indicated on the lower right panel. The
+   geometry is rendered in Plain `Display mode <Display modes_>`_.
 
 
 Volumes menu
@@ -113,6 +130,37 @@ holding down the right mouse button. The available actions are summarised in
      - Move the Drone forwards.
 
 
+Lighting modes
+--------------
+
+By default, the drone camera uses a bright overhead light to illuminate the
+scene. As an alternative option, sunlight illumination, with or without
+atmospheric scattering, can be utilised. Pressing the :bash:`p` key enables the
+user to cycle through the lighting modes.
+
+Activation of the sunlight lighting function will open a Location panel in the
+bottom right corner of the display window. The lighting parameters (latitude,
+time, etc.) are reported on this panel. To edit these settings, simply click on
+the corresponding value. For an overview of the available interactions, refer to
+:numref:`tab-lighting-interactions` below.
+
+.. _tab-lighting-interactions:
+
+.. list-table:: Lighting interactions.
+   :width: 75%
+   :widths: auto
+   :header-rows: 1
+
+   * - Action
+     - Result
+   * - :bash:`LeftClick`
+     - Enter (if on a location setting value) or Exit (otherwise) the edit mode.
+   * - :bash:`P`
+     - Toggle the lighting mode.
+   * - :bash:`Return`
+     - Exit the edit mode (if in edit mode).
+
+
 Display modes
 -------------
 
@@ -145,35 +193,6 @@ options can be selected using the :bash:`PageDown`, :bash:`PageUp` and
      - Decrease the transparency (in Blend or Premultiplied mode).
    * - :bash:`ArrowDown`
      - Increase the transparency (in Blend or Premultiplied mode).
-
-
-Location settings
------------------
-
-The location settings (latitude, time, etc.) are indicated at the bottom right
-of the display window. To edit these settings, simply click on the corresponding
-value. For an overview of the available interactions, refer to
-:numref:`tab-location-interactions` below.
-
-.. note::
-
-   The location settings control the Sun position and the Sky rendering.
-
-.. _tab-location-interactions:
-
-.. list-table:: Location interactions.
-   :width: 75%
-   :widths: auto
-   :header-rows: 1
-
-   * - Action
-     - Result
-   * - :bash:`LeftClick`
-     - Enter (if on a setting value) or Exit (otherwise) the edit mode.
-   * - :bash:`P`
-     - Toggle the Sky rendering.
-   * - :bash:`Return`
-     - Exit the edit mode (if in edit mode).
 
 
 .. ============================================================================

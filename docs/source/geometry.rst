@@ -79,7 +79,8 @@ The resulting geometry is represented in :numref:`fig-benchmark-geometry` below.
       :alt: (B)
 
    Representations of the `gamma/benchmark <ExampleBenchmark_>`_ example. (A)
-   Cross-section along the (xOz) plane. (B) Calzone display view.
+   Cross-section along the (xOz) plane. (B) Calzone display view (the root
+   volume is transparent).
 
 
 Including a topography
@@ -126,7 +127,8 @@ definition is inlined below. It is a derivative of the PDG `standard rock
       :alt: (B)
 
    Representations of the `geometry/topography <ExampleTopography_>`_ example.
-   (A) Cross-section along the (xOz) plane. (B) Calzone display view.
+   (A) Cross-section along the (xOz) plane. (B) Calzone display view (the root
+   volume is transparent).
 
 
 Replicating a volume
@@ -169,7 +171,8 @@ description of a muon chamber. The resulting geometry is represented in
       :alt: (B)
 
    Representations of the `muon/trajectograph <ExampleTrajectograph_>`_ example.
-   (A) Cross-section along the (yOz) plane. (B) Calzone display view.
+   (A) Cross-section along the (yOz) plane. (B) Calzone display view (the root
+   volume is transparent).
 
 ----
 
