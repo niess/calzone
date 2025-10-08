@@ -94,8 +94,8 @@ from photogrammetry measurements. The grey box on the volcano ridge
 [$11.983056^\circ$N, $86.172815^\circ$W][DETECTOR_LOC]), the details of which
 are displayed in the top-right insert (using wireframe mode). The superimposed
 yellow segments illustrate the trajectory of a photon, originating from the
-$1.12\,$MeV emission line of $^{214}$Bi (a gamma-active radon daughter),
-simulated with [Calzone][CALZONE] and [Goupil][GOUPIL] in conjunction.
+$1.46\,$MeV emission line of $^{40}$K, simulated with [Calzone][CALZONE] and
+[Goupil][GOUPIL] in conjunction.
 \label{fig:display-example}
 ](display-example.png)
 
