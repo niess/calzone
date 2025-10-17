@@ -193,7 +193,7 @@ this project. All authors contributed to the preparation of this manuscript.
 
 # Acknowledgements
 
-This is contribution no. XXX of the ClerVolc program of the International
+This is contribution no. 726 of the ClerVolc program of the International
 Research Center for Disaster Sciences and Sustainable Development of the
 University of Clermont Auvergne. In addition, We gratefully acknowledge support
 from the Mésocentre Clermont-Auvergne of the Université Clermont Auvergne for
