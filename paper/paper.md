@@ -25,7 +25,7 @@ bibliography: paper.bib
 
 # Summary
 
-The transport of high-energy particles (e.g. [$\gamma$-rays][GAMMA_RAY]) through
+The transport of high-energy particles (e.g. [gamma-rays][GAMMA_RAY]) through
 ordinary matter is an inherently stochastic process, with individual collisions
 described within the framework of [Quantum Field
 Theory](https://en.wikipedia.org/wiki/Quantum_field_theory). The resolution of
@@ -91,7 +91,7 @@ Example of [`calzone-display`][CALZONE_DISPLAY]. The background image comprises
 a Digital Elevation Model ([DEM][DEM]) of the [Masaya][MASAYA] volcano, derived
 from photogrammetry measurements. The grey box on the volcano ridge
 (bottom-left) corresponds to a gamma-spectrometer (located at
-[$11.983056^\circ$N, $86.172815^\circ$W][DETECTOR_LOC]), the details of which
+$11.983056^\circ$N, $86.172815^\circ$W), the details of which
 are displayed in the top-right insert (using wireframe mode). The superimposed
 yellow segments illustrate the trajectory of a photon, originating from the
 $1.46\,$MeV emission line of $^{40}$K, simulated with [Calzone][CALZONE] and
@@ -144,8 +144,8 @@ The process of meshing a [DEM][DEM] with triangular facets introduces specific
 issues. To optimise the geometry traversal, the [Geant4][GEANT4] software uses a
 [voxelisation][VOXEL] algorithm. This method scales poorly for [DEMs][DEM] that
 typically comprises millions of nodes (see e.g., [@Niess:2020]), and is
-inefficient for long-range particles (such as [$\gamma$][GAMMA] and
-[$\mu$][MUON]). Thus, [Calzone][CALZONE] defines a dedicated `Mesh` object that
+inefficient for long-range particles (such as $\gamma$ and $\mu$). Thus,
+[Calzone][CALZONE] defines a dedicated `Mesh` object that
 includes a Bounding Volume Hierarchy ([BVH][BVH]) algorithm (partitioning the
 surface of the mesh, rather than its volume). The user may then select the
 desired algorithm for each mesh. The default approach is to use a surface
@@ -195,7 +195,7 @@ this project. All authors contributed to the preparation of this manuscript.
 
 This is contribution no. 726 of the ClerVolc program of the International
 Research Center for Disaster Sciences and Sustainable Development of the
-University of Clermont Auvergne. In addition, We gratefully acknowledge support
+University of Clermont Auvergne. In addition, we gratefully acknowledge support
 from the Mésocentre Clermont-Auvergne of the Université Clermont Auvergne for
 providing computing resources needed for validating this work.
 
@@ -209,7 +209,6 @@ providing computing resources needed for validating this work.
 [CALZONE]: https://github.com/niess/calzone/
 [CALZONE_DISPLAY]: https://github.com/niess/calzone-display/
 [DEM]: https://geant4.kek.jp/Reference/11.2.0/classG4TessellatedSolid.html
-[DETECTOR_LOC]: https://www.google.fr/maps/place/11%C2%B058'59.0%22N+86%C2%B010'22.1%22W/
 [FREECAD]: https://www.freecad.org/
 [GAMMA]: https://en.wikipedia.org/wiki/Photon
 [GAMMA_RAY]: https://en.wikipedia.org/wiki/Gamma_ray
