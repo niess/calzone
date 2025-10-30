@@ -25,12 +25,11 @@ bibliography: paper.bib
 
 # Summary
 
-The transport of high-energy particles (e.g. [gamma-rays][GAMMA_RAY]) through
+The transport of high-energy particles (e.g., [gamma-rays][GAMMA_RAY]) through
 ordinary matter is an inherently stochastic process, with individual collisions
-described within the framework of [Quantum Field
-Theory](https://en.wikipedia.org/wiki/Quantum_field_theory). The resolution of
+described within the framework of quantum field theory. The resolution of
 such transport problems is facilitated by the use of Monte Carlo methods,
-denoted Monte Carlo Particles Transport (MCPT) herein. In particular, the
+denoted Monte Carlo particles transport (MCPT) herein. In particular, the
 [Geant4][GEANT4] software [@Allison:2016; @Allison:2006; @Agostinelli:2003] is
 an established MCPT `C++` library for simulating the passage of high-energy
 particles through matter.
@@ -45,11 +44,11 @@ developed in conjunction with [Goupil][GOUPIL] [@Niess:2024], a backward
 packages can be used entirely independently, if necessary.
 
 [Calzone's][CALZONE] interface has been designed with simplicity in mind. Source
-particles are injected into the simulation volume as a [NumPY][NUMPY]
-[array][NDARRAY] [@Harris:2020], and a [NumPY][NUMPY] [array][NDARRAY] of
+particles are injected into the simulation volume as a [NumPy][NUMPY]
+[array][NDARRAY] [@Harris:2020], and a [NumPy][NUMPY] [array][NDARRAY] of
 collected energy deposits (or particles) is returned. The Monte Carlo geometry
 is encoded in a [Python][PYTHON] `dict`, which can be loaded from configuration
-files, e.g. using [JSON][JSON], [TOML][TOML] or [YAML][YAML] formats. This basic
+files, e.g., using [JSON][JSON], [TOML][TOML] or [YAML][YAML] formats. This basic
 workflow is illustrated below,
 
 ```python
@@ -66,11 +65,11 @@ deposits = simulation.run(particles).deposits
 [Calzone][CALZONE] encourages the use of meshes to describe the Monte Carlo
 geometry. Various mesh formats are supported, such as [OBJ][OBJ], [STL][STL],
 [GeoTIFF][GEOTIFF] and [Turtle][TURTLE]/[PNG][PNG] [@Niess:2020]. These formats
-can be used to encode the components of a detector (exported from a [CAD][CAD]
-scheme) or a Digital Elevation Model ([DEM][DEM]) describing the surrounding
+can be used to encode the components of a detector (exported from a computer-aided design, or [CAD][CAD],
+scheme) or a digital elevation model ([DEM][DEM]) describing the surrounding
 terrain. Additionally, [Calzone][CALZONE] features an interactive display
 ([`calzone-display`][CALZONE_DISPLAY]) that allows users to navigate through the
-Monte Carlo geometry and to inspect Monte Carlo tracks (see e.g.
+Monte Carlo geometry and to inspect Monte Carlo tracks (see, e.g.,
 \autoref{fig:display-example}).
 
 
@@ -83,12 +82,12 @@ is provided under an open-source
 rigorous [validation][GEANT4_VALIDATION] including comparisons with experimental
 data [@Allison:2016]. As a result, [Geant4][GEANT4] is employed in a multitude
 of [applications](https://geant4.web.cern.ch/about/#applications), including
-high-energy physics (its initial scope) and radiation studies (e.g. for medical
+high-energy physics (its initial scope) and radiation studies (e.g., for medical
 or space sciences).
 
 ![
 Example of [`calzone-display`][CALZONE_DISPLAY]. The background image comprises
-a Digital Elevation Model ([DEM][DEM]) of the [Masaya][MASAYA] volcano, derived
+a digital elevation model ([DEM][DEM]) of the [Masaya][MASAYA] volcano, derived
 from photogrammetry measurements. The grey box on the volcano ridge
 (bottom-left) corresponds to a gamma-spectrometer (located at
 $11.983056^\circ$N, $86.172815^\circ$W), the details of which
@@ -130,7 +129,7 @@ to delineate volumes of the same material (terrain, sensor, mechanical support,
 etc.) using surfaces approximated by triangular meshes. For instance, the
 [FreeCAD][FREECAD] software is able to export the detector parts as [STL][STL]
 files, which could then be re-read and transcribed into
-[`G4TessellatedSolids`][G4TS] (e.g., using [CADMesh][CADMESH] [@Poole:2012]).
+[`G4TessellatedSolids`][G4TS] (e.g., using [CADMesh][CADMESH]) [@Poole:2012].
 [Calzone][CALZONE] streamlines this process by defining a geometry format that
 serves as an intermediary. This format uses standard objects, including `dict`,
 `float`, `list`, and `str`, and integrates various mesh formats, such as
@@ -143,13 +142,13 @@ serves as an intermediary. This format uses standard objects, including `dict`,
 The process of meshing a [DEM][DEM] with triangular facets introduces specific
 issues. To optimise the geometry traversal, the [Geant4][GEANT4] software uses a
 [voxelisation][VOXEL] algorithm. This method scales poorly for [DEMs][DEM] that
-typically comprises millions of nodes (see e.g., [@Niess:2020]), and is
+typically comprises millions of nodes [@Niess:2020], and is
 inefficient for long-range particles (such as $\gamma$ and $\mu$). Thus,
 [Calzone][CALZONE] defines a dedicated `Mesh` object that
-includes a Bounding Volume Hierarchy ([BVH][BVH]) algorithm (partitioning the
+includes a bounding volume hierarchy ([BVH][BVH]) algorithm (partitioning the
 surface of the mesh, rather than its volume). The user may then select the
 desired algorithm for each mesh. The default approach is to use a surface
-[BVH][BVH] for [DEMs][DEM], while [voxelisation][VOXEL] is used otherwise (i.e.
+[BVH][BVH] for [DEMs][DEM], while [voxelisation][VOXEL] is used otherwise (i.e.,
 a [`G4TessellatedSolid`][G4TS]).
 
 ## Interoperability with Goupil
@@ -159,9 +158,9 @@ A further distinctive feature of MCPT applications in geosciences (such as
 source largely encompasses the detector, which renders analogue simulations
 ineffective. In a typical use case, only a few dozen out of a million of
 simulated particles leave a signal in the detector. It is therefore often
-necessary to rely on Importance Sampling ([IS][IS]) methods. One effective
+necessary to rely on importance sampling methods. One effective
 method in this context is to backward simulate the transport in the detector's
-far environment (see e.g. [@Niess:2018; @Niess:2022]). To this end,
+far environment [@Niess:2018; @Niess:2022]. To this end,
 [Calzone][CALZONE] is interoperable with [Goupil][GOUPIL] [@Niess:2024].
 
 ## Particles generator
@@ -171,7 +170,7 @@ sources. For this purpose, [Calzone][CALZONE] provides a geometry-aware
 [`ParticlesGenerator`][GENERATOR] object, which can, for instance, generate
 particles entering a specific geometry volume. Moreover, [Calzone's][CALZONE]
 [`ParticlesGenerator`][GENERATOR] consistently provides generation weights,
-which are essential for [IS][IS] methods.
+which are essential for importance sampling methods.
 
 
 # Software architecture
