@@ -88,7 +88,7 @@ static HashedMaterial get_hashed_material(const rust::String & name) {
     if (name == "StandardRock") {
         // Create StandardRock.
         auto RockElement = new G4Element("StandardRock",
-            "StandardRock", 11., 22. *CLHEP::g / CLHEP::mole);
+            "StandardRock", 11.0, 22.0 * CLHEP::g / CLHEP::mole);
         material = new G4Material("StandardRock",
             2.65 * CLHEP::g/CLHEP::cm3, 2, kStateSolid);
         // The rock element is added two times to ensure that the density effect
@@ -98,6 +98,7 @@ static HashedMaterial get_hashed_material(const rust::String & name) {
         material->AddElement(RockElement, 1);
         auto * parameters = material->GetIonisation();
         parameters->SetMeanExcitationEnergy(136.4 * CLHEP::eV);
+        MATERIALS["StandardRock"] = { material, 0x0 };
     } else {
         // Fallback to NIST database.
         auto nist = G4NistManager::Instance();
