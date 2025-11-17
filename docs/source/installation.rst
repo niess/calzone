@@ -72,7 +72,7 @@ package in-source (under `src/python/calzone
    cargo build --release
 
    # Link the resulting binary.
-   ln -rs target/release/libcalzone.so src/python/calzone/calzone.so
+   ln -rs target/release/lib_core.so src/python/calzone/_core.so
 
 The source of the interactive display is also available from `GitHub
 <GitHub-Display_>`_, e.g. as
