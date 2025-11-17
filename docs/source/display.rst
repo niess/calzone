@@ -84,6 +84,10 @@ below.
 
    * - Action
      - Result
+   * - :bash:`ArrowLeft`
+     - Display the previous event.
+   * - :bash:`ArrowRight`
+     - Display the next event.
    * - :bash:`LeftClick`
      - Toggle the display of all daughter tracks.
    * - :bash:`LeftClick`\ +\ :bash:`Control`
@@ -181,6 +185,10 @@ options can be selected using the :bash:`PageDown`, :bash:`PageUp` and
 
    * - Action
      - Result
+   * - :bash:`ArrowDown`
+     - Decrease the transparency (in Blend or Premultiplied mode).
+   * - :bash:`ArrowUp`
+     - Increase the transparency (in Blend or Premultiplied mode).
    * - :bash:`PageDown`
      - Switch to the previous display mode.
    * - :bash:`PageDown`\ + \ :bash:`Shift`
@@ -189,10 +197,6 @@ options can be selected using the :bash:`PageDown`, :bash:`PageUp` and
      - Switch to the next display mode.
    * - :bash:`PageUp`\ + \ :bash:`Shift`
      - Switch to the next wireframe mode.
-   * - :bash:`ArrowDown`
-     - Decrease the transparency (in Blend or Premultiplied mode).
-   * - :bash:`ArrowDown`
-     - Increase the transparency (in Blend or Premultiplied mode).
 
 
 .. ============================================================================
