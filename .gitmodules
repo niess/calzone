@@ -4,3 +4,6 @@
 [submodule "fmt"]
 	path = deps/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "mulder"]
+	path = deps/mulder
+	url = https://github.com/niess/mulder.git

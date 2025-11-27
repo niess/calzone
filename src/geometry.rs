@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use crate::utils::extract::{Extractor, Rotation, Strings, Property, Tag, TryFromBound};
-use crate::utils::error::Error;
+use crate::utils::error::{Error, variant_error};
 use crate::utils::error::ErrorKind::{Exception, IndexError, NotImplementedError, TypeError,
     ValueError};
 use crate::utils::float::f64x3;
@@ -22,6 +22,7 @@ use std::path::Path;
 mod bytes;
 mod goupil;
 mod map;
+mod mulder;
 pub mod materials;
 pub mod mesh;
 pub mod volume;
@@ -40,6 +41,14 @@ pub use volume::Algorithm;
 /// A static Monte Carlo geometry.
 #[pyclass(frozen, module="calzone")]
 pub struct Geometry (pub(crate) SharedPtr<ffi::GeometryBorrow>);
+
+#[derive(EnumVariantsStrings, Default)]
+#[enum_variants_strings_transform(transform="lower_case")]
+enum GeometryFormat {
+    #[default]
+    Goupil,
+    Mulder,
+}
 
 unsafe impl Send for ffi::GeometryBorrow {}
 unsafe impl Sync for ffi::GeometryBorrow {}
@@ -85,21 +94,44 @@ impl Geometry {
         Volume::display(&root, data)
     }
 
-    /// Export the geometry as a `goupil.ExternalGeometry` object.
-    fn export<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let goupil = py.import_bound("goupil")?;
-        let external_geometry = goupil.getattr("ExternalGeometry")?;
+    /// Export the Geant4 geometry.
+    #[pyo3(signature=(format=None))]
+    fn export<'py>(
+        &self,
+        py: Python<'py>,
+        format: Option<GeometryFormat>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let format = format.unwrap_or_else(|| GeometryFormat::default());
         let file = super::FILE
             .get(py)
             .unwrap();
-        self.0.set_goupil();
+        self.0.export_data();
         let args = (file,);
-        external_geometry.call1(args)
+        match format {
+            GeometryFormat::Goupil => {
+                let goupil = py.import_bound("goupil")?;
+                let external_geometry = goupil.getattr("ExternalGeometry")?;
+                external_geometry.call1(args)
+            },
+            GeometryFormat::Mulder => {
+                let mulder = py.import_bound("mulder")?;
+                let local_geometry = mulder.getattr("LocalGeometry")?;
+                local_geometry.call1(args)
+            },
+        }
     }
 
     /// Find a geometry volume matching the given stem.
     fn find(&self, stem: &str) -> PyResult<Volume> {
         Volume::new(&self.0, stem, false)
+    }
+}
+
+impl<'py> FromPyObject<'py> for GeometryFormat {
+    fn extract_bound(any: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let value: String = any.extract()?;
+        Self::from_str(&value)
+            .map_err(|options| variant_error("bad format", &value, options))
     }
 }
 

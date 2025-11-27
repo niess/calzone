@@ -107,14 +107,30 @@ Python interface
       provided (as returned by the :py:meth:`Simulation.run` method), this
       information will be superimposed on the geometry display.
 
-   .. method:: export()
+   .. automethod:: export
 
-      Export the Geant4 geometry as a `goupil.ExternalGeometry
-      <ExternalGeometry_>`_.
+      The *format* argument specifies the destination format. The supported
+      values are listed in :numref:`tab-export-formats` below. The default
+      format is :python:`"goupil"`.
+
+      .. _tab-export-formats:
+
+      .. list-table:: Export formats.
+         :width: 50%
+         :widths: auto
+         :header-rows: 1
+
+         * - Format
+           - Destination
+         * - :python:`"goupil"`
+           - :py:class:`goupil.ExternalGeometry <ExternalGeometry>`
+         * - :python:`"mulder"`
+           - :py:class:`mulder.LocalGeometry`
 
       .. note::
 
-         This methods requires the `goupil`_ module to be installed.
+         This methods requires the `goupil`_ and/or `mulder`_ modules to be
+         installed.
 
    .. automethod:: find
 
@@ -775,7 +791,6 @@ Python interface
 .. _Geant4: https://geant4.web.cern.ch/docs/
 .. _JSON: https://www.json.org/json-en.html
 .. _HadConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/reference_PL/index.html
-.. _ExternalGeometry: https://goupil.readthedocs.io/en/latest/py/external_geometry.html
 .. _G4EmExtraPhysics: https://geant4.kek.jp/Reference/11.2.0/classG4EmExtraPhysics.html
 .. _G4Material: https://geant4.kek.jp/Reference/11.2.0/classG4Material.html
 .. _G4VExceptionHandler: https://geant4.kek.jp/Reference/11.2.0/classG4VExceptionHandler.html
@@ -783,7 +798,9 @@ Python interface
 .. _G4VSolid: https://geant4.kek.jp/Reference/11.2.0/classG4VSolid.html
 .. _GeoTIFF: https://fr.wikipedia.org/wiki/GeoTIFF
 .. _Goupil: https://goupil.readthedocs.io/en/latest/
+.. _LocalGeometry: https://mulder.readthedocs.io/en/latest/interface.html#mulder.LocalGeometry
 .. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
+.. _Mulder: https://mulder.readthedocs.io/en/latest/
 .. _OpenGate: http://www.opengatecollaboration.org/
 .. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
 .. _PNG: https://en.wikipedia.org/wiki/PNG

@@ -19,7 +19,9 @@ autodoc_member_order = "groupwise"
 autosectionlabel_prefix_document = True
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
-    "numpy": ("https://numpy.org/doc/stable/", None)
+    "goupil": ("https://goupil.readthedocs.io/en/latest/", None),
+    "mulder": ("https://mulder.readthedocs.io/en/latest", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
 }
 
 templates_path = ["_templates"]

@@ -15,6 +15,8 @@
 #include "G4VoxelLimits.hh"
 // Goupil interface.
 #include "G4Goupil.hh"
+// Goupil interface.
+#include "G4Mulder.hh"
 
 
 // ============================================================================
@@ -791,14 +793,14 @@ G4VPhysicalVolume * GeometryBorrow::world() const {
 
 // ============================================================================
 //
-// Goupil interface.
+// Goupil & mulder interfaces.
 //
 // ============================================================================
 
-static GeometryData * GOUPIL_GEOMETRY = nullptr;
+static GeometryData * GEOMETRY_DATA = nullptr;
 
-void GeometryBorrow::set_goupil() const {
-    GOUPIL_GEOMETRY = this->data;
+void GeometryBorrow::export_data() const {
+    GEOMETRY_DATA = this->data;
 }
 
 static void optimise(G4VPhysicalVolume * physical) {
@@ -822,12 +824,23 @@ static void optimise(G4VPhysicalVolume * physical) {
 }
 
 const G4VPhysicalVolume * G4Goupil::NewGeometry() {
-    auto geometry = GOUPIL_GEOMETRY->clone();
+    auto geometry = GEOMETRY_DATA->clone();
     optimise(geometry->world);
     return geometry->world;
 }
 
 void G4Goupil::DropGeometry(const G4VPhysicalVolume * volume) {
+    auto geometry = GeometryData::get(volume);
+    geometry->drop();
+}
+
+const G4VPhysicalVolume * G4Mulder::NewGeometry() {
+    auto geometry = GEOMETRY_DATA->clone();
+    optimise(geometry->world);
+    return geometry->world;
+}
+
+void G4Mulder::DropGeometry(const G4VPhysicalVolume * volume) {
     auto geometry = GeometryData::get(volume);
     geometry->drop();
 }

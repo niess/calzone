@@ -48,8 +48,8 @@ struct GeometryBorrow {
     std::uint64_t id() const;
     G4VPhysicalVolume * world() const;
 
-    // Goupil interface.
-    void set_goupil() const;
+    // Goupil & mulder interfaces.
+    void export_data() const;
 
 private:
     GeometryData * data;

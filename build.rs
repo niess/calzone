@@ -56,6 +56,10 @@ fn main() {
     let goupil_include = make_path(&goupil_prefix, &["interfaces/geant4"]);
     let goupil_source = make_path(&goupil_prefix, &["interfaces/geant4/G4Goupil.cc"]);
 
+    let mulder_prefix = "deps/mulder/src";
+    let mulder_include = make_path(&mulder_prefix, &["module/interface/geant4"]);
+    let mulder_source = make_path(&mulder_prefix, &["module/interface/geant4/G4Mulder.cc"]);
+
     let fmt_prefix = "deps/fmt";
     let fmt_include = make_path(&fmt_prefix, &["include"]);
 
@@ -96,10 +100,13 @@ fn main() {
         .include(&fmt_include)
         .include(&geant4_include)
         .include(&goupil_include)
+        .include(&mulder_include)
         .include("src")
         .files(sources)
         .define("G4GOUPIL_INITIALISE", "g4goupil_initialise")
-        .file(&goupil_source);
+        .define("G4MULDER_INITIALISE", "g4mulder_initialise")
+        .file(&goupil_source)
+        .file(&mulder_source);
 
     #[cfg(windows)]
     bridge

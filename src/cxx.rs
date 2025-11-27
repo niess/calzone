@@ -343,7 +343,7 @@ pub mod ffi {
         fn borrow_volume(self: &GeometryBorrow, name: &str) -> SharedPtr<VolumeBorrow>;
         fn check(self: &GeometryBorrow, resolution: i32) -> SharedPtr<Error>;
         fn find_volume(self: &GeometryBorrow, stem: &str) -> SharedPtr<VolumeBorrow>;
-        fn set_goupil(self: &GeometryBorrow);
+        fn export_data(self: &GeometryBorrow);
 
         type VolumeBorrow;
         fn compute_box(self: &VolumeBorrow, frame: &str) -> [f64; 6];
