@@ -23,7 +23,7 @@ fn init(module: &Bound<PyModule>) -> PyResult<()> {
 
     // Set __file__.
     let py = module.py();
-    {
+    let dll = {
         let filename = match get_dylib_path() {
             Some(path) => path
                             .to_string_lossy()
@@ -31,9 +31,10 @@ fn init(module: &Bound<PyModule>) -> PyResult<()> {
             None => return Err(PySystemError::new_err("could not resolve module path")),
         };
         FILE
-            .set(py, filename)
+            .set(py, filename.clone())
             .unwrap();
-    }
+        filename
+    };
 
     // Set data path.
     const DATA_KEY: &str = "GEANT4_DATA_DIR";
@@ -71,6 +72,7 @@ fn init(module: &Bound<PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(simulation::source::particles, module)?)?;
 
     // Register constant(s).
+    module.add("_DLL", dll)?;
     module.add("GEANT4_VERSION", GEANT4_VERSION)?;
 
     // Register Geant4 finalisation.
