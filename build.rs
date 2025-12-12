@@ -130,6 +130,10 @@ fn main() {
         println!("cargo:rerun-if-changed={}", path);
     }
 
+    for path in [&goupil_include, &goupil_source, &mulder_include, &mulder_source] {
+        println!("cargo:rerun-if-changed={}", path.display());
+    }
+
     println!("cargo:rustc-link-search={}", geant4_lib.display());
     const LIBS: [&str; 17] = [
         "G4analysis", "G4physicslists", "G4run", "G4event", "G4tracking", "G4processes",
