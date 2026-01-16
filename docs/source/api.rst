@@ -627,10 +627,22 @@ Python interface
       This property is a :py:class:`Geometry` instance. However, by default, no
       geometry is attached to the simulation.
 
+      When setting this property, a path to a geometry file, or a
+      :py:class:`dict` geometry description, can be provided in lieu of a
+      :py:class:`Geometry` object. For instance,
+
+      >>> simulation.geometry = "geometry.toml"
+
    .. autoattribute:: physics
 
       This property is a :py:class:`Physics` instance. By default, only
       (:python:`"standard"`) electromagnetic interactions are enabled.
+
+      When setting this property, the electromagnetic and/or hadronic physics
+      models may be specified in lieu of a :py:class:`Physics` object. For
+      instance,
+
+      >>> simulation.physics = "penelope-FTFP_BERT"
 
    .. autoattribute:: random
 

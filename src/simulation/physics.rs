@@ -171,7 +171,7 @@ impl From<EmPhysicsModel> for ffi::EmPhysicsModel {
 #[allow(non_camel_case_types)]
 #[derive(EnumVariantsStrings)]
 #[enum_variants_strings_transform(transform="upper_case")]
-enum HadPhysicsModel {
+pub enum HadPhysicsModel {
     FTFP_BERT,
     FTFP_BERT_HP,
     QGSP_BERT,

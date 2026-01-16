@@ -7,6 +7,7 @@ use crate::utils::namespace::Namespace;
 use crate::utils::numpy::{PyArray, PyArrayMethods};
 use crate::utils::io::DictLike;
 use cxx::SharedPtr;
+use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 use std::pin::Pin;
@@ -198,7 +199,15 @@ impl<'py> TryFrom<PhysicsArg<'py>> for Py<Physics> {
             PhysicsArg::String(model) => {
                 let py = model.py();
                 let model = model.to_cow()?;
-                let physics = Physics::new(Some(model.as_ref()), None, None)?;
+                let (em_model, had_model) = match model.split_once("-") {
+                    Some((em_model, had_model)) => (Some(em_model), Some(had_model)),
+                    None => if physics::HadPhysicsModel::from_str(&model).is_ok() {
+                        (None, Some(model.as_ref()))
+                    } else {
+                        (Some(model.as_ref()), None)
+                    },
+                };
+                let physics = Physics::new(em_model, None, had_model)?;
                 Py::new(py, physics)
             },
         }
