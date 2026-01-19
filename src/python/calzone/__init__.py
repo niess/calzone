@@ -11,4 +11,4 @@ def init():
 init()
 del init
 
-VERSION = "1.1.5"
+VERSION = "1.1.6"

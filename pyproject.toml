@@ -15,7 +15,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Physics"
 ]
-version = "1.1.5"
+version = "1.1.6"
 requires-python = ">=3.7.0"
 dependencies = [
     "numpy >= 1.6.0",
@@ -51,6 +51,7 @@ auditwheel repair -w {dest_dir} {wheel}\
 
 [tool.cibuildwheel.macos]
 build = [ "cp38-macosx_arm64", "cp38-macosx_x86_64" ]
+environment = "RUSTFLAGS='-C link-args=-Wl,-headerpad_max_install_names'"
 
 repair-wheel-command = """
 DYLD_LIBRARY_PATH=$PWD/$GEANT4_PREFIX/lib/:$DYLD_LIBRARY_PATH \
