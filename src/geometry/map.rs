@@ -1,5 +1,5 @@
 use crate::utils::error::Error;
-use crate::utils::error::ErrorKind::{NotImplementedError, ValueError};
+use crate::utils::error::ErrorKind::{NotImplementedError, TypeError, ValueError};
 use crate::utils::extract::{Extractor, Property, Tag};
 use crate::utils::float::f64x3;
 use crate::utils::io::{dump_stl, PathString};
@@ -7,6 +7,8 @@ use crate::utils::numpy::{PyArray, PyArrayMethods, PyUntypedArray};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::ffi::OsStr;
+use std::fs::File;
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 
@@ -129,6 +131,23 @@ impl Map {
         let filename = filename.to_string();
         let path = Path::new(&filename);
         match path.extension().and_then(OsStr::to_str) {
+            Some("asc") | Some("ASC") => {
+                let mut nodata: Option<f32> = None;
+                let mut precision: Option<usize> = None;
+                if let Some(kwargs) = kwargs {
+                    const EXTRACTOR: Extractor<2> = Extractor::new([
+                        Property::optional_f64("nodata"),
+                        Property::optional_u32("precision"),
+                    ]);
+                    let tag = Tag::new("dump", "", None);
+                    let [nodata_value, prec] = EXTRACTOR.extract_any(&tag, kwargs, None)?;
+                    let nodata_value: Option<f64> = nodata_value.into();
+                    nodata = nodata_value.map(|value| value as f32);
+                    let prec: Option<u32> = prec.into();
+                    precision = prec.map(|value| value as usize);
+                }
+                self.to_ascii(py, &filename, nodata, precision)
+            },
             Some("png") | Some("PNG") => {
                 if let Some(kwargs) = kwargs {
                     const EXTRACTOR: Extractor<0> = Extractor::new([]); // No arguments.
@@ -194,6 +213,7 @@ impl Map {
     pub fn from_file(py: Python, path: &Path) -> PyResult<Self> {
         let filename = path.to_str().unwrap();
         match path.extension().and_then(OsStr::to_str) {
+            Some("asc") | Some("ASC") => Self::from_ascii(py, filename),
             Some("png") | Some("PNG") => Self::from_png(py, filename),
             Some("tif") | Some("TIF") => Self::from_geotiff_file(py, filename),
             Some(other) => {
@@ -656,6 +676,313 @@ impl Map {
             .and_then(|m| m.getattr("fromarray"))
             .and_then(|f| f.call1((array.as_any(),)))?;
         image.call_method("save", (path,), Some(&kwargs))?;
+
+        Ok(())
+    }
+}
+
+
+// ===============================================================================================
+//
+// ASCII Grid serialisation.
+//
+// ===============================================================================================
+
+impl Map {
+    fn from_ascii<'py>(py: Python, path: &str) -> PyResult<Self> {
+        #[derive(Clone, Copy)]
+        enum MetaType {
+            Nx,
+            Ny,
+            X0,
+            Y0,
+            Delta,
+            NoData,
+        }
+
+        enum MetaValue {
+            NRows(usize),
+            NCols(usize),
+            XLLCenter(f64),
+            XLLCorner(f64),
+            YLLCenter(f64),
+            YLLCorner(f64),
+            CellSize(f64),
+            NoData(Result<f32, String>),
+        }
+
+        impl MetaValue {
+            fn into_f64(self) -> f64 {
+                match self {
+                    Self::CellSize(value) => value,
+                    _ => unreachable!(),
+                }
+            }
+
+            fn into_usize(self) -> usize {
+                match self {
+                    Self::NRows(value) => value,
+                    Self::NCols(value) => value,
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        const WHAT: &str = "ASCII Grid file";
+
+        impl MetaType {
+            const fn lineno(&self) -> usize {
+                match self {
+                    Self::Nx => 1,
+                    Self::Ny => 2,
+                    Self::X0 => 3,
+                    Self::Y0 => 4,
+                    Self::Delta => 5,
+                    Self::NoData => 6,
+                }
+            }
+
+            fn parse(
+                &self,
+                lines: &mut impl Iterator<Item=Result<String, std::io::Error>>,
+                path: &str,
+            ) -> PyResult<MetaValue> {
+                let badname = |expected: &str, found: &str| -> PyErr {
+                    let why = format!(
+                        "{}:{}: expected {}, found {}", path, self.lineno(), expected, found
+                    );
+                    Error::new(TypeError).what(WHAT).why(&why).to_err()
+                };
+
+                let badvalue = |err: String, value: &str| -> PyErr {
+                    let why = format!("{}:{}: {}: {}", path, self.lineno(), err, value);
+                    Error::new(TypeError).what(WHAT).why(&why).to_err()
+                };
+
+                let eol = || -> PyErr {
+                    let why = format!("{}:{}: unexpected end-of-line", path, self.lineno());
+                    Error::new(TypeError).what(WHAT).why(&why).to_err()
+                };
+
+                let Some(line) = lines.next() else { return Err(eol()) };
+                let Ok(line) = line else { return Err(eol()) };
+                let mut tokens = line.split_ascii_whitespace();
+                let Some(name) = tokens.next() else { return Err(eol()) };
+                let name = name.to_uppercase();
+                let Some(value) = tokens.next() else { return Err(eol()) };
+                if let Some(token) = tokens.next() {
+                    let why = format!("{}:{}: unexpected token: {}", path, self.lineno(), token);
+                    return Err(Error::new(TypeError).what(WHAT).why(&why).to_err())
+                }
+                let value = match self {
+                    Self::Nx => {
+                        if name.as_str() != "NCOLS" { return Err(badname("ncols", name.as_str())) }
+                        match value.parse::<usize>() {
+                            Ok(value) => MetaValue::NCols(value),
+                            Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                        }
+                    },
+                    Self::Ny => {
+                        if name.as_str() != "NROWS" { return Err(badname("nrows", name.as_str())) }
+                        match value.parse::<usize>() {
+                            Ok(value) => MetaValue::NRows(value),
+                            Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                        }
+                    },
+                    Self::X0 => {
+                        if name.as_str() == "XLLCENTER" {
+                            match value.parse::<f64>() {
+                                Ok(value) => MetaValue::XLLCenter(value),
+                                Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                            }
+                        } else if name.as_str() == "XLLCORNER" {
+                            match value.parse::<f64>() {
+                                Ok(value) => MetaValue::XLLCorner(value),
+                                Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                            }
+                        } else {
+                            return Err(badname("xllcenter or xllcorner", name.as_str()))
+                        }
+                    },
+                    Self::Y0 => {
+                        if name.as_str() == "YLLCENTER" {
+                            match value.parse::<f64>() {
+                                Ok(value) => MetaValue::YLLCenter(value),
+                                Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                            }
+                        } else if name.as_str() == "YLLCORNER" {
+                            match value.parse::<f64>() {
+                                Ok(value) => MetaValue::YLLCorner(value),
+                                Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                            }
+                        } else {
+                            return Err(badname("yllcenter or yllcorner", name.as_str()))
+                        }
+                    },
+                    Self::Delta => {
+                        if name.as_str() != "CELLSIZE" {
+                            return Err(badname("cellsize", name.as_str()))
+                        }
+                        match value.parse::<f64>() {
+                            Ok(value) => MetaValue::CellSize(value),
+                            Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                        }
+                    },
+                    Self::NoData => {
+                        if name.as_str() == "NODATA_VALUE" {
+                            match value.parse::<f32>() {
+                                Ok(value) => MetaValue::NoData(Ok(value)),
+                                Err(err) => { return Err(badvalue(err.to_string(), value)) },
+                            }
+                        } else {
+                            MetaValue::NoData(Err(line))
+                        }
+                    },
+                };
+                Ok(value)
+            }
+        }
+
+        let file = File::open(path)?;
+        let mut lines = BufReader::new(file).lines();
+
+        let nx = MetaType::Nx.parse(&mut lines, path)?.into_usize();
+        let ny = MetaType::Ny.parse(&mut lines, path)?.into_usize();
+        let x0 = MetaType::X0.parse(&mut lines, path)?;
+        let y0 = MetaType::Y0.parse(&mut lines, path)?;
+        let dx = MetaType::Delta.parse(&mut lines, path)?.into_f64();
+        let dy = dx;
+        let x0 = match x0 {
+            MetaValue::XLLCorner(x0) => x0 + 0.5 * dx,
+            MetaValue::XLLCenter(x0) => x0,
+            _ => unreachable!(),
+        };
+        let y0 = match y0 {
+            MetaValue::YLLCorner(y0) => y0 + 0.5 * dy,
+            MetaValue::YLLCenter(y0) => y0,
+            _ => unreachable!(),
+        };
+        let nodata = MetaType::NoData.parse(&mut lines, path)?;
+
+        let (mut lineno, mut line, nodata) = match nodata {
+            MetaValue::NoData(value) => match value {
+                Ok(value) => (MetaType::NoData.lineno() + 1, lines.next(), value),
+                Err(line) => (MetaType::NoData.lineno(), Some(Ok(line)), -f32::INFINITY),
+            },
+            _ => unreachable!()
+        };
+        let array = PyArray::<f32>::empty(py, &[ny, nx])?;
+        let size = nx * ny;
+        if size > 0 {
+            let z = unsafe { array.slice_mut()? };
+            let mut index: usize = 0;
+            'outer: loop {
+                let Some(content) = line else { break };
+                let Ok(content) = content else {
+                    let why = format!("{}:{}: unexpected end-of-line", path, lineno);
+                    return Err(Error::new(TypeError).what(WHAT).why(&why).to_err())
+                };
+                for token in content.split_ascii_whitespace() {
+                    if index >= size { break 'outer }
+                    let row = ny - 1 - (index / nx);
+                    let col = index % nx;
+                    z[row * nx + col] = token.parse::<f32>()
+                        .map(|zi| if zi == nodata { f32::NAN } else { zi })
+                        .map_err(|err| {
+                            let why = format!("{}:{}: {}: {}", path, lineno, err, token);
+                            Error::new(TypeError).what(WHAT).why(&why).to_err()
+                        })?;
+                    index += 1;
+                }
+                lineno += 1;
+                line = lines.next();
+            }
+            if index < size {
+                let why = format!("{}: expected {} z-values, found {}", path, size, index);
+                return Err(Error::new(TypeError).what(WHAT).why(&why).to_err())
+            }
+        }
+
+        let map = Self {
+            crs: None,
+            nx,
+            x0,
+            x1: x0 + dx * ((nx - 1) as f64),
+            ny,
+            y0,
+            y1: y0 + dy * ((ny - 1) as f64),
+            z: array.into_any().unbind(),
+        };
+        Ok(map)
+    }
+
+    fn to_ascii(
+        &self,
+        py: Python,
+        path: &str,
+        nodata: Option<f32>,
+        precision: Option<usize>,
+    ) -> PyResult<()> {
+        let dx = if self.nx > 1 { (self.x1 - self.x0) / ((self.nx - 1) as f64) } else { 0.0 };
+        let dy = if self.ny > 1 { (self.y1 - self.y0) / ((self.ny - 1) as f64) } else { 0.0 };
+        if (dx.abs() - dy.abs()).abs() > f64::EPSILON {
+            return Err(Error::new(TypeError).what("cells").why("not squared").to_err())
+        }
+        enum Order {
+            Decreasing,
+            Increasing,
+        }
+        let xorder = if dx < 0.0 { Order::Decreasing } else { Order::Increasing };
+        let yorder = if dy < 0.0 { Order::Decreasing } else { Order::Increasing };
+
+        let file = File::create(path)?;
+        let mut stream = BufWriter::new(file);
+        write!(stream,
+            "\
+            ncols {}\n\
+            nrows {}\n\
+            xllcenter {}\n\
+            yllcenter {}\n\
+            cellsize {}\n",
+            self.nx,
+            self.ny,
+            if dx > 0.0 { self.x0 } else { self.x1 },
+            if dy > 0.0 { self.y0 } else { self.y1 },
+            dx.abs(),
+        )?;
+        if let Some(nodata) = nodata {
+            match precision {
+                Some(precision) => write!(
+                    stream, "nodata_value {:.prec$}\n", nodata, prec=precision
+                )?,
+                None => write!(stream, "nodata_value {}\n", nodata)?,
+            }
+        }
+
+        let z: &PyArray<f32> = self.z.extract(py)?;
+        let z = unsafe { z.slice()? };
+        for i in 0..self.ny {
+            let i = match yorder {
+                Order::Increasing => self.ny - 1 - i,
+                Order::Decreasing => i,
+            };
+            for j in 0..self.nx {
+                let jj = match xorder {
+                    Order::Increasing => j,
+                    Order::Decreasing => self.nx - 1 - j,
+                };
+                let mut zij = z[i * self.nx + jj];
+                if let Some(nodata) = nodata {
+                    if zij.is_nan() { zij = nodata }
+                }
+                match precision {
+                    Some(precision) => write!(stream, "{:.prec$}", zij, prec=precision)?,
+                    None => write!(stream, "{}", zij)?,
+                }
+                let sep = if j < self.nx - 1 { ' ' } else { '\n' };
+                write!(stream, "{}", sep)?
+            }
+        }
 
         Ok(())
     }

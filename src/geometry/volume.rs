@@ -745,7 +745,7 @@ impl TryFromBound for MeshShape {
                     None
                 }
             },
-            Some("png") | Some("tif") => {
+            Some("asc") | Some("ASC") | Some("png") | Some("PNG") | Some("tif") | Some("TIF") => {
                 let regular = regular.unwrap_or(false);
                 let map = MapParameters::new(padding, origin, regular);
                 Some(map)

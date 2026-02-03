@@ -239,18 +239,18 @@ Python interface
 
       The *data* can be provided as a `geotiff
       <https://github.com/KipCrossing/geotiff>`__ object, or loaded from an
-      image file (in `GeoTIFF`_, or `PNG`_ format). For instance, the following
-      loads topography data from a `GeoTIFF`_ file,
+      image file (in `ASCII Grid`_, `GeoTIFF`_, or `PNG`_ format). For instance,
+      the following loads topography data from a `GeoTIFF`_ file,
 
       >>> topography = calzone.Map("topography.tif") # doctest: +SKIP
 
    .. automethod:: dump
 
       The export format is specified by the file extension. It must be one of
-      :python:`".png"` or :python:`".stl"`. When exporting as STL, optional
-      *kwargs* can be provided in order to customise the 3D shape (see
-      :numref:`tab-topography-items`). For instance, the following exports the
-      map as a `PNG`_ image (including topography metadata).
+      :python:`".asc"`, :python:`".png"` or :python:`".stl"`. When exporting as
+      STL, optional *kwargs* can be provided in order to customise the 3D shape
+      (see :numref:`tab-topography-items`). For instance, the following exports
+      the map as a `PNG`_ image (including topography metadata).
 
       .. doctest::
          :hide:
@@ -796,6 +796,7 @@ Python interface
 .. 
 .. ============================================================================
 
+.. _ASCII Grid: https://modis.ornl.gov/documentation/ascii_grid_format.html
 .. _builder: https://en.wikipedia.org/wiki/Builder_pattern
 .. _calzone-display: https://pypi.org/project/calzone-display
 .. _EMConstructors: https://geant4-userdoc.web.cern.ch/UsersGuides/PhysicsListGuide/html/electromagnetic/index.html

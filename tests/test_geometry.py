@@ -204,6 +204,25 @@ def test_Map():
     A = calzone.Geometry(data)["A"]
     assert_allclose(A.surface_area, 6 * 4.0)
 
+    dem1 = calzone.Map(PREFIX / "assets/map.asc")
+    path = Path(TMPDIR.name) / "map.asc"
+    dem1.dump(path, nodata=-9999)
+    dem2 = calzone.Map(path)
+
+    for dem in (dem1, dem2):
+        assert dem.nx == 4
+        assert dem.ny == 3
+        assert dem.x0 == -1.5
+        assert dem.x1 == 1.5
+        assert dem.y0 == -1.0
+        assert dem.y1 == 1.0
+        expected = (
+            (0, 1, 2, 3),
+            (4, 5, 6, 7),
+            (8, 9, 10, 11),
+        )
+        assert_allclose(dem.z, expected)
+
 
 def test_Mesh():
     """Test the mesh shape."""
