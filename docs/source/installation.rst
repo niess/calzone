@@ -103,9 +103,6 @@ version. These are listed in :numref:`tab-optional-dependencies` below.
    * - Format
      - Python version
      - Required package
-   * - `GeoTIFF`_
-     - 3.7, or more
-     - `geotiff <PyGeotiff_>`_
    * - `PNG`_
      - 3.7, or more
      - `Pillow`_
@@ -126,7 +123,6 @@ version. These are listed in :numref:`tab-optional-dependencies` below.
 .. _BevyEngine: https://bevyengine.org/
 .. _Geant4: https://geant4.web.cern.ch/docs/
 .. _GeoTIFF: https://en.wikipedia.org/wiki/GeoTIFF
-.. _PyGeotiff: https://github.com/KipCrossing/geotiff
 .. _GitHub: https://github.com/niess/calzone
 .. _GitHub-Display: https://github.com/niess/calzone-display
 .. _Pillow: https://python-pillow.org/

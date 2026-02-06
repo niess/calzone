@@ -4,7 +4,7 @@ use crate::utils::extract::{Extractor, Property, Tag};
 use crate::utils::float::f64x3;
 use crate::utils::io::{dump_stl, PathString};
 use crate::utils::numpy::{PyArray, PyArrayMethods, PyUntypedArray};
-use geotiff::GeoTiff;
+use geotiff::{GeoTiff, RasterType};
 use geo_types::geometry::Coord;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -486,12 +486,39 @@ impl Map {
             (x, y)
         };
 
+        let raster_type = match geotiff.geo_key_directory.raster_type
+            .unwrap_or(RasterType::Undefined) {
+            RasterType::RasterPixelIsArea => RasterType::RasterPixelIsArea,
+            RasterType::RasterPixelIsPoint => RasterType::RasterPixelIsPoint,
+            _ => if geotiff
+                .get_value_at::<f64>(&Coord { x: x0, y: y0 }, 0)
+                .or_else(|| geotiff.get_value_at::<f64>(&Coord { x: x1, y: y0 }, 0))
+                .or_else(|| geotiff.get_value_at::<f64>(&Coord { x: x0, y: y1 }, 0))
+                .or_else(|| geotiff.get_value_at::<f64>(&Coord { x: x1, y: y1 }, 0))
+                .is_none() {
+                RasterType::RasterPixelIsPoint
+            } else {
+                RasterType::RasterPixelIsArea
+            },
+        };
+        let (x0, x1, dx, y0, y1, dy) = match raster_type {
+            RasterType::RasterPixelIsArea => {
+                let dx = (x1 - x0) / (nx as f64);
+                let dy = (y1 - y0) / (ny as f64);
+                (x0 + 0.5 * dx, x1 - 0.5 * dx, dx, y0 + 0.5 * dy, y1 - 0.5 * dy, dy)
+            },
+            RasterType::RasterPixelIsPoint => {
+                let dx = (x1 - x0) / ((nx - 1) as f64);
+                let dy = (y1 - y0) / ((ny - 1) as f64);
+                (x0, x1, dx, y0, y1, dy)
+            },
+            _ => unreachable!(),
+        };
+
         let array = PyArray::<f32>::empty(py, &[ny, nx])?;
         let size = nx * ny;
         if size > 0 {
             let z = unsafe { array.slice_mut()? };
-            let dx = (x1 - x0) / ((nx - 1) as f64);
-            let dy = (y1 - y0) / ((ny - 1) as f64);
             for iy in 0..ny {
                 let y = if iy == ny - 1 { y1 } else { y0 + iy as f64 * dy };
                 for ix in 0..nx {
