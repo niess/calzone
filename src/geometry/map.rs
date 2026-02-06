@@ -1,9 +1,11 @@
 use crate::utils::error::Error;
-use crate::utils::error::ErrorKind::{NotImplementedError, TypeError, ValueError};
+use crate::utils::error::ErrorKind::{IOError, NotImplementedError, TypeError, ValueError};
 use crate::utils::extract::{Extractor, Property, Tag};
 use crate::utils::float::f64x3;
 use crate::utils::io::{dump_stl, PathString};
 use crate::utils::numpy::{PyArray, PyArrayMethods, PyUntypedArray};
+use geotiff::GeoTiff;
+use geo_types::geometry::Coord;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::ffi::OsStr;
@@ -64,7 +66,7 @@ impl Map {
                 let geotiff = py.import_bound("geotiff")
                     .and_then(|module| module.getattr("GeoTiff"))?;
                 if any.is_instance(&geotiff)? {
-                    Self::from_geotiff(&any)
+                    Self::from_geotiff_object(&any)
                 } else {
                     let why = format!(
                         "unimplemented conversion from '{}'",
@@ -465,7 +467,46 @@ impl Map {
 // ===============================================================================================
 
 impl Map {
-    fn from_geotiff<'py>(geotiff: &Bound<'py, PyAny>) -> PyResult<Self> {
+    fn from_geotiff_file<'py>(py: Python, path: &str) -> PyResult<Self> {
+        let geotiff = GeoTiff::read(File::open(path)?)
+            .map_err(|err| Error::new(IOError)
+                .what("GeoTIFF file")
+                .why(&err.to_string())
+                .to_err()
+            )?;
+        let crs = geotiff.geo_key_directory.projected_type.map(|crs| crs as usize);
+        let nx = geotiff.raster_width;
+        let ny = geotiff.raster_height;
+        let ([x0, x1], [y0, y1]) = {
+            let extent = geotiff.model_extent();
+            let min = extent.min();
+            let max = extent.max();
+            let x = [ min.x, max.x ];
+            let y = [ min.y, max.y ];
+            (x, y)
+        };
+
+        let array = PyArray::<f32>::empty(py, &[ny, nx])?;
+        let size = nx * ny;
+        if size > 0 {
+            let z = unsafe { array.slice_mut()? };
+            let dx = (x1 - x0) / ((nx - 1) as f64);
+            let dy = (y1 - y0) / ((ny - 1) as f64);
+            for iy in 0..ny {
+                let y = if iy == ny - 1 { y1 } else { y0 + iy as f64 * dy };
+                for ix in 0..nx {
+                    let x = if ix == nx - 1 { x1 } else { x0 + ix as f64 * dx };
+                    z[iy * nx + ix] = geotiff.get_value_at(&Coord { x, y }, 0)
+                        .unwrap_or_else(|| 0.0);
+                }
+            }
+        }
+        let z = array.into_any().unbind();
+
+        Ok(Self { crs, nx, ny, x0, x1, y0, y1, z })
+    }
+
+    fn from_geotiff_object<'py>(geotiff: &Bound<'py, PyAny>) -> PyResult<Self> {
         // Get metadata.
         let crs = geotiff.getattr("crs_code")
             .and_then(|crs| {
@@ -514,13 +555,6 @@ impl Map {
             z: array.as_any().into(),
         };
         Ok(map)
-    }
-
-    fn from_geotiff_file<'py>(py: Python, path: &str) -> PyResult<Self> {
-        py.import_bound("geotiff")
-            .and_then(|module| module.getattr("GeoTiff"))
-            .and_then(|constr| constr.call1((path,)))
-            .and_then(|object| Self::from_geotiff(&object))
     }
 }
 
