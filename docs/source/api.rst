@@ -138,6 +138,9 @@ Python interface
       <calzone.Volume.name>` or the tail of an incomplete :py:attr:`pathname
       <calzone.Volume.path>`.
 
+   .. rubric:: Attributes
+     :heading-level: 4
+
    .. attribute:: root
 
       The geometry root :py:class:`volume <calzone.Volume>`.
@@ -212,6 +215,9 @@ Python interface
       :doc:`geometry description <geometry>` section for the meaning of the
       other arguments.
 
+   .. rubric:: Attributes
+     :heading-level: 4
+
    .. autoattribute:: algorithm
 
       If not :python:`None`, this attribute will override the traversal
@@ -280,6 +286,9 @@ Python interface
       :python:`(x0,y0)`, or :python:`(x1,y1)`, respectively. Since image formats
       are conventionally rendered with node :python:`(0,0)` located at upper
       left corner, it is frequent to have :python:`y0 > y1`.
+
+   .. rubric:: Attributes
+     :heading-level: 4
 
    .. autoattribute:: crs
 
@@ -505,6 +514,9 @@ Python interface
 
       >>> physics = calzone.Physics()
 
+   .. rubric:: Attributes
+     :heading-level: 4
+
    .. autoattribute:: default_cut
 
    .. autoattribute:: em_model
@@ -568,6 +580,9 @@ Python interface
 
       >>> rns = prng.uniform01(100)
 
+   .. rubric:: Attributes
+     :heading-level: 4
+
    .. autoattribute:: index
 
       This property can be modified, resulting in consuming or rewinding the
@@ -621,6 +636,9 @@ Python interface
       can be provided to set the :py:attr:`random` engine state of the
       simulation for each event. This is typically used to replay previously
       simulated Monte Carlo events (e.g. with additional tracking data).
+
+   .. rubric:: Attributes
+     :heading-level: 4
 
    .. autoattribute:: geometry
 
@@ -743,6 +761,15 @@ Python interface
       outside of the mother volume, when checking the side. Set
       *include_daughters* to :python:`True` if this is not the desired
       behaviour.
+
+   .. automethod:: volume
+
+      By default, daughter volumes are excluded from the mother volume
+      computation. Set *include_daughters* to :python:`True` if this is not the
+      desired behaviour.
+
+   .. rubric:: Attributes
+     :heading-level: 4
 
    .. autoattribute:: daughters
 
