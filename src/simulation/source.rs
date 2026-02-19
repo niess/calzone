@@ -932,10 +932,9 @@ impl <'a> OntoGenerator<'a> {
             let phi = 2.0 * std::f64::consts::PI * random.next_open01();
             direction.rotate(cos_theta, phi);
             particle.direction = direction.into();
-
-            if let Some(w) = self.weight {
-                *weight *= w;
-            }
+        }
+        if let Some(w) = self.weight {
+            *weight *= w;
         }
 
         self.direction.is_some()
