@@ -43,8 +43,9 @@ these data can be downloaded (or updated) as
 
    python -m calzone download
 
-Alternatively, the :bash:`G4_DATA_DIR` environment variable can be set to the
-location of already existing Geant4 data, e.g. from another Geant4 installation.
+Alternatively, the :bash:`GEANT4_DATA_DIR` environment variable can be set to
+the location of already existing Geant4 data, e.g. from another Geant4
+installation.
 
 
 From source
