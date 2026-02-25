@@ -612,6 +612,14 @@ GeometryData::GeometryData(const rust::Box<Volume> & volume) {
         assert(solids.empty());
     }
 
+    // Disable voxels if the world volume does not include the origin. This
+    // results in a Geant4 segfault otherwise.
+    if (top_solid->Inside(G4ThreeVector(0.0, 0.0, 0.0 )) == EInside::kOutside) {
+        logical->SetOptimisation(false);
+    } else {
+        logical->SetOptimisation(true);
+    }
+
     // Register the world volume.
     auto world_name = std::string(volume->name());
     this->world = new G4PVPlacement(
