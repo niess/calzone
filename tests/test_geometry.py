@@ -1,6 +1,7 @@
 import calzone
 import os
 from pathlib import Path
+import pytest
 from tempfile import TemporaryDirectory
 import xml.etree.ElementTree as ET
 
@@ -142,6 +143,13 @@ def test_Geometry():
 
     for key, volume in zip(("A", "A.B"), geometry):
         assert volume == geometry[key]
+
+    assert geometry["A"].index == 0
+    assert geometry["A.B"].index == 1
+
+    with pytest.raises(IndexError) as e:
+        geometry["C"]
+    assert "unknown volume 'C'" in str(e.value)
 
     try:
         import goupil

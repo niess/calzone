@@ -593,9 +593,15 @@ impl Volume {
         PyTuple::new_bound(py, &self.daughters)
     }
 
+    /// The volume index.
+    #[getter]
+    fn get_index(&self) -> usize {
+        self.volume.get_index()
+    }
+
     /// The volume name.
     #[getter]
-    fn get_name<'py>(&self) -> &str {
+    fn get_name(&self) -> &str {
         match self.path.rsplit_once('.') {
             None => self.path.as_str(),
             Some((_, name)) => name,

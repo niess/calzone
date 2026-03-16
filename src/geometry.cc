@@ -29,6 +29,11 @@
 //
 // ============================================================================
 
+struct IndexedVolume {
+    const G4VPhysicalVolume * ptr;
+    size_t index;
+};
+
 struct GeometryData {
     GeometryData(const rust::Box<Volume> &);
     ~GeometryData();
@@ -42,7 +47,7 @@ struct GeometryData {
 
     std::uint64_t id = 0;
     G4VPhysicalVolume * world = nullptr;
-    std::map<std::string, const G4VPhysicalVolume *> elements;
+    std::map<std::string, IndexedVolume> elements;
     std::vector<const G4VPhysicalVolume *> orderedElements;
     std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> mothers;
 
@@ -539,7 +544,7 @@ static G4LogicalVolume * build_volumes(
 
 static void map_volumes(
     const G4VPhysicalVolume * self,
-    std::map<std::string, const G4VPhysicalVolume *> & elements,
+    std::map<std::string, IndexedVolume> & elements,
     std::vector<const G4VPhysicalVolume *> & orderedElements,
     std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> & mothers
 ) {
@@ -547,7 +552,8 @@ static void map_volumes(
     int n = logical->GetNoDaughters();
     for (int i = 0; i < n; i++) {
         auto daughter = logical->GetDaughter(i);
-        elements[daughter->GetName()] = daughter;
+        auto index = orderedElements.size();
+        elements[daughter->GetName()] = { daughter, index };
         orderedElements.push_back(daughter);
         mothers[daughter] = self;
         map_volumes(daughter, elements, orderedElements, mothers);
@@ -635,7 +641,7 @@ GeometryData::GeometryData(const rust::Box<Volume> & volume) {
         false,
         0
     );
-    this->elements[world_name] = this->world;
+    this->elements[world_name] = { this->world, 0 };
     this->orderedElements.push_back(this->world);
     this->mothers[this->world] = nullptr;
     this->INSTANCES[this->world] = this;
@@ -704,16 +710,17 @@ std::shared_ptr<GeometryBorrow> create_geometry(
     }
 }
 
-static const G4VPhysicalVolume * get_volume(
+static IndexedVolume get_indexed_volume(
     const std::string & path,
-    std::map<std::string, const G4VPhysicalVolume *> & elements
+    std::map<std::string, IndexedVolume> & elements
 ) {
-    const G4VPhysicalVolume * volume = elements[path];
-    if (volume == nullptr) {
+    try {
+        return elements.at(path);
+    } catch(const std::out_of_range& e) {
         std::string msg = fmt::format("unknown volume '{}'", path);
         set_error(ErrorType::ValueError, msg.c_str());
+        return { nullptr, 0 };
     }
-    return volume;
 }
 
 std::shared_ptr<VolumeBorrow> GeometryBorrow::borrow_volume(
@@ -721,16 +728,13 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::borrow_volume(
 ) const {
     clear_error();
     std::string name = std::string(name_);
-    const G4VPhysicalVolume * volume = nullptr;
-    if (name == "__root__") {
-        volume = this->data->world;
-    } else {
-        volume = get_volume(name, this->data->elements);
-        if (volume == nullptr) {
-            return nullptr;
-        }
+    auto indexed = get_indexed_volume(name, this->data->elements);
+    if (indexed.ptr == nullptr) {
+        return nullptr;
     }
-    return std::make_shared<VolumeBorrow>(this->data, volume);
+    return std::make_shared<VolumeBorrow>(
+        this->data, indexed.ptr, indexed.index
+    );
 }
 
 std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
@@ -768,7 +772,8 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
         set_error(ErrorType::ValueError, msg.c_str());
         return nullptr;
     } else {
-        return std::make_shared<VolumeBorrow>(this->data, volume);
+        size_t index = this->data->elements[volume->GetName()].index;
+        return std::make_shared<VolumeBorrow>(this->data, volume, index);
     }
 }
 
@@ -778,7 +783,7 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::index_volume(
     clear_error();
     if (index < this->data->orderedElements.size()) {
         const G4VPhysicalVolume * volume = this->data->orderedElements[index];
-        return std::make_shared<VolumeBorrow>(this->data, volume);
+        return std::make_shared<VolumeBorrow>(this->data, volume, index);
     } else {
         auto msg = fmt::format(
             "expected an index in [0, {}), found {}",
@@ -889,8 +894,8 @@ void G4Mulder::DropGeometry(const G4VPhysicalVolume * volume) {
 //
 // ============================================================================
 
-VolumeBorrow::VolumeBorrow(GeometryData * g, const G4VPhysicalVolume * v):
-    geometry(g->clone()), volume(v) {};
+VolumeBorrow::VolumeBorrow(GeometryData * g, const G4VPhysicalVolume * v,
+    size_t i): geometry(g->clone()), volume(v), index(i) {};
 
 VolumeBorrow::~VolumeBorrow() {
     this->geometry->drop();
@@ -935,10 +940,10 @@ std::unique_ptr<G4AffineTransform> VolumeBorrow::compute_transform(
     }
 
     const G4VPhysicalVolume * current = this->volume;
-    const G4VPhysicalVolume * target = get_volume(
+    const G4VPhysicalVolume * target = get_indexed_volume(
         frame,
         this->geometry->elements
-    );
+    ).ptr;
     if (any_error()) {
         return nullptr;
     }
@@ -1194,6 +1199,10 @@ std::array<double, 6> VolumeBorrow::generate_onto(
         normal.z()
     };
     return result;
+}
+
+size_t VolumeBorrow::get_index() const {
+    return this->index;
 }
 
 EInside VolumeBorrow::inside(

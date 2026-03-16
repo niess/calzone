@@ -368,6 +368,7 @@ pub mod ffi {
             transform: &G4AffineTransform,
             compute_normal: bool
         ) -> [f64; 6];
+        fn get_index(self: &VolumeBorrow) -> usize;
         fn inside(
             self: &VolumeBorrow,
             point: &[f64; 3],

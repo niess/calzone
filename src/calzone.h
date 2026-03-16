@@ -67,7 +67,7 @@ std::shared_ptr<GeometryBorrow> create_geometry(const rust::Box<Volume> &);
 // ============================================================================
 
 struct VolumeBorrow {
-    VolumeBorrow(GeometryData *, const G4VPhysicalVolume *);
+    VolumeBorrow(GeometryData *, const G4VPhysicalVolume *, size_t);
     ~VolumeBorrow();
     VolumeBorrow(const VolumeBorrow &) = delete; // Forbid copy.
 
@@ -91,6 +91,7 @@ struct VolumeBorrow {
         const G4AffineTransform &,
         bool
     ) const;
+    size_t get_index() const;
     EInside inside(
         const std::array<double, 3> &,
         const G4AffineTransform &,
@@ -109,6 +110,7 @@ struct VolumeBorrow {
 private:
     GeometryData * geometry;
     const G4VPhysicalVolume * volume;
+    size_t index;
 };
 
 class G4TessellatedSolid;
