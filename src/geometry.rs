@@ -50,6 +50,18 @@ enum GeometryFormat {
     Mulder,
 }
 
+#[derive(FromPyObject)]
+enum VolumeArg {
+    Index(usize),
+    Name(String),
+}
+
+pub enum VolumeKey<'a> {
+    Index(usize),
+    Name(&'a str),
+    Stem(&'a str),
+}
+
 unsafe impl Send for ffi::GeometryBorrow {}
 unsafe impl Sync for ffi::GeometryBorrow {}
 
@@ -66,11 +78,19 @@ impl Geometry {
     /// The geometry root volume.
     #[getter]
     fn get_root(&self) -> PyResult<Volume> {
-        Volume::new(&self.0, "__root__", true)
+        Volume::new(&self.0, VolumeKey::Index(0))
     }
 
-    fn __getitem__(&self, path: &str) -> PyResult<Volume> {
-        Volume::new(&self.0, path, true)
+    fn __getitem__(&self, arg: VolumeArg) -> PyResult<Volume> {
+        let key = match &arg {
+            VolumeArg::Index(index) => VolumeKey::Index(*index),
+            VolumeArg::Name(name) => VolumeKey::Name(name.as_str()),
+        };
+        Volume::new(&self.0, key)
+    }
+
+    fn __len__(&self) -> usize {
+        self.0.len()
     }
 
     /// Check the geometry by looking for overlapping volumes.
@@ -123,7 +143,7 @@ impl Geometry {
 
     /// Find a geometry volume matching the given stem.
     fn find(&self, stem: &str) -> PyResult<Volume> {
-        Volume::new(&self.0, stem, false)
+        Volume::new(&self.0, VolumeKey::Stem(stem))
     }
 }
 
@@ -932,14 +952,14 @@ impl From<ffi::EInside> for i32 {
 }
 
 impl Volume {
-    pub fn new(
+    pub fn new<'a>(
         geometry: &SharedPtr<ffi::GeometryBorrow>,
-        name: &str,
-        exact: bool
+        key: VolumeKey<'a>,
     ) -> PyResult<Self> {
-        let volume = match exact {
-            true => geometry.borrow_volume(name),
-            false => geometry.find_volume(name),
+        let volume = match key {
+            VolumeKey::Index(index) => geometry.index_volume(index),
+            VolumeKey::Name(name) => geometry.borrow_volume(name),
+            VolumeKey::Stem(stem) => geometry.find_volume(stem),
         };
         if let Some(msg) = ffi::get_error().value() {
             let err = Error::new(IndexError).what("volume").why(msg);

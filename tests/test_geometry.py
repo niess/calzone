@@ -133,9 +133,15 @@ def test_Geometry():
     data = {"A": {"B": {"box": 1.0}}}
     geometry = calzone.Geometry(data)
 
+    assert len(geometry) == 2
     assert geometry["A"] == geometry.root
+    assert geometry[0] == geometry.root
+    assert geometry[1] == geometry["A.B"]
     assert isinstance(geometry["A"], calzone.Volume)
     assert geometry.find("B").path == geometry["A.B"].path
+
+    for key, volume in zip(("A", "A.B"), geometry):
+        assert volume == geometry[key]
 
     try:
         import goupil

@@ -4,6 +4,7 @@
 #include "simulation/sampler.h"
 // standard library.
 #include <list>
+#include <vector>
 // fmt library.
 #include <fmt/core.h>
 // Geant4 interface.
@@ -42,6 +43,7 @@ struct GeometryData {
     std::uint64_t id = 0;
     G4VPhysicalVolume * world = nullptr;
     std::map<std::string, const G4VPhysicalVolume *> elements;
+    std::vector<const G4VPhysicalVolume *> orderedElements;
     std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> mothers;
 
 private:
@@ -538,6 +540,7 @@ static G4LogicalVolume * build_volumes(
 static void map_volumes(
     const G4VPhysicalVolume * self,
     std::map<std::string, const G4VPhysicalVolume *> & elements,
+    std::vector<const G4VPhysicalVolume *> & orderedElements,
     std::map<const G4VPhysicalVolume *, const G4VPhysicalVolume *> & mothers
 ) {
     auto * logical = self->GetLogicalVolume();
@@ -545,8 +548,9 @@ static void map_volumes(
     for (int i = 0; i < n; i++) {
         auto daughter = logical->GetDaughter(i);
         elements[daughter->GetName()] = daughter;
+        orderedElements.push_back(daughter);
         mothers[daughter] = self;
-        map_volumes(daughter, elements, mothers);
+        map_volumes(daughter, elements, orderedElements, mothers);
     }
 }
 
@@ -632,11 +636,14 @@ GeometryData::GeometryData(const rust::Box<Volume> & volume) {
         0
     );
     this->elements[world_name] = this->world;
+    this->orderedElements.push_back(this->world);
     this->mothers[this->world] = nullptr;
     this->INSTANCES[this->world] = this;
 
     // Map volumes hierarchy.
-    map_volumes(this->world, this->elements, this->mothers);
+    map_volumes(
+        this->world, this->elements, this->orderedElements, this->mothers
+    );
 }
 
 GeometryData::~GeometryData() {
@@ -763,6 +770,28 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
     } else {
         return std::make_shared<VolumeBorrow>(this->data, volume);
     }
+}
+
+std::shared_ptr<VolumeBorrow> GeometryBorrow::index_volume(
+    size_t index
+) const {
+    clear_error();
+    if (index < this->data->orderedElements.size()) {
+        const G4VPhysicalVolume * volume = this->data->orderedElements[index];
+        return std::make_shared<VolumeBorrow>(this->data, volume);
+    } else {
+        auto msg = fmt::format(
+            "expected an index in [0, {}), found {}",
+            this->data->orderedElements.size(),
+            index
+        );
+        set_error(ErrorType::IndexError, msg.c_str());
+        return nullptr;
+    }
+}
+
+size_t GeometryBorrow::len() const {
+    return this->data->orderedElements.size();
 }
 
 

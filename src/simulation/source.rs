@@ -1,4 +1,4 @@
-use crate::geometry::{Geometry, Volume};
+use crate::geometry::{Geometry, Volume, VolumeKey};
 use crate::utils::error::{ctrlc_catched, Error, variant_explain};
 use crate::utils::error::ErrorKind::{KeyboardInterrupt, KeyError, NotImplementedError, TypeError,
                                      ValueError};
@@ -704,7 +704,7 @@ impl<'py> VolumeArg<'py> {
                             .why("expected a 'Volume', found a 'str'");
                         err.to_err()
                     })?;
-                Volume::new(geometry, &path, true)?
+                Volume::new(geometry, VolumeKey::Name(&path))?
             },
             Self::Volume(volume) => volume.get().clone(),
         };
