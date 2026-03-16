@@ -49,6 +49,15 @@ Python interface
       Calzone's user space, the :bash:`$GEANT4_DATA_DIR` must be set
       accordingly.
 
+   .. tip::
+
+      This method can also be invoked directly from a shell, for example as
+      follows
+
+      .. code-block:: console
+
+         calzone download --force
+
 ----
 
 .. autoclass:: calzone.Geant4Exception
@@ -103,6 +112,15 @@ Python interface
       :py:class:`Geant4Exception` is raised. Thus, only the first found overlap
       is reported, in case that the geometry comprises multiple overlaps.
 
+      .. tip::
+
+         This method can also be invoked directly from a shell, for example as
+         follows
+
+         .. code-block:: console
+
+            calzone check geometry.toml --resolution 10000
+
    .. automethod:: display
 
       .. note::
@@ -113,6 +131,15 @@ Python interface
       Launch an interactive display of the geometry. If tracking *data* is
       provided (as returned by the :py:meth:`Simulation.run` method), this
       information will be superimposed on the geometry display.
+
+      .. tip::
+
+         This method can also be invoked directly from a shell, for example as
+         follows
+
+         .. code-block:: console
+
+            calzone display geometry.toml
 
    .. automethod:: export
 

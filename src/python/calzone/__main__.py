@@ -21,6 +21,19 @@ def main():
         dest = "command"
     )
 
+    check = subparsers.add_parser("check",
+        help = "check a calzone geometry."
+    )
+
+    check.add_argument("path",
+        help = "Path to the geometry file.",
+    )
+
+    check.add_argument("-r", "--resolution",
+        help = "the number of trials when checking for overlaps",
+        type = int
+    )
+
     config = subparsers.add_parser("config",
         help = "print configuration data."
     )
@@ -81,7 +94,11 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "config":
+    if args.command == "check":
+        geometry = calzone.Geometry(args.path)
+        geometry.check(args.resolution)
+
+    elif args.command == "config":
         result = []
         if args.geant4_version:
             result.append(calzone.GEANT4_VERSION)
