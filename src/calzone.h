@@ -43,6 +43,7 @@ struct GeometryBorrow {
     std::shared_ptr<VolumeBorrow> borrow_volume(rust::Str) const;
     std::shared_ptr<VolumeBorrow> find_volume(rust::Str) const;
     std::shared_ptr<VolumeBorrow> index_volume(size_t) const;
+    std::shared_ptr<VolumeBorrow> root_volume() const;
     size_t len() const;
 
     // Geant4 interface.

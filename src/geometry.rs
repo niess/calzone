@@ -59,6 +59,7 @@ enum VolumeArg {
 pub enum VolumeKey<'a> {
     Index(usize),
     Name(&'a str),
+    Root,
     Stem(&'a str),
 }
 
@@ -78,7 +79,7 @@ impl Geometry {
     /// The geometry root volume.
     #[getter]
     fn get_root(&self) -> PyResult<Volume> {
-        Volume::new(&self.0, VolumeKey::Index(0))
+        Volume::new(&self.0, VolumeKey::Root)
     }
 
     fn __getitem__(&self, arg: VolumeArg) -> PyResult<Volume> {
@@ -593,7 +594,7 @@ impl Volume {
         PyTuple::new_bound(py, &self.daughters)
     }
 
-    /// The volume index.
+    /// The volume index within the geometry.
     #[getter]
     fn get_index(&self) -> usize {
         self.volume.get_index()
@@ -965,6 +966,7 @@ impl Volume {
         let volume = match key {
             VolumeKey::Index(index) => geometry.index_volume(index),
             VolumeKey::Name(name) => geometry.borrow_volume(name),
+            VolumeKey::Root => geometry.root_volume(),
             VolumeKey::Stem(stem) => geometry.find_volume(stem),
         };
         if let Some(msg) = ffi::get_error().value() {

@@ -346,6 +346,7 @@ pub mod ffi {
         fn find_volume(self: &GeometryBorrow, stem: &str) -> SharedPtr<VolumeBorrow>;
         fn index_volume(self: &GeometryBorrow, index: usize) -> SharedPtr<VolumeBorrow>;
         fn len(self: &GeometryBorrow) -> usize;
+        fn root_volume(self: &GeometryBorrow) -> SharedPtr<VolumeBorrow>;
 
         type VolumeBorrow;
         fn compute_box(self: &VolumeBorrow, frame: &str) -> [f64; 6];

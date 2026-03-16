@@ -61,8 +61,22 @@ Python interface
 
 .. autoclass:: calzone.Geometry
 
-   This class wraps an immutable `G4VPhysicalVolume`_ instance, acting as root
-   (world) volume for the Geant4 Monte Carlo simulation.
+   This class wraps a collection of `G4VPhysicalVolumes <G4VPhysicalVolume_>`_,
+   constituting a Geant4 Monte Carlo geometry. The corresponding
+   :py:class:`Volume` objects are accessible as a sequence. For instance,
+
+   .. doctest::
+      :hide:
+
+      >>> geometry = calzone.Geometry("geometry.toml")
+
+   >>> for index, volume in enumerate(geometry):
+   ...     assert volume == geometry[index]
+
+   Alternatively, a Monte Carlo :py:class:`Volume` can be accessed by providing
+   its absolute :ref:`pathname <pathname>` inside the geometry. For instance,
+
+   >>> volume = geometry["Environment.Detector"]
 
    .. method:: __new__(definition)
 
@@ -78,13 +92,6 @@ Python interface
 
          The :py:class:`GeometryBuilder` class (described hereafter) allows for
          customisation of the geometry before actually building it.
-
-   .. method:: __getitem__(self, pathname)
-
-      Return an interface to a Monte Carlo :py:class:`Volume` given its absolute
-      :ref:`pathname <pathname>` inside the geometry. For instance,
-
-      >>> volume = geometry["Environment.Detector"]
 
    .. automethod:: check
 
@@ -137,6 +144,11 @@ Python interface
       The *stem* argument might specify a volume :py:attr:`name
       <calzone.Volume.name>` or the tail of an incomplete :py:attr:`pathname
       <calzone.Volume.path>`.
+
+      .. note::
+
+         In the event of multiple potential matches, only the :py:class:`Volume`
+         with the lowest :py:attr:`~Volume.index` value is returned.
 
    .. rubric:: Attributes
      :heading-level: 4
@@ -777,6 +789,21 @@ Python interface
       :external:py:class:`tuple` of :external:py:class:`str` objects. Note that
       only direct descendants are reported (e.g., not grand-daughters).
 
+   .. autoattribute:: index
+
+      The volume index corresponds to its order when traversing the geometry.
+      For instance,
+
+      >>> for index, volume in enumerate(geometry):
+      ...     assert volume.index == index
+
+      .. tip::
+
+         The geometry tree is traversed using a `depth-first / post-order
+         <TreeTraversal_>`_ algorithm. Consequently, daughter volumes have a
+         lower index than their mother, with the root volume having the largest
+         index value.
+
    .. autoattribute:: material
 
       This is the name of the underlying `G4Material`_, as registered to Geant4.
@@ -847,6 +874,7 @@ Python interface
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
 .. _TOML: https://toml.io/en/
+.. _TreeTRaversal: https://en.wikipedia.org/wiki/Tree_traversal
 .. _Turtle: https://github.com/niess/turtle
 .. _Voxels: https://en.wikipedia.org/wiki/Voxel
 .. _WikipediaPCG: https://en.wikipedia.org/wiki/Permuted_congruential_generator

@@ -131,25 +131,45 @@ def test_Envelope():
 def test_Geometry():
     """Test the Geometry interface."""
 
-    data = {"A": {"B": {"box": 1.0}}}
+    data = { "A": {
+        "B": {
+            "D": { "box": 1.0 },
+            "E": { "box": 1.0 },
+        },
+        "C" : {
+            "F": { "box": 1.0 },
+        },
+    }}
+    paths = (
+        "A.B.D",
+        "A.B.E",
+        "A.B",
+        "A.C.F",
+        "A.C",
+        "A",
+    )
     geometry = calzone.Geometry(data)
 
-    assert len(geometry) == 2
+    assert len(geometry) == 6
     assert geometry["A"] == geometry.root
-    assert geometry[0] == geometry.root
-    assert geometry[1] == geometry["A.B"]
+    for i, path in enumerate(paths):
+        assert geometry[i].index == i
+        assert geometry[i] == geometry[path]
+
     assert isinstance(geometry["A"], calzone.Volume)
     assert geometry.find("B").path == geometry["A.B"].path
+    assert geometry.find("D").path == geometry["A.B.D"].path
 
-    for key, volume in zip(("A", "A.B"), geometry):
-        assert volume == geometry[key]
-
-    assert geometry["A"].index == 0
-    assert geometry["A.B"].index == 1
+    for path, volume in zip(paths, geometry):
+        assert volume == geometry[path]
 
     with pytest.raises(IndexError) as e:
-        geometry["C"]
-    assert "unknown volume 'C'" in str(e.value)
+        geometry["G"]
+    assert "unknown volume 'G'" in str(e.value)
+
+    with pytest.raises(IndexError) as e:
+        geometry.find("G")
+    assert "unknown volume '*G'" in str(e.value)
 
     try:
         import goupil
@@ -157,7 +177,7 @@ def test_Geometry():
         pass
     else:
         geometry = geometry.export()
-        assert len(geometry.sectors) == 2
+        assert len(geometry.sectors) == 6
 
 
 def test_GeometryBuilder():

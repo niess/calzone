@@ -552,12 +552,12 @@ static void map_volumes(
     int n = logical->GetNoDaughters();
     for (int i = 0; i < n; i++) {
         auto daughter = logical->GetDaughter(i);
-        auto index = orderedElements.size();
-        elements[daughter->GetName()] = { daughter, index };
-        orderedElements.push_back(daughter);
         mothers[daughter] = self;
         map_volumes(daughter, elements, orderedElements, mothers);
     }
+    auto index = orderedElements.size();
+    elements[self->GetName()] = { self, index };
+    orderedElements.push_back(self);
 }
 
 GeometryData::GeometryData(const rust::Box<Volume> & volume) {
@@ -641,8 +641,6 @@ GeometryData::GeometryData(const rust::Box<Volume> & volume) {
         false,
         0
     );
-    this->elements[world_name] = { this->world, 0 };
-    this->orderedElements.push_back(this->world);
     this->mothers[this->world] = nullptr;
     this->INSTANCES[this->world] = this;
 
@@ -745,15 +743,6 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
 
     std::function<G4VPhysicalVolume * (G4VPhysicalVolume *)> inspect;
     inspect = [&](G4VPhysicalVolume * volume) -> G4VPhysicalVolume * {
-        auto && name = volume->GetName();
-        if (name.length() >= stem.length()) {
-            auto endswith = name.compare(
-                name.length() - stem.length(),
-                stem.length(),
-                stem
-            );
-            if (endswith == 0) return volume;
-        }
         auto && logical = volume->GetLogicalVolume();
         std::uint64_t n = logical->GetNoDaughters();
         for (std::uint64_t i = 0; i < n; i++) {
@@ -762,6 +751,15 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::find_volume(
             if (result != nullptr) {
                 return result;
             }
+        }
+        auto && name = volume->GetName();
+        if (name.length() >= stem.length()) {
+            auto endswith = name.compare(
+                name.length() - stem.length(),
+                stem.length(),
+                stem
+            );
+            if (endswith == 0) return volume;
         }
         return nullptr;
     };
@@ -792,6 +790,16 @@ std::shared_ptr<VolumeBorrow> GeometryBorrow::index_volume(
         );
         set_error(ErrorType::IndexError, msg.c_str());
         return nullptr;
+    }
+}
+
+std::shared_ptr<VolumeBorrow> GeometryBorrow::root_volume() const {
+    auto volume = this->data->world;
+    if (volume == nullptr) {
+        return nullptr;
+    } else {
+        auto index = this->data->orderedElements.size() - 1;
+        return std::make_shared<VolumeBorrow>(this->data, volume, index);
     }
 }
 
