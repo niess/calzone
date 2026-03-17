@@ -187,8 +187,11 @@ impl GeometryBuilder {
 
     /// Build the Monte Carlo `Geometry`.
     fn build(&mut self, py: Python) -> PyResult<Geometry> {
-        // Validate volumes.
-        self.definition.volume.validate()?;
+        // Validate root volume.
+        self.definition.volume.validate_root()?;
+
+        // Resolve subtractions as overlap doublets
+        self.definition.volume.resolve_overlaps()?;
 
         // Build meshes.
         self.definition.volume.build_meshes(py, self.algorithm)?;

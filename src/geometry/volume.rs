@@ -1,4 +1,4 @@
-use crate::utils::error::ErrorKind::{KeyError, IOError, NotImplementedError, ValueError};
+use crate::utils::error::ErrorKind::{KeyError, IOError, ValueError};
 use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::extract::{extract, Extractor, Vector, Padding, Property, PropertyValue, Tag,
                             TryFromBound};
@@ -171,7 +171,7 @@ impl Volume {
             // Check that the overlaping volume is defined.
             match volumes.iter().find(|v| &v.name == name) {
                 None => {
-                    let err = tag.bad().what("disentangle items").why(format!(
+                    let err = tag.bad().what("overlap items").why(format!(
                         "undefined '{}' volume",
                         name,
                     )).to_err(ValueError);
@@ -195,13 +195,13 @@ impl Volume {
         let (overlaps, tag) = tag.resolve(&overlaps)?;
         for (left, right) in overlaps.iter() {
             let left: String = extract(&left)
-                .or_else(|| tag.bad().what("left-hand side disentangle item").into())?;
+                .or_else(|| tag.bad().what("left-hand side overlap item").into())?;
             let result: PyResult<Vec<String>> = right.extract();
             match result {
                 Err(_) => {
                     let right: String = extract(&right)
                         .expect("a (sequence of) 'str'")
-                        .or_else(|| tag.bad().what("right-hand side disentangle item").into())?;
+                        .or_else(|| tag.bad().what("right-hand side overlap item").into())?;
                     push(left, right)?;
                 },
                 Ok(rights) => {
@@ -221,69 +221,61 @@ impl Volume {
         Ok(o)
     }
 
-    pub(super) fn validate(&self) -> PyResult<()> {
-        fn inspect(tag: &Tag, volume: &Volume) -> PyResult<()> {
-            let daughters: Vec<_> = volume.volumes.iter()
-                .map(|v| (v.name(), !v.subtract.is_empty()))
-                .collect();
-            for v in volume.volumes.iter() {
-                let vtag = tag.extend(v.name.as_ref(), None, None);
-                for subtract in v.subtract.iter() {
-                    if subtract == v.name() {
-                        let why = format!("cannot subtract self ('{}.{}')", tag.path(), subtract);
-                        return Err(vtag.bad().what("subtract").why(why).to_err(ValueError))
-                    }
-
-                    match daughters.iter().find(|v| v.0 == subtract) {
-                        None => {
-                            let why = format!("unknown volume '{}.{}'", tag.path(), subtract);
-                            return Err(vtag.bad().what("subtract").why(why).to_err(ValueError))
-                        },
-                        Some((_, subtracted)) => if *subtracted {
-                            let why = format!(
-                                "cannot subtract a subtracted volume ('{}.{}')",
-                                tag.path(),
-                                subtract
-                            );
-                            return Err(vtag.bad().what("subtract").why(why)
-                                .to_err(NotImplementedError))
-                        } else {
-                            // Check overlaps.
-                            let mut is_vol = false;
-                            let mut is_sub = false;
-                            for [left, right] in volume.overlaps.iter() {
-                                if left == volume.name() || right == volume.name() {
-                                    is_vol = true;
-                                }
-                                if left == subtract || right == subtract {
-                                    is_sub = true;
-                                }
-                                if is_vol && is_sub {
-                                    let why = format!(
-                                        "cannot subtract overlaping volumes ('{}.{}', '{}'.'{}')",
-                                        tag.path(),
-                                        volume.name(),
-                                        tag.path(),
-                                        subtract,
-                                    );
-                                    return Err(vtag.bad().what("subtract").why(why)
-                                        .to_err(NotImplementedError))
-                                }
-                            }
-                        },
-                    }
-                }
-                inspect(&vtag, v)?;
-            }
-            Ok(())
-        }
-
+    pub(super) fn validate_root(&self) -> PyResult<()> {
         let tag = Tag::new("volume", self.name.as_ref(), None);
-        if !self.subtract.is_empty() {
+        if self.subtract.is_empty() {
+            Ok(())
+        } else {
             let why = format!("unknown volume '{}'", self.subtract[0]);
-            return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
+            Err(tag.bad().what("subtract").why(why).to_err(ValueError))
         }
-        inspect(&tag, self)
+    }
+
+    pub(super) fn resolve_overlaps(&mut self) -> PyResult<()> {
+        // Check that subtracted volumes exists.
+        for v in &self.volumes {
+            for s in &v.subtract {
+                if self.volumes.iter().find(|d| &d.name == &v.name).is_none() {
+                    let tag = Tag::new("volume", &self.name, None);
+                    let why = format!("unknown volume '{}.{}'", tag.path(), s);
+                    return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
+                }
+            }
+        }
+
+        // Fill overlaps doublets.
+        let mut solved = Vec::new();
+        let mut pending = Vec::new();
+        for v in &mut self.volumes {
+            if v.subtract.is_empty() {
+                solved.push(v.name());
+            } else {
+                pending.push(v);
+            }
+        }
+        while !pending.is_empty() {
+            let initial_len = pending.len();
+            for v in &mut pending {
+                v.subtract.retain(|s| {
+                    self.overlaps.push([v.name.clone(), s.clone()]);
+                    if solved.contains(&s) {
+                        false
+                    } else {
+                        true
+                    }
+                })
+            }
+            pending.retain(|v| !v.subtract.is_empty());
+            if pending.len() == initial_len {
+                let tag = Tag::new("volume", self.name.as_ref(), None);
+                let why = "could not resolve sub-volumes overlaps".to_owned();
+                return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
+            }
+        }
+        for v in self.volumes.iter_mut() {
+            v.resolve_overlaps()?;
+        }
+        Ok(())
     }
 }
 
