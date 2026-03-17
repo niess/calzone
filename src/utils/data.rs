@@ -1,5 +1,5 @@
 use crate::utils::error::{ctrlc_catched, Error};
-use crate::utils::error::ErrorKind::{KeyboardInterrupt, ValueError};
+use crate::utils::error::ErrorKind::{FileNotFoundError, KeyboardInterrupt, ValueError};
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use pyo3::prelude::*;
@@ -186,4 +186,24 @@ impl<'a> DataSet<'a> {
         };
         format!("{}.{}.tar.gz", name, self.version)
     }
+}
+
+pub fn validate_datasets() -> PyResult<()> {
+    const DATA_KEY: &str = "GEANT4_DATA_DIR";
+    let data_dir = match env::var(DATA_KEY) {
+        Ok(data_dir) => PathBuf::from(data_dir),
+        Err(_) => default_path(),
+    };
+
+    for dataset in DATASETS.iter() {
+        let path = data_dir.join(dataset.dirname());
+        if !path.is_dir() {
+            let what = format!("{} dataset", dataset.name);
+            let why = format!("missing folder: {}", path.display());
+            let err = Error::new(FileNotFoundError).what(&what).why(&why);
+            return Err(err.to_err())
+        }
+    }
+
+    Ok(())
 }

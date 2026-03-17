@@ -1,6 +1,7 @@
 #![allow(deprecated)]
 
 use crate::geometry::Geometry;
+use crate::utils::data::validate_datasets;
 use crate::utils::error::Error;
 use crate::utils::error::ErrorKind::ValueError;
 use crate::utils::namespace::Namespace;
@@ -11,6 +12,7 @@ use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use pyo3::types::PyString;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 mod physics;
 mod random;
@@ -145,6 +147,12 @@ impl Simulation {
         random_indices: Option<&PyArray<u64>>,
         verbose: Option<bool>, // Hidden argument.
     ) -> PyResult<PyObject> {
+        static VALIDATED: AtomicBool = AtomicBool::new(false);
+        if !VALIDATED.load(Ordering::Relaxed) {
+            validate_datasets()?;
+            VALIDATED.store(true, Ordering::Relaxed);
+        }
+
         let py = particles.py();
         let verbose = verbose.unwrap_or(false);
         let particles = source::ParticlesIterator::new(particles)?;
