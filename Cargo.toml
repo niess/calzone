@@ -39,6 +39,7 @@ regex.workspace = true
 reqwest.workspace = true
 tar.workspace = true
 temp-dir.workspace = true
+version-compare = "0.2"
 
 [workspace.dependencies]
 flate2 = "1.0"

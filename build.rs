@@ -7,13 +7,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tar::Archive;
 use temp_dir::TempDir;
+use version_compare::Version;
 
 
 const LINESEP: &str = if cfg!(windows) { "\r\n" } else { "\n" };
 
 const MISSING_GEANT4: &str = "Could not locate **Geant4** install";
 
-fn main() {
+fn main() -> Result<(), String> {
     const GEANT4_CONFIG: &str = if cfg!(windows) {
         "geant4-config.cmd"
     } else {
@@ -22,14 +23,14 @@ fn main() {
     let command = Command::new(GEANT4_CONFIG)
         .arg("--prefix")
         .output();
-    let geant4_prefix = match command {
+    let (geant4_prefix, geant4_version) = match command {
         Ok(output) => {
             let geant4_prefix = String::from_utf8(output.stdout)
                 .expect(&boxed("Could not parse **Geant4** prefix"))
                 .trim()
                 .to_string();
-            export_geant4_version(GEANT4_CONFIG);
-            geant4_prefix
+            let geant4_version = export_geant4_version(GEANT4_CONFIG);
+            (geant4_prefix, geant4_version)
         },
         Err(_) => {
             let geant4_prefix = env::var_os("GEANT4_PREFIX")
@@ -43,8 +44,8 @@ fn main() {
             let geant4_prefix = geant4_prefix.to_string_lossy().to_string();
             const SEP: char = std::path::MAIN_SEPARATOR;
             let geant4_config = format!("{geant4_prefix}{SEP}bin{SEP}{GEANT4_CONFIG}");
-            export_geant4_version(&geant4_config);
-            geant4_prefix
+            let geant4_version = export_geant4_version(&geant4_config);
+            (geant4_prefix, geant4_version)
         },
     };
     export_geant4_datasets(&geant4_prefix);
@@ -135,14 +136,26 @@ fn main() {
     }
 
     println!("cargo:rustc-link-search={}", geant4_lib.display());
-    const LIBS: [&str; 17] = [
-        "G4analysis", "G4physicslists", "G4run", "G4event", "G4tracking", "G4processes",
-        "G4digits_hits", "G4track", "G4particles", "G4geometry", "G4materials",
-        "G4graphics_reps", "G4intercoms", "G4global", "G4clhep", "G4ptl", "G4zlib"
-    ];
-    for lib in LIBS {
+    let libs = {
+        let mut libs = vec![
+            "G4analysis", "G4physicslists", "G4run", "G4event", "G4tracking", "G4digits_hits",
+            "G4track", "G4particles", "G4geometry", "G4materials", "G4graphics_reps",
+            "G4intercoms", "G4global", "G4clhep", "G4ptl", "G4zlib"
+        ];
+        let geant4_version = Version::from(&geant4_version)
+            .expect(&format!("could not parse Geant4 version ({})", geant4_version));
+        if geant4_version < Version::from("11.4.0").unwrap() {
+            libs.push("G4processes");
+        } else {
+            libs.extend_from_slice(&["G4processes_hadronic", "G4processes_core"]);
+        }
+        libs
+    };
+    for lib in libs {
         println!("cargo:rustc-link-lib={}", lib);
     }
+
+    Ok(())
 }
 
 fn make_path(prefix: &str, locations: &[&str]) -> PathBuf {
@@ -156,7 +169,7 @@ fn make_path(prefix: &str, locations: &[&str]) -> PathBuf {
     panic!("missing {}", path.display())
 }
 
-fn export_geant4_version(geant4_config: &str) {
+fn export_geant4_version(geant4_config: &str) -> String {
     let output = Command::new(geant4_config)
         .arg("--version")
         .output()
@@ -171,6 +184,7 @@ fn export_geant4_version(geant4_config: &str) {
     let path = Path::new(&out_dir)
         .join("geant4_version.in");
     std::fs::write(&path, format!("\"{}\"", geant4_version)).unwrap();
+    geant4_version
 }
 
 fn export_geant4_datasets(geant4_prefix: &str) {
