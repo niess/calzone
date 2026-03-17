@@ -1,8 +1,8 @@
 name: Build Geant4
 on:
   push:
-    branches:
-      - geant4
+    tags:
+      - geant4-**
 
 env:
   GEANT4_VERSION: '11.3.2'
@@ -15,17 +15,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-latest, windows-latest, windows-11-arm]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-14, windows-2022, windows-11-arm]
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             tag: manylinux2014_x86_64
           - os: ubuntu-24.04-arm
             tag: manylinux2014_aarch64
-          - os: macos-13
+          - os: macos-15-intel
             tag: macosx_11_0_x86_64  # match MACOSX_DEPLOYMENT_TARGET
-          - os: macos-latest
+          - os: macos-14
             tag: macosx_11_0_arm64   # match MACOSX_DEPLOYMENT_TARGET
-          - os: windows-latest
+          - os: windows-2022
             tag: win_amd64
           - os: windows-11-arm
             tag: win_arm64
