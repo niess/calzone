@@ -893,13 +893,6 @@ impl<'a, 'py, T> ExtractResult<'a, 'py, T>
 where
     T: FromPyObject<'py> + TypeName,
 {
-    pub fn expect(mut self, typename: &'static str) -> Self {
-        if let Err(_) = self.result.as_ref() {
-            self.expected = Some(typename);
-        }
-        self
-    }
-
     pub fn or(self, message: &str) -> PyResult<T> {
         let expected = self.expected
             .unwrap_or_else(T::type_name);

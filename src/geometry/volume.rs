@@ -12,7 +12,6 @@ use pyo3::prelude::*;
 use pyo3::exceptions::{PyNotImplementedError};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::cmp::Ordering::{Equal, Greater};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
@@ -161,68 +160,6 @@ impl Volume {
         Ok(())
     }
 
-    pub(super) fn flatten_overlaps<'py>(
-        tag: &Tag,
-        overlaps: &DictLike<'py>,
-        volumes: &[Self],
-    ) -> PyResult<Vec<[String; 2]>> {
-        // Extract and flatten overlaps.
-        let mut o = Vec::<[String; 2]>::new();
-
-        let find = |name: &String| -> PyResult<()> {
-            // Check that the overlaping volume is defined.
-            match volumes.iter().find(|v| &v.name == name) {
-                None => {
-                    let err = tag.bad().what("overlap items").why(format!(
-                        "undefined '{}' volume",
-                        name,
-                    )).to_err(ValueError);
-                    Err(err)
-                }
-                Some(_) => Ok(()),
-            }
-        };
-
-        let mut push = |left: String, right: String| -> PyResult<()> {
-            // Order and push an overlap pair.
-            find(&left)?;
-            find(&right)?;
-            match left.cmp(&right) {
-                Greater => o.push([right, left]),
-                _ => o.push([left, right]),
-            }
-            Ok(())
-        };
-
-        let (overlaps, tag) = tag.resolve(&overlaps)?;
-        for (left, right) in overlaps.iter() {
-            let left: String = extract(&left)
-                .or_else(|| tag.bad().what("left-hand side overlap item").into())?;
-            let result: PyResult<Vec<String>> = right.extract();
-            match result {
-                Err(_) => {
-                    let right: String = extract(&right)
-                        .expect("a (sequence of) 'str'")
-                        .or_else(|| tag.bad().what("right-hand side overlap item").into())?;
-                    push(left, right)?;
-                },
-                Ok(rights) => {
-                    for right in rights {
-                        push(left.clone(), right)?;
-                    }
-                },
-            }
-        }
-
-        // Sort overlaps.
-        o.sort_by(|a, b| match a[0].cmp(&b[0]) {
-            Equal => a[1].cmp(&b[1]),
-            other => other,
-        });
-        o.dedup(); // remove duplicates.
-        Ok(o)
-    }
-
     pub(super) fn validate_root(&self) -> PyResult<()> {
         let tag = Tag::new("volume", self.name.as_ref(), None);
         if self.subtract.is_empty() {
@@ -317,6 +254,7 @@ impl Volume {
                         }
                     }
                 }
+                unreachable!()
             }
         }
 
@@ -336,6 +274,13 @@ impl Volume {
             v.resolve_overlaps(Some(tag))?;
         }
         Ok(())
+    }
+
+    pub(super) fn clean_temporaries(&mut self) {
+        self.overlaps.clear();
+        for v in self.volumes.iter_mut() {
+            v.clean_temporaries();
+        }
     }
 }
 
@@ -389,12 +334,11 @@ impl TryFromBound for Volume {
             .map_err(|why| tag.bad().what("name").why(why.to_string()).to_err(ValueError))?;
 
         // Extract base properties.
-        const EXTRACTOR: Extractor<9> = Extractor::new([
+        const EXTRACTOR: Extractor<8> = Extractor::new([
             Property::optional_str("material"),
             Property::optional_strs("role"),
             Property::optional_vec("position"),
             Property::optional_mat("rotation"),
-            Property::optional_dict("disentangle"),
             Property::optional_strs("subtract"),
             Property::optional_any("materials"),
             Property::optional_any("meshes"),
@@ -404,7 +348,7 @@ impl TryFromBound for Volume {
         let py = value.py();
         let tag = tag.cast("volume");
         let mut remainder = IndexMap::<String, Bound<PyAny>>::new();
-        let [material, role, position, rotation, disentangle, subtract, materials, meshes,
+        let [material, role, position, rotation, subtract, materials, meshes,
              include] = EXTRACTOR.extract(&tag, value, Some(&mut remainder))?;
 
         let name = tag.name().to_string();
@@ -412,7 +356,6 @@ impl TryFromBound for Volume {
         let role: Vec<String> = role.into();
         let position: Option<f64x3> = position.into();
         let rotation: Option<f64x3x3> = rotation.into();
-        let overlaps: Option<DictLike> = disentangle.into();
         let subtract: Vec<String> = subtract.into();
         let include: Option<Bound<PyAny>> = include.into();
 
@@ -528,12 +471,6 @@ impl TryFromBound for Volume {
             }
         }
 
-        // Extract overlaps.
-        let overlaps = match overlaps {
-            None => Vec::<[String; 2]>::new(),
-            Some(overlaps) => Self::flatten_overlaps(&tag, &overlaps, volumes.as_slice())?,
-        };
-
         // Extract materials.
         let materials: Option<Bound<PyAny>> = materials.into();
         let materials: PyResult<Option<MaterialsDefinition>> = materials
@@ -541,6 +478,7 @@ impl TryFromBound for Volume {
             .transpose();
         let materials = materials?;
 
+        let overlaps = Vec::new();
         let volume = Self {
             name, material, roles, shape, position, rotation, volumes, overlaps, subtract,
             materials
@@ -965,10 +903,6 @@ impl Volume {
             Shape::Sphere(shape) => &shape,
             _ => unreachable!(),
         }
-    }
-
-    pub fn subtract(&self) -> &[String] {
-        self.subtract.as_slice()
     }
 
     pub fn volumes(&self) -> &[Volume] {

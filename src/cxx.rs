@@ -458,7 +458,6 @@ pub mod ffi {
         fn sensitive(self: &Volume) -> bool;
         fn shape(self: &Volume) -> ShapeType;
         fn sphere_shape(self: &Volume) -> &SphereShape;
-        fn subtract(self: &Volume) -> &[String];
         fn volumes(self: &Volume) -> &[Volume];
 
         type MeshHandle;

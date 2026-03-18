@@ -346,9 +346,6 @@ see :ref:`geometry:Shape definition`.
    * - :python:`"role"`
      - :python:`[str]`
      - :python:`None`
-   * - :python:`"disentangle"`
-     - :python:`dict` (:numref:`tab-disentangle-items`)
-     - :python:`None`
    * - :python:`"subtract"`
      - :python:`[str]`
      - :python:`None`
@@ -446,47 +443,17 @@ Possible actions and recipients are listed in :numref:`tab-volume-roles` below.
 Overlaps
 ~~~~~~~~
 
-The :python:`"disentangle"` and :python:`"subtract"` volume properties address the
-issue of overlaps between sister volumes in two distinct ways. The
-:python:`"subtract"` property explicitly specifies sister volumes (by their
-name) whose shape are to be subtracted from the current volume. This can be
-employed, for instance, to dig out a portion of a :python:`"Ground"` volume to
-accommodate a partially buried :python:`"Detector"` volume.
-
-.. note::
-
-   Only unsubtracted volumes can be subtracted from. Consequently, the
-   *subtract* property does not permit the formation of subtraction chains.
-
-The :python:`"disentangle"` property indicates pairs of overlapping daughter
-volumes which should be separated, (see :numref:`tab-disentangle-items`), for
-instance as,
+The :python:`"subtract"` property specifies sister volumes (by their name) whose
+shape are to be subtracted from the current volume. This can be employed, for
+instance, to dig out a portion of a :python:`"Ground"` volume to accommodate a
+partially buried :python:`"Detector"` volume. For examples, as
 
 .. code:: toml
 
-   [VolumeName.disentangle]
+   [MotherName.DaughterA]
 
-   Bottom = [ "Left", "Right" ]
-   Top = "Left"
+   subtract = "DaughterB"
 
-These volumes are separated using an iterative subtraction procedure. It should
-be noted that this procedure does not guarantee which volume is subtracted or
-not. It is therefore recommended that this method be used only for the purpose
-of patching small (erroneous) overlaps (e.g. due to numeric approximations).
-
-.. _tab-disentangle-items:
-
-.. list-table:: Disentangle items.
-   :width: 75%
-   :widths: auto
-   :header-rows: 1
-
-   * - Key
-     - Value type
-     - Default value
-   * - :python:`VolumeName`
-     - :python:`[str]`
-     - 
 
 Includes
 ~~~~~~~~

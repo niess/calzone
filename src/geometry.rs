@@ -212,6 +212,10 @@ impl GeometryBuilder {
             unreachable!()
         }
         let geometry = Geometry (geometry);
+
+        // Clean temporary data from the geometry definition.
+        self.definition.volume.clean_temporaries();
+
         Ok(geometry)
     }
 
@@ -244,7 +248,6 @@ impl GeometryBuilder {
         slf: Bound<'py, GeometryBuilder>,
         pathname: &str,
         material: Option<String>,
-        overlaps: Option<DictLike<'py>>,
         position: Option<f64x3>,
         role: Option<Strings>,
         rotation: Option<Rotation>,
@@ -255,14 +258,6 @@ impl GeometryBuilder {
         let volume = builder.find_mut(pathname)?;
         if let Some(material) = material {
             volume.material = material;
-        }
-        if let Some(overlaps) = overlaps {
-            let tag = Tag::new("", "overlaps", None);
-            volume.overlaps = volume::Volume::flatten_overlaps(
-                &tag,
-                &overlaps,
-                volume.volumes.as_slice()
-            )?;
         }
         if let Some(position) = position {
             volume.position = Some(position);
