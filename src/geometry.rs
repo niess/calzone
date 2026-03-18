@@ -191,7 +191,7 @@ impl GeometryBuilder {
         self.definition.volume.validate_root()?;
 
         // Resolve subtractions as overlap doublets
-        self.definition.volume.resolve_overlaps()?;
+        self.definition.volume.resolve_overlaps(None)?;
 
         // Build meshes.
         self.definition.volume.build_meshes(py, self.algorithm)?;

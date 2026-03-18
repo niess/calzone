@@ -389,3 +389,27 @@ def test_Volume():
     points = numpy.zeros((4, 3))
     expected = numpy.tile([0.0, 0.0, -1.0], 4).reshape(points.shape)
     assert_allclose(B.local_coordinates(points), expected)
+
+
+def test_overlaps():
+    """Test overlaps resolution."""
+
+    calzone.Geometry({ "A": {
+        "B" : { "box": 1.0, "subtract": ("C", "D") },
+        "C" : { "box": 1.0, "subtract": "D" },
+        "D" : { "box": 1.0 },
+    }})
+
+    with pytest.raises(ValueError) as e:
+        calzone.Geometry({ "A": {
+            "B" : { "box": 1.0, "subtract": "C" },
+            "C" : { "box": 1.0, "subtract": "D" },
+            "D" : { "box": 1.0, "subtract": "B" },
+        }})
+    assert "cycle: C -> D -> B" in str(e.value)
+
+    with pytest.raises(ValueError) as e:
+        calzone.Geometry({ "A": {
+            "B" : { "box": 1.0, "subtract": "C" },
+        }})
+    assert "unknown volume 'A.C'" in str(e.value)

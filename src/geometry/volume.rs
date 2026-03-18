@@ -3,6 +3,7 @@ use crate::utils::error::{variant_error, variant_explain};
 use crate::utils::extract::{extract, Extractor, Vector, Padding, Property, PropertyValue, Tag,
                             TryFromBound};
 use crate::utils::float::{f64x3, f64x3x3};
+use crate::utils::graph::{GraphError, HashGraph, Nothing, Visitor};
 use crate::utils::io::DictLike;
 use crate::utils::units::convert;
 use enum_variants_strings::EnumVariantsStrings;
@@ -12,6 +13,7 @@ use pyo3::exceptions::{PyNotImplementedError};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering::{Equal, Greater};
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
 use super::{ffi, MaterialsDefinition};
@@ -231,49 +233,107 @@ impl Volume {
         }
     }
 
-    pub(super) fn resolve_overlaps(&mut self) -> PyResult<()> {
-        // Check that subtracted volumes exists.
-        for v in &self.volumes {
-            for s in &v.subtract {
-                if self.volumes.iter().find(|d| &d.name == &v.name).is_none() {
-                    let tag = Tag::new("volume", &self.name, None);
-                    let why = format!("unknown volume '{}.{}'", tag.path(), s);
-                    return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
+    pub(super) fn resolve_overlaps(&mut self, tag: Option<Tag>) -> PyResult<()> {
+        let name = self.name.clone(); // due to mutable borrow.
+        let tag = tag.unwrap_or_else(|| Tag::new("volume", &name, None));
+
+        // Convert sub-volumes subtractions to overlap doublets. First, we split sub-volumes into
+        // resolved onees (i.e., that do not need any subtraction) and pending ones.
+        let mut solved = Vec::new();
+        let mut pending = Vec::new();
+        for (i, v) in self.volumes.iter().enumerate() {
+            if v.subtract.is_empty() {
+                solved.push(i);
+            } else {
+                let mut edges = Vec::new();
+                for s in &v.subtract {
+                    match self.volumes.iter().enumerate().find(|d| &d.1.name == s) {
+                        None => {
+                            let why = format!("unknown volume '{}.{}'", tag.path(), s);
+                            let tag = tag.extend(&v.name, None, None);
+                            return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
+                        },
+                        Some((j, _)) => edges.push(j),
+                    }
                 }
+                pending.push((i, edges))
             }
         }
 
-        // Fill overlaps doublets.
-        let mut solved = Vec::new();
-        let mut pending = Vec::new();
-        for v in &mut self.volumes {
-            if v.subtract.is_empty() {
-                solved.push(v.name());
-            } else {
-                pending.push(v);
-            }
-        }
+        // Recursively solve overlaps.
+        let mut overlaps = Vec::new();
         while !pending.is_empty() {
             let initial_len = pending.len();
-            for v in &mut pending {
-                v.subtract.retain(|s| {
-                    self.overlaps.push([v.name.clone(), s.clone()]);
-                    if solved.contains(&s) {
+            for p in &mut pending {
+                p.1.retain(|j| {
+                    if solved.contains(j) {
+                        overlaps.push((p.0, *j));
                         false
                     } else {
                         true
                     }
                 })
             }
-            pending.retain(|v| !v.subtract.is_empty());
+            pending.retain(|p| {
+                if p.1.is_empty() {
+                    solved.push(p.0);
+                    false
+                } else {
+                    true
+                }
+            });
             if pending.len() == initial_len {
-                let tag = Tag::new("volume", self.name.as_ref(), None);
-                let why = "could not resolve sub-volumes overlaps".to_owned();
-                return Err(tag.bad().what("subtract").why(why).to_err(ValueError))
+                // A cyclic reference prevents processing overlaps. Let us build the dependencies
+                // graph in order to locate the faulty cycle.
+                let mut graph = HashMap::<usize, Vec<usize>>::new();
+                for i in solved.drain(..) {
+                    graph.insert(i, Vec::new());
+                }
+                let mut unsolved = Vec::new();
+                for (i, p) in pending.drain(..) {
+                    graph.insert(i, p);
+                    unsolved.push(i);
+                }
+                let graph = HashGraph(graph);
+
+                // Loop over unsolved overlaps and look for a cycle.
+                let mut visitor = Visitor::new(&graph);
+                for i in &unsolved {
+                    if let Err(err) = visitor.visit(i, &mut Nothing) {
+                        match err {
+                            GraphError::Cycle(nodes) => {
+                                let nodes: Vec<_> = nodes
+                                    .into_iter()
+                                    .map(|i| self.volumes[*i].name.as_str())
+                                    .collect();
+                                let nodes = nodes.join(" -> ");
+                                let tag = tag.cast("sub-volumes");
+                                let why = format!("cycle: {}", nodes);
+                                return Err(
+                                    tag.bad().what("subtraction(s)").why(why).to_err(ValueError)
+                                )
+                            },
+                            GraphError::Missing(_) => unreachable!(),
+                        }
+                    }
+                }
             }
         }
+
+        // Update the sub-volumes overlaps.
+        self.overlaps.clear();
+        for (i, j) in overlaps {
+            self.overlaps.push([
+                self.volumes[i].name.clone(),
+                self.volumes[j].name.clone(),
+            ])
+        }
+
+        // Recurse over sub-volumes.
         for v in self.volumes.iter_mut() {
-            v.resolve_overlaps()?;
+            let name = v.name.clone();
+            let tag = tag.extend(&name, None, None);
+            v.resolve_overlaps(Some(tag))?;
         }
         Ok(())
     }

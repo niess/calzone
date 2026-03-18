@@ -271,7 +271,6 @@ static G4VSolid * build_solids(
     // Build sub-solids.
     std::list<const G4VSolid *> daughters;
     std::map<rust::String, G4AffineTransform> transforms;
-    std::list<std::array<rust::String, 2>> subtractions;
     for (auto && v: volume.volumes()) {
         auto s = build_solids(v, pathname, solids, orphans);
         if (s == nullptr) {
@@ -280,18 +279,10 @@ static G4VSolid * build_solids(
             daughters.push_back(s);
             auto && t = local_transform(v);
             transforms[v.name()] = std::move(t);
-
-            for (auto && subtract: v.subtract()) {
-                std::array<rust::String, 2> item = {
-                    v.name(),
-                    subtract
-                };
-                subtractions.push_back(std::move(item));
-            }
         }
     }
 
-    // Apply subtractions and overlaps.
+    // Apply subtractions.
     auto subtract = [&](const std::array<rust::String, 2> & item) {
         const std::string path0 = fmt::format("{}.{}",
             pathname, std::string(item[0]));
@@ -339,10 +330,6 @@ static G4VSolid * build_solids(
 
     for (auto overlap: volume.overlaps()) {
         subtract(overlap);
-    }
-
-    for (auto item: subtractions) {
-        subtract(item);
     }
 
     // Build current solid.

@@ -3,6 +3,7 @@ pub mod error;
 pub mod export;
 pub mod extract;
 pub mod float;
+pub mod graph;
 pub mod io;
 pub mod namespace;
 pub mod numpy;
