@@ -80,7 +80,7 @@ impl<'py> FromPyObject<'py> for Algorithm {
     fn extract_bound(algorithm: &Bound<'py, PyAny>) -> PyResult<Self> {
         let algorithm: String = algorithm.extract()?;
         let algorithm = Algorithm::from_str(&algorithm)
-            .map_err(|options| variant_error("algorith", &algorithm, options))?;
+            .map_err(|options| variant_error("bad algorithm", &algorithm, options))?;
         Ok(algorithm)
     }
 }
