@@ -300,6 +300,7 @@ pub mod ffi {
         energy: f64,
         position: [f64; 3],
         direction: [f64; 3],
+        time: f64,
         volume: [u8; 16],
         process: [u8; 16],
     }
@@ -510,6 +511,8 @@ pub mod ffi {
             point_deposit: f64,
             start: &G4ThreeVector,
             end: &G4ThreeVector,
+            t_start: f64,
+            t_end: f64,
         );
         unsafe fn push_particle(
             self: &mut RunAgent,

@@ -212,19 +212,21 @@ impl Deposits {
         point_deposit: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
+        t_start: f64,
+        t_end: f64,
         weight: f64,
         random_index: &[u64; 2],
     ) {
         self.values.entry(volume)
             .and_modify(|e| e.push(
-                event, tid, pid, energy, total_deposit, point_deposit, start, end, weight,
-                random_index
+                event, tid, pid, energy, total_deposit, point_deposit, start, end, t_start, t_end,
+                weight, random_index
             ))
             .or_insert_with(|| {
                 let mut cell = DepositsCell::new(self.mode);
                 cell.push(
-                    event, tid, pid, energy, total_deposit, point_deposit, start, end, weight,
-                    random_index
+                    event, tid, pid, energy, total_deposit, point_deposit, start, end, t_start,
+                    t_end, weight, random_index
                 );
                 cell
             });
@@ -245,7 +247,7 @@ enum DepositsCell {
 
 #[derive(Default)]
 struct BriefDeposits {
-    total: IndexMap<usize, (f64, f64, [u64; 2])>,
+    total: IndexMap<usize, (f64, f64, f64, [u64; 2])>,
 }
 
 #[derive(Default)]
@@ -266,10 +268,10 @@ impl DepositsCell {
         let deposits = match self {
             Self::Brief(mut deposits) => {
                 let array = PyArray::<TotalDeposit>::empty(py, &[deposits.total.len()])?;
-                for (i, (event, (value, weight, random_index))) in deposits.total
+                for (i, (event, (value, time, weight, random_index))) in deposits.total
                     .drain(..)
                     .enumerate() {
-                    let deposit = TotalDeposit { event, value, weight, random_index };
+                    let deposit = TotalDeposit { event, value, time, weight, random_index };
                     array.set(i, deposit)?;
                 }
                 array.into_any().unbind()
@@ -296,31 +298,39 @@ impl DepositsCell {
         point_deposit: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
+        t_start: f64,
+        t_end: f64,
         weight: f64,
         random_index: &[u64; 2],
     ) {
         match self {
             Self::Brief(ref mut deposits) => {
                 deposits.total.entry(event)
-                    .and_modify(|e| { e.0 += total_deposit })
-                    .or_insert((total_deposit, weight, *random_index));
+                    .and_modify(|e| {
+                        e.0 += total_deposit;
+                        if t_start < e.1 {
+                            e.1 = t_start;
+                        }
+                    })
+                    .or_insert((total_deposit, t_start, weight, *random_index));
             },
             Self::Detailed(ref mut deposits) => {
                 let start = ffi::to_vec(start);
                 let end = ffi::to_vec(end);
                 let line_deposit = total_deposit - point_deposit;
+                let time = [ t_start, t_end ];
                 let random_index = *random_index;
                 if line_deposit > 0.0 {
                     let deposit = LineDeposit {
                         event, tid, pid, energy, start, end, value: line_deposit, weight,
-                        random_index
+                        time, random_index
                     };
                     deposits.line.push(deposit);
                 }
                 if point_deposit > 0.0 {
                     let deposit = PointDeposit {
                         event, tid, pid, energy, position: end, value: point_deposit, weight,
-                        random_index
+                        time: t_start, random_index
                     };
                     deposits.point.push(deposit);
                 }
@@ -346,6 +356,7 @@ pub struct LineDeposit {
     value: f64,
     start: [f64; 3],
     end: [f64; 3],
+    time: [f64; 2],
     weight: f64,
     random_index: [u64; 2],
 }
@@ -359,6 +370,7 @@ pub struct PointDeposit {
     energy: f64,
     value: f64,
     position: [f64; 3],
+    time: f64,
     weight: f64,
     random_index: [u64; 2],
 }
@@ -368,6 +380,7 @@ pub struct PointDeposit {
 pub struct TotalDeposit {
     event: usize,
     value: f64,
+    time: f64,
     weight: f64,
     random_index: [u64; 2],
 }

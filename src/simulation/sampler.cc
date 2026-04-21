@@ -26,9 +26,12 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
             double energy = pre->GetKineticEnergy();
             auto start = pre->GetPosition() / CLHEP::cm;
             auto end = post->GetPosition() / CLHEP::cm;
+            auto t_start = pre->GetGlobalTime() / CLHEP::s;
+            auto t_end = post->GetGlobalTime() / CLHEP::s;
 
             RUN_AGENT->push_deposit(
-                volume, tid, pid, energy, deposit, point_deposit, start, end
+                volume, tid, pid, energy, deposit, point_deposit, start, end,
+                t_start, t_end
             );
         }
     }
@@ -82,6 +85,7 @@ G4bool SamplerImpl::ProcessHits(G4Step * step, G4TouchableHistory *) {
                     point->GetKineticEnergy() / CLHEP::MeV,
                     { r.x(), r.y(), r.z() },
                     { u.x(), u.y(), u.z() },
+                    0.0,
                     { 0x0 },
                     { 0x0 }
                 };

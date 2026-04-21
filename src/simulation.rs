@@ -423,11 +423,13 @@ impl<'a> RunAgent<'a> {
         point_deposit: f64,
         start: &ffi::G4ThreeVector,
         end: &ffi::G4ThreeVector,
+        t_start: f64,
+        t_end: f64,
     ) {
         if let Some(deposits) = self.deposits.as_mut() {
             deposits.push(
                 volume, self.index - 1, tid, pid, energy, total_deposit, point_deposit, start, end,
-                self.weight, &self.random_index
+                t_start, t_end, self.weight, &self.random_index
             )
         }
     }

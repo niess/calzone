@@ -175,12 +175,14 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
     auto push_vertex = [&](const G4StepPoint * p, bool pre=false) {
         auto && r = p->GetPosition() / CLHEP::cm;
         auto && u = p->GetMomentumDirection();
+        auto && t = p->GetGlobalTime() / CLHEP::s;
         Vertex vertex = {
             0,
             tid,
             p->GetKineticEnergy() / CLHEP::MeV,
             { r.x(), r.y(), r.z() },
             { u.x(), u.y(), u.z() },
+            t,
             { 0x0 },
             { 0x0 }
         };
