@@ -99,7 +99,7 @@ impl Geometry {
         let resolution = resolution.unwrap_or(1000);
         self.0
             .check(resolution)
-            .to_result()?;
+            .take_result()?;
         Ok(())
     }
 
@@ -208,7 +208,7 @@ impl GeometryBuilder {
         // Build volumes.
         let geometry = ffi::create_geometry(&self.definition.volume);
         if geometry.is_null() {
-            ffi::get_error().to_result()?;
+            ffi::get_error().take_result()?;
             unreachable!()
         }
         let geometry = Geometry (geometry);
@@ -658,8 +658,8 @@ impl Volume {
     ) -> PyResult<PyObject> {
         let frame = frame.unwrap_or("");
         let bbox = self.volume.compute_box(frame);
-        if let Some(why) = ffi::get_error().value() {
-            let err = Error::new(ValueError).what("box operation").why(why);
+        if let Some(why) = ffi::get_error().take_opt() {
+            let err = Error::new(ValueError).what("box operation").why(&why);
             return Err(err.into());
         }
 
@@ -679,8 +679,8 @@ impl Volume {
     fn compute_origin(&self, frame: Option<&str>) -> PyResult<f64x3> {
         let frame = frame.unwrap_or("");
         let origin = self.volume.compute_origin(frame);
-        if let Some(why) = ffi::get_error().value() {
-            let err = Error::new(ValueError).what("origin operation").why(why);
+        if let Some(why) = ffi::get_error().take_opt() {
+            let err = Error::new(ValueError).what("origin operation").why(&why);
             return Err(err.into());
         }
         Ok((&origin).into())
@@ -967,8 +967,8 @@ impl Volume {
             VolumeKey::Root => geometry.root_volume(),
             VolumeKey::Stem(stem) => geometry.find_volume(stem),
         };
-        if let Some(msg) = ffi::get_error().value() {
-            let err = Error::new(IndexError).what("volume").why(msg);
+        if let Some(msg) = ffi::get_error().take_opt() {
+            let err = Error::new(IndexError).what("volume").why(&msg);
             return Err(err.into())
         }
         let ffi::VolumeInfo { path, material, solid, mother, mut daughters } =

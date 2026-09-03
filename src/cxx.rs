@@ -328,6 +328,7 @@ pub mod ffi {
         include!("calzone.h");
 
         // Errors interface.
+        fn clear_error();
         fn initialise_errors();
         fn get_error() -> SharedPtr<Error>;
 

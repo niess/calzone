@@ -176,8 +176,8 @@ impl ffi::Error {
     const KEYBOARD_INTERUPT: &'static str = "Ctrl+C catched";
     const MEMORY_ERROR: &'static str = "could not allocate memory";
 
-    pub fn to_result(&self) -> PyResult<()> {
-        match self.tp {
+    pub fn take_result(&self) -> PyResult<()> {
+        let result = match self.tp {
             ffi::ErrorType::None => Ok(()),
             ffi::ErrorType::FileNotFoundError => {
                 Err(PyFileNotFoundError::new_err(self.message.clone()))
@@ -201,21 +201,25 @@ impl ffi::Error {
                 Err(PyValueError::new_err(self.message.clone()))
             },
             _ => unreachable!(),
-        }
+        };
+        ffi::clear_error();
+        result
     }
 
-    pub fn value(&self) -> Option<&str> {
-        match self.tp {
+    pub fn take_opt(&self) -> Option<String> {
+        let opt = match self.tp {
             ffi::ErrorType::None => None,
-            ffi::ErrorType::FileNotFoundError => Some(self.message.as_str()),
-            ffi::ErrorType::Geant4Exception => Some(self.message.as_str()),
-            ffi::ErrorType::IndexError => Some(self.message.as_str()),
-            ffi::ErrorType::IOError => Some(self.message.as_str()),
-            ffi::ErrorType::KeyboardInterrupt => Some(Self::KEYBOARD_INTERUPT),
-            ffi::ErrorType::MemoryError => Some(Self::MEMORY_ERROR),
-            ffi::ErrorType::ValueError => Some(self.message.as_str()),
+            ffi::ErrorType::FileNotFoundError => Some(self.message.clone()),
+            ffi::ErrorType::Geant4Exception => Some(self.message.clone()),
+            ffi::ErrorType::IndexError => Some(self.message.clone()),
+            ffi::ErrorType::IOError => Some(self.message.clone()),
+            ffi::ErrorType::KeyboardInterrupt => Some(Self::KEYBOARD_INTERUPT.to_string()),
+            ffi::ErrorType::MemoryError => Some(Self::MEMORY_ERROR.to_string()),
+            ffi::ErrorType::ValueError => Some(self.message.clone()),
             _ => unreachable!(),
-        }
+        };
+        ffi::clear_error();
+        opt
     }
 }
 

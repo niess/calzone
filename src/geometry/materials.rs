@@ -35,16 +35,16 @@ impl MaterialsDefinition {
     pub fn build(&self) -> PyResult<()> {
         for element in &self.elements {
             ffi::add_element(&element)
-                .to_result()?;
+                .take_result()?;
         }
         for molecule in &self.molecules {
             ffi::add_molecule(&molecule)
-                .to_result()?;
+                .take_result()?;
         }
         let mixtures = self.sorted_mixtures()?;
         for mixture in mixtures {
             ffi::add_mixture(mixture)
-                .to_result()?;
+                .take_result()?;
         }
         Ok(())
     }

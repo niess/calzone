@@ -160,7 +160,7 @@ impl Simulation {
         let mut binding = self.random.bind(py).borrow_mut();
         let mut random = RandomContext::new(&mut binding);
         let result = ffi::run_simulation(&mut agent, &mut random, verbose)
-            .to_result();
+            .take_result();
 
         let agent = Pin::into_inner(agent);
         result.and_then(|_| agent.export(py))
