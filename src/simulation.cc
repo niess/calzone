@@ -23,23 +23,15 @@ void drop_simulation() {
     delete manager;
 }
 
-std::shared_ptr<Error> run_simulation(
-    RunAgent & agent,
-    RandomContext &, // Implicit scope.
-    bool verbose
-) {
-    clear_error();
-
-    // Configure the simulation.
-    auto geometryImpl = GeometryImpl::Get();
+static G4RunManager * init_manager(const Physics & physics) {
     auto physicsImpl = PhysicsImpl::Get();
+    auto geometryImpl = GeometryImpl::Get();
 
-    RUN_AGENT = &agent;
     geometryImpl->Update();
-    physicsImpl->Update();
+    physicsImpl->Update(physics);
 
     physicsImpl->DisableVerbosity();
-    static G4RunManager * manager = nullptr;
+    static G4RunManager * manager = G4RunManager::GetRunManager();
     if (manager == nullptr) {
         auto buffer = std::cout.rdbuf();
         std::cout.rdbuf(nullptr); // Disable cout temporarly.
@@ -55,6 +47,25 @@ std::shared_ptr<Error> run_simulation(
         manager->SetUserAction(SteppingImpl::Get());
         manager->Initialize();
     }
+
+    return manager;
+}
+
+void dry_simulation(Physics physics) {
+    RUN_AGENT = nullptr;
+    init_manager(physics);
+}
+
+std::shared_ptr<Error> run_simulation(
+    RunAgent & agent,
+    RandomContext &, // Implicit scope.
+    bool verbose
+) {
+    clear_error();
+
+    // Configure the simulation.
+    RUN_AGENT = &agent;
+    G4RunManager * manager = init_manager(RUN_AGENT->physics());
 
     if (RUN_AGENT->is_tracker()) {
         manager->SetUserAction(TrackingImpl::Get());

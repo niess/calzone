@@ -19,7 +19,7 @@ struct PhysicsImpl: public G4VUserPhysicsList {
 
     // User interface.
     void DisableVerbosity() const;
-    void Update();
+    void Update(const Physics &);
 
     static PhysicsImpl * Get();
 

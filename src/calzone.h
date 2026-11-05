@@ -167,8 +167,11 @@ private:
     const std::string process;
 };
 
+extern G4VPhysicalVolume * DRY_WORLD;
+extern G4Material * DRY_WORLD_MATERIAL;
+
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
-    int, rust::Str, rust::Str
+    Physics, int, rust::Str, rust::Str
 );
 
 
@@ -181,6 +184,7 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
 extern RunAgent * RUN_AGENT;
 
 void drop_simulation();
+void dry_simulation(Physics);
 std::shared_ptr<Error> run_simulation(RunAgent &, RandomContext &, bool);
 
 

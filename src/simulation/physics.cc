@@ -79,8 +79,7 @@ void PhysicsImpl::DisableVerbosity() const
     UImanager->ApplyCommand("/process/had/verbose 0");
 }
 
-void PhysicsImpl::Update() {
-    auto && definition = RUN_AGENT->physics();
+void PhysicsImpl::Update(const Physics & definition) {
     bool modified = false;
     if (!this->decayPhysics) {
         this->decayPhysics.reset(new G4DecayPhysics());
@@ -239,34 +238,31 @@ double PhysicsCalculator::compute_dedx(double energy) {
 }
 
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
+    Physics physics,
     int pid,
     rust::Str material,
     rust::Str process
 ) {
     clear_error();
 
-    G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
-    const G4ParticleDefinition * part = particleTable->FindParticle(pid);
-    if (part == nullptr) {
-        std::string msg = fmt::format("unknown pid '{}'", pid);
-        set_error(ErrorType::ValueError, msg.c_str());
-        return nullptr;
-    }
-
-    G4EmCalculator * calc = new G4EmCalculator;
-    if (calc == nullptr) {
-        set_error(
-            ErrorType::Geant4Exception,
-            "could not create G4EmCalculator"
-        );
-        return nullptr;
-    }
-
-    const G4Material * mat = calc->FindMaterial(std::string(material));
+    G4Material * mat = G4Material::GetMaterial(
+        std::string(material), false
+    );
     if (mat == nullptr) {
         std::string msg = fmt::format(
             "unknown material '{}'", std::string(material)
         );
+        set_error(ErrorType::ValueError, msg.c_str());
+        return nullptr;
+    }
+
+    DRY_WORLD_MATERIAL = mat;
+    dry_simulation(physics); // Enforce Geant4 kernel initialisation.
+
+    G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
+    const G4ParticleDefinition * part = particleTable->FindParticle(pid);
+    if (part == nullptr) {
+        std::string msg = fmt::format("unknown pid '{}'", pid);
         set_error(ErrorType::ValueError, msg.c_str());
         return nullptr;
     }
@@ -289,6 +285,19 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
         }
         processName = proc->GetProcessName();
     }
+
+    G4EmCalculator * calc = new G4EmCalculator;
+    if (calc == nullptr) {
+        set_error(
+            ErrorType::Geant4Exception,
+            "could not create G4EmCalculator"
+        );
+        return nullptr;
+    }
+
+    // Enforce physics tables computation.
+    G4ProductionCutsTable::GetProductionCutsTable()
+        ->UpdateCoupleTable(DRY_WORLD);
 
     return std::make_unique<PhysicsCalculator>(calc, part, mat, processName);
 }

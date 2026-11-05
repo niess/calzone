@@ -402,6 +402,7 @@ pub mod ffi {
         // Physics calculator interface.
         type PhysicsCalculator;
         fn create_physics_calculator(
+            physics: Physics,
             pid: i32,
             material: &str,
             process: &str,
