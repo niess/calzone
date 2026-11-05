@@ -399,6 +399,15 @@ pub mod ffi {
         fn add_molecule(element: &Molecule) -> SharedPtr<Error>;
         fn describe_material(name: &str) -> Mixture;
 
+        // Physics calculator interface.
+        type PhysicsCalculator;
+        fn create_physics_calculator(
+            pid: i32,
+            material: &str,
+            process: &str,
+        ) -> UniquePtr<PhysicsCalculator>;
+        fn compute_dedx(self: Pin<&mut PhysicsCalculator>, energy: f64) -> f64;
+
         // Simulation interface.
         fn drop_simulation();
         fn run_simulation(

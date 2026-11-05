@@ -1,6 +1,9 @@
 // User interface.
 #include "physics.h"
+// fmt library.
+#include <fmt/core.h>
 // Geant4 interface.
+#include "G4EmCalculator.hh"
 #include "G4EmDNAPhysics.hh"
 #include "G4EmLivermorePhysics.hh"
 #include "G4EmStandardPhysics.hh"
@@ -15,6 +18,7 @@
 #include "G4HadronPhysicsQGSP_BERT_HP.hh"
 #include "G4HadronPhysicsQGSP_BIC.hh"
 #include "G4HadronPhysicsQGSP_BIC_HP.hh"
+#include "G4ProcessTable.hh"
 #include "G4RunManager.hh"
 #include "G4UImanager.hh"
 
@@ -196,4 +200,95 @@ void PhysicsImpl::Update() {
 PhysicsImpl * PhysicsImpl::Get() {
     static PhysicsImpl * instance = new PhysicsImpl();
     return instance;
+}
+
+
+// ============================================================================
+//
+// Physics calculator interface.
+//
+// ============================================================================
+
+PhysicsCalculator::PhysicsCalculator(
+        G4EmCalculator * calc,
+        const G4ParticleDefinition * part,
+        const G4Material * mat,
+        const std::string proc
+): emCalculator(calc), particle(part), material(mat), process(proc)
+{}
+
+PhysicsCalculator::~PhysicsCalculator() {
+    delete this->emCalculator;
+}
+
+double PhysicsCalculator::compute_dedx(double energy) {
+    if (this->process.empty()) {
+        return this->emCalculator->GetDEDX(
+            energy * CLHEP::MeV,
+            this->particle,
+            this->material
+        );
+    } else {
+        return this->emCalculator->ComputeDEDX(
+            energy * CLHEP::MeV,
+            this->particle,
+            this->process,
+            this->material
+        );
+    }
+}
+
+std::unique_ptr<PhysicsCalculator> create_physics_calculator(
+    int pid,
+    rust::Str material,
+    rust::Str process
+) {
+    clear_error();
+
+    G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
+    const G4ParticleDefinition * part = particleTable->FindParticle(pid);
+    if (part == nullptr) {
+        std::string msg = fmt::format("unknown pid '{}'", pid);
+        set_error(ErrorType::ValueError, msg.c_str());
+        return nullptr;
+    }
+
+    G4EmCalculator * calc = new G4EmCalculator;
+    if (calc == nullptr) {
+        set_error(
+            ErrorType::Geant4Exception,
+            "could not create G4EmCalculator"
+        );
+        return nullptr;
+    }
+
+    const G4Material * mat = calc->FindMaterial(std::string(material));
+    if (mat == nullptr) {
+        std::string msg = fmt::format(
+            "unknown material '{}'", std::string(material)
+        );
+        set_error(ErrorType::ValueError, msg.c_str());
+        return nullptr;
+    }
+
+    std::string processName = "";
+    if (!process.empty()) {
+        G4ProcessTable * processTable = G4ProcessTable::GetProcessTable();
+        G4VProcess * proc = processTable->FindProcess(
+            std::string(process), part
+        );
+        if (proc == nullptr) {
+            std::string msg = fmt::format(
+                "unknown process '{}' for {} (pid={})",
+                std::string(process),
+                part->GetParticleName(),
+                pid
+            );
+            set_error(ErrorType::ValueError, msg.c_str());
+            return nullptr;
+        }
+        processName = proc->GetProcessName();
+    }
+
+    return std::make_unique<PhysicsCalculator>(calc, part, mat, processName);
 }

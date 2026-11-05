@@ -8,6 +8,7 @@
 #include "G4TessellatedSolid.hh"
 // Calzone interface.
 struct GeometryBorrow;
+struct PhysicsCalculator;
 struct VolumeBorrow;
 #include "calzone/src/cxx.rs.h"
 
@@ -135,6 +136,40 @@ std::shared_ptr<Error> add_molecule(const Molecule &);
 class G4Material;
 G4Material * get_material(const rust::String & name);
 Mixture describe_material(rust::Str);
+
+
+// ============================================================================
+//
+// Physics calculator interface.
+//
+// ============================================================================
+
+class G4EmCalculator;
+class G4ParticleDefinition;
+
+struct PhysicsCalculator {
+    PhysicsCalculator(
+        G4EmCalculator *,
+        const G4ParticleDefinition *,
+        const G4Material *,
+        const std::string
+    );
+    ~PhysicsCalculator();
+    PhysicsCalculator(const PhysicsCalculator &) = delete; // Forbid copy.
+
+    // User interface.
+    double compute_dedx(double);
+
+private:
+    G4EmCalculator * emCalculator;
+    const G4ParticleDefinition * particle;
+    const G4Material * material;
+    const std::string process;
+};
+
+std::unique_ptr<PhysicsCalculator> create_physics_calculator(
+    int, rust::Str, rust::Str
+);
 
 
 // ============================================================================

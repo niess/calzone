@@ -115,6 +115,13 @@ impl Physics {
             },
         }
     }
+
+    pub fn stopping_power(&self, pid: i32, material: &str, energy: f64) -> PyResult<f64> {
+        let mut calc = ffi::create_physics_calculator(pid, material, "");
+        ffi::get_error().take_result()?;
+        let dedx = calc.as_mut().unwrap().compute_dedx(energy);
+        Ok(dedx)
+    }
 }
 
 // ===============================================================================================
