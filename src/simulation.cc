@@ -18,7 +18,7 @@ RunAgent * RUN_AGENT = nullptr;
 void drop_simulation() {
     // Gracefully exit Geant4. That is, detach any pending geometry before
     // deleting the run manager.
-    GeometryImpl::Get()->Reset();
+    GeometryImpl::Get()->Reset(nullptr);
     auto manager = G4RunManager::GetRunManager();
     delete manager;
 }

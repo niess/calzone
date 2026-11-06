@@ -18,7 +18,8 @@ struct GeometryImpl: public G4VUserDetectorConstruction {
     G4VPhysicalVolume * Construct();
 
     // User interface.
-    void Reset();
+    void Reset(G4VPhysicalVolume *) const;
+    void SetDryMaterial(G4Material *);
     void Update();
 
     GeometryState State() const {

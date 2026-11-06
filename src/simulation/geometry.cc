@@ -5,69 +5,105 @@
 #include "G4RunManager.hh"
 
 
+static const char * DRY_WORLD_NAME = "__DryWorld__";
+
+[[noreturn]] static void unreachable() {
+    std::cerr << "code has reached an unexpected state" << std::endl;
+    std::exit(EXIT_FAILURE);
+}
+
 G4VPhysicalVolume * GeometryImpl::Construct() {
-    if (RUN_AGENT != nullptr) {
-        std::cout << "XXX Building run geometry " << this->geometry_id << std::endl;
+    if (this->state == GeometryState::Dry) {
+        return this->dry_world;
+    } else if (this->state == GeometryState::Run) {
         auto && geometry = RUN_AGENT->geometry();
         return geometry.world();
     } else {
-        if (this->dry_world == nullptr) {
-            std::cout << "XXX Building dry geometry for " << this->dry_material->GetName() << std::endl;
-
-            // Construct Dummy world for dry runs.
-            G4Box * solid = new G4Box("World", 1.0, 1.0, 1.0);
-            this->dry_logical = new G4LogicalVolume(
-                solid, this->dry_material, "World"
-            );
-            this->dry_world = new G4PVPlacement(
-                nullptr,
-                G4ThreeVector(),
-                this->dry_logical,
-                "World",
-                nullptr,
-                false,
-                0
-            );
-        } else if (this->dry_logical->GetMaterial() != this->dry_material) {
-            // Update material.
-            std::cout << "XXX Updating dry geometry for " << this->dry_material->GetName() << std::endl;
-            this->dry_logical->SetMaterial(this->dry_material);
-        }
-        return this->dry_world;
+        unreachable();
     }
 }
 
-void GeometryImpl::Reset() {
+void GeometryImpl::Reset(G4VPhysicalVolume * world) const {
     auto manager = G4RunManager::GetRunManager();
     if (manager != nullptr) {
-        manager->ReinitializeGeometry(false, true);
+        if (world != nullptr) {
+            manager->DefineWorldVolume(world);
+        }
+        manager->ReinitializeGeometry(false);
     }
+}
+
+void GeometryImpl::SetDryMaterial(G4Material * material) {
+    this->dry_material = material;
+    this->dry_logical->SetMaterial(material);
 }
 
 void GeometryImpl::Update() {
-    if (RUN_AGENT != nullptr) {
-        auto id = RUN_AGENT->geometry().id();
-        if (this->state == GeometryState::Run) {
-            if (id != this->geometry_id) {
-                this->Reset();
-            }
-        } else {
+    if (this->state == GeometryState::None) {
+        if (RUN_AGENT != nullptr) {
             this->state = GeometryState::Run;
-            this->dry_material = nullptr;
-            this->Reset();
+        } else {
+            this->SetDryMaterial(PhysicsCalculator::DRY_WORLD_MATERIAL);
+            this->state = GeometryState::Dry;
         }
-        this->geometry_id = id;
-    } else if (PhysicsCalculator::DRY_WORLD_MATERIAL != nullptr) {
-        if (PhysicsCalculator::DRY_WORLD_MATERIAL != this->dry_material) {
-            this->dry_material = PhysicsCalculator::DRY_WORLD_MATERIAL;
-            this->Reset();
-            std::cout << "XXX Setting dry material to " << this->dry_material->GetName() << std::endl;
+    } else {
+        if (RUN_AGENT != nullptr) {
+            auto id = RUN_AGENT->geometry().id();
+            bool update = false;
+            if (this->state == GeometryState::Run) {
+                if (id != this->geometry_id) {
+                    update = true;
+                }
+            } else if (this->state == GeometryState::Dry) {
+                this->state = GeometryState::Run;
+                this->dry_material = nullptr;
+                update = true;
+            } else {
+                unreachable();
+            }
+            if (update) {
+                auto && world = RUN_AGENT->geometry().world();
+                this->Reset(world);
+                this->geometry_id = id;
+            }
+        } else if (PhysicsCalculator::DRY_WORLD_MATERIAL != nullptr) {
+            if (this->state == GeometryState::Run) {
+                this->SetDryMaterial(PhysicsCalculator::DRY_WORLD_MATERIAL);
+                this->Reset(this->dry_world);
+            } else if (this->state == GeometryState::Dry) {
+                if (PhysicsCalculator::DRY_WORLD_MATERIAL !=
+                    this->dry_material) {
+                    this->SetDryMaterial(PhysicsCalculator::DRY_WORLD_MATERIAL);
+                    auto manager = G4RunManager::GetRunManager();
+                    manager->GeometryHasBeenModified();
+                }
+            } else {
+                unreachable();
+            }
+            this->state = GeometryState::Dry;
         }
-        this->state = GeometryState::Dry;
     }
 }
 
 GeometryImpl * GeometryImpl::Get() {
-    static GeometryImpl * instance = new GeometryImpl();
+    static GeometryImpl * instance = nullptr;
+    if (instance == nullptr) {
+        instance = new GeometryImpl();
+
+        // Construct a dummy world for dry runs.
+        G4Box * solid = new G4Box(DRY_WORLD_NAME, 1.0, 1.0, 1.0);
+        instance->dry_logical = new G4LogicalVolume(
+            solid, nullptr, DRY_WORLD_NAME
+        );
+        instance->dry_world = new G4PVPlacement(
+            nullptr,
+            G4ThreeVector(),
+            instance->dry_logical,
+            DRY_WORLD_NAME,
+            nullptr,
+            false,
+            0
+        );
+    }
     return instance;
 }
