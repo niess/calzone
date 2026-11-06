@@ -66,7 +66,7 @@ void GeometryImpl::Update() {
                 this->Reset(world);
                 this->geometry_id = id;
             }
-        } else if (PhysicsCalculator::DRY_WORLD_MATERIAL != nullptr) {
+        } else {
             if (this->state == GeometryState::Run) {
                 this->SetDryMaterial(PhysicsCalculator::DRY_WORLD_MATERIAL);
                 this->Reset(this->dry_world);
