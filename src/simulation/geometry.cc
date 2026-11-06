@@ -5,34 +5,35 @@
 #include "G4RunManager.hh"
 
 
-G4VPhysicalVolume * DRY_WORLD = nullptr;
-G4Material * DRY_WORLD_MATERIAL = nullptr;
-
 G4VPhysicalVolume * GeometryImpl::Construct() {
     if (RUN_AGENT != nullptr) {
+        std::cout << "XXX Building run geometry " << this->geometry_id << std::endl;
         auto && geometry = RUN_AGENT->geometry();
         return geometry.world();
     } else {
-        // Dummy world for dry runs.
-        static G4LogicalVolume * logical = nullptr;
-        if (DRY_WORLD == nullptr) {
+        if (this->dry_world == nullptr) {
+            std::cout << "XXX Building dry geometry for " << this->dry_material->GetName() << std::endl;
+
+            // Construct Dummy world for dry runs.
             G4Box * solid = new G4Box("World", 1.0, 1.0, 1.0);
-            logical = new G4LogicalVolume(
-                solid, DRY_WORLD_MATERIAL, "World"
+            this->dry_logical = new G4LogicalVolume(
+                solid, this->dry_material, "World"
             );
-            DRY_WORLD = new G4PVPlacement(
+            this->dry_world = new G4PVPlacement(
                 nullptr,
                 G4ThreeVector(),
-                logical,
+                this->dry_logical,
                 "World",
                 nullptr,
                 false,
                 0
             );
-        } else {
-            logical->SetMaterial(DRY_WORLD_MATERIAL);
+        } else if (this->dry_logical->GetMaterial() != this->dry_material) {
+            // Update material.
+            std::cout << "XXX Updating dry geometry for " << this->dry_material->GetName() << std::endl;
+            this->dry_logical->SetMaterial(this->dry_material);
         }
-        return DRY_WORLD;
+        return this->dry_world;
     }
 }
 
@@ -46,10 +47,23 @@ void GeometryImpl::Reset() {
 void GeometryImpl::Update() {
     if (RUN_AGENT != nullptr) {
         auto id = RUN_AGENT->geometry().id();
-        if (id != this->geometry_id) {
+        if (this->state == GeometryState::Run) {
+            if (id != this->geometry_id) {
+                this->Reset();
+            }
+        } else {
+            this->state = GeometryState::Run;
+            this->dry_material = nullptr;
             this->Reset();
         }
         this->geometry_id = id;
+    } else if (PhysicsCalculator::DRY_WORLD_MATERIAL != nullptr) {
+        if (PhysicsCalculator::DRY_WORLD_MATERIAL != this->dry_material) {
+            this->dry_material = PhysicsCalculator::DRY_WORLD_MATERIAL;
+            this->Reset();
+            std::cout << "XXX Setting dry material to " << this->dry_material->GetName() << std::endl;
+        }
+        this->state = GeometryState::Dry;
     }
 }
 

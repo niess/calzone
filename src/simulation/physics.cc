@@ -1,4 +1,5 @@
 // User interface.
+#include "geometry.h"
 #include "physics.h"
 // fmt library.
 #include <fmt/core.h>
@@ -217,12 +218,16 @@ PhysicsCalculator::PhysicsCalculator(
 {}
 
 PhysicsCalculator::~PhysicsCalculator() {
+    // Terminate the dry run.
+    static G4RunManager * manager = G4RunManager::GetRunManager();
+    manager->RunTermination();
+
     delete this->emCalculator;
 }
 
 double PhysicsCalculator::compute_dedx(double energy) {
     if (this->process.empty()) {
-        return this->emCalculator->GetDEDX(
+        return this->emCalculator->ComputeTotalDEDX(
             energy * CLHEP::MeV,
             this->particle,
             this->material
@@ -235,6 +240,23 @@ double PhysicsCalculator::compute_dedx(double energy) {
             this->material
         );
     }
+}
+
+// Validate that a material is currently in use by scanning the production cuts
+// table. Alternatively, the current geometry could be scanned, but I am
+// assuming that this would be less efficient, on average.
+static bool has_cuts(const G4Material * material) {
+    G4ProductionCutsTable * table =
+        G4ProductionCutsTable::GetProductionCutsTable();
+    G4int n = table->GetTableSize();
+    for (G4int i = 0; i < n; i++) {
+        const G4MaterialCutsCouple * couple = table->GetMaterialCutsCouple(i);
+        if (couple && couple->GetMaterial() == material) {
+            std::cout << "XXX Found " << material->GetName() << " in ProductionCuts table" << std::endl;
+            return true; 
+        }
+    }
+    return false;
 }
 
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
@@ -256,8 +278,14 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
         return nullptr;
     }
 
-    DRY_WORLD_MATERIAL = mat;
-    dry_simulation(physics); // Enforce Geant4 kernel initialisation.
+    if ((GeometryImpl::Get()->State() == GeometryState::Run) && has_cuts(mat)) {
+        // Use the current run geometry.
+        PhysicsCalculator::DRY_WORLD_MATERIAL = nullptr;
+    } else {
+        // Trigger a geometry or/and material update.
+        PhysicsCalculator::DRY_WORLD_MATERIAL = mat;
+    }
+    dry_simulation(physics); // Configure / update Geant4 kernel.
 
     G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
     const G4ParticleDefinition * part = particleTable->FindParticle(pid);
@@ -294,10 +322,6 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
         );
         return nullptr;
     }
-
-    // Enforce physics tables computation.
-    G4ProductionCutsTable::GetProductionCutsTable()
-        ->UpdateCoupleTable(DRY_WORLD);
 
     return std::make_unique<PhysicsCalculator>(calc, part, mat, processName);
 }

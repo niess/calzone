@@ -53,7 +53,8 @@ static G4RunManager * init_manager(const Physics & physics) {
 
 void dry_simulation(Physics physics) {
     RUN_AGENT = nullptr;
-    init_manager(physics);
+    G4RunManager * manager = init_manager(physics);
+    manager->RunInitialization();
 }
 
 std::shared_ptr<Error> run_simulation(

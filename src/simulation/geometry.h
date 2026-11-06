@@ -5,6 +5,12 @@
 #include "calzone.h"
 
 
+enum class GeometryState {
+    Dry,
+    None,
+    Run,
+};
+
 struct GeometryImpl: public G4VUserDetectorConstruction {
     GeometryImpl(const GeometryImpl &) = delete;
 
@@ -15,6 +21,10 @@ struct GeometryImpl: public G4VUserDetectorConstruction {
     void Reset();
     void Update();
 
+    GeometryState State() const {
+        return this->state;
+    }
+
     static GeometryImpl * Get();
 
 private:
@@ -22,4 +32,8 @@ private:
 
     // User interface.
     std::uint64_t geometry_id = 0;
+    GeometryState state = GeometryState::None;
+    G4LogicalVolume * dry_logical = nullptr;
+    G4Material * dry_material = nullptr;
+    G4VPhysicalVolume * dry_world = nullptr;
 };

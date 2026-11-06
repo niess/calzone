@@ -160,15 +160,14 @@ struct PhysicsCalculator {
     // User interface.
     double compute_dedx(double);
 
+    static inline G4Material * DRY_WORLD_MATERIAL = nullptr;
+
 private:
     G4EmCalculator * emCalculator;
     const G4ParticleDefinition * particle;
     const G4Material * material;
     const std::string process;
 };
-
-extern G4VPhysicalVolume * DRY_WORLD;
-extern G4Material * DRY_WORLD_MATERIAL;
 
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
     Physics, int, rust::Str, rust::Str
