@@ -150,6 +150,7 @@ class G4ParticleDefinition;
 struct PhysicsCalculator {
     PhysicsCalculator(
         G4EmCalculator *,
+        double,
         const G4ParticleDefinition *,
         const G4Material *,
         const std::string
@@ -158,12 +159,13 @@ struct PhysicsCalculator {
     PhysicsCalculator(const PhysicsCalculator &) = delete; // Forbid copy.
 
     // User interface.
-    double compute_dedx(double);
+    double stopping_power(double, bool, double);
 
     static inline G4Material * DRY_WORLD_MATERIAL = nullptr;
 
 private:
     G4EmCalculator * emCalculator;
+    double default_cut;
     const G4ParticleDefinition * particle;
     const G4Material * material;
     const std::string process;

@@ -116,13 +116,47 @@ impl Physics {
         }
     }
 
-    pub fn stopping_power(&self, pid: i32, material: String, energy: f64) -> PyResult<f64> {
-        let mut calc = ffi::create_physics_calculator(self.0, pid, material, "");
+    #[pyo3(signature=(*, pid, material, energy, process=None, cut=None))]
+    pub fn stopping_power(
+        &self,
+        pid: i32,
+        material: String,
+        energy: f64,
+        process: Option<&str>,
+        cut: Option<CutArg>,
+    ) -> PyResult<f64> {
+        let process = process.unwrap_or("");
+        let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack();
+        let mut calc = ffi::create_physics_calculator(self.0, pid, material, process);
         ffi::get_error().take_result()?;
-        let dedx = calc.as_mut().unwrap().compute_dedx(energy);
-        Ok(dedx)
+        let sp = calc.as_mut().unwrap().stopping_power(energy, range_cut, energy_cut);
+        Ok(sp)
     }
 }
+
+#[derive(FromPyObject)]
+pub enum CutArg {
+    Flag(bool),
+    Value(f64),
+}
+
+impl CutArg {
+    const FALSE: Self = Self::Flag(false);
+
+    fn unpack(self) -> (bool, f64) {
+        match self {
+            Self::Flag(b) => if b {
+                (true, 0.0)
+            } else {
+                (false, f64::MAX)
+            },
+            Self::Value(v) => {
+                (false, v)
+            },
+        }
+    }
+}
+
 
 // ===============================================================================================
 //

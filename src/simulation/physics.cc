@@ -211,10 +211,12 @@ PhysicsImpl * PhysicsImpl::Get() {
 
 PhysicsCalculator::PhysicsCalculator(
         G4EmCalculator * calc,
+        double cut,
         const G4ParticleDefinition * part,
         const G4Material * mat,
         const std::string proc
-): emCalculator(calc), particle(part), material(mat), process(proc)
+): emCalculator(calc), default_cut(cut), particle(part), material(mat),
+    process(proc)
 {}
 
 PhysicsCalculator::~PhysicsCalculator() {
@@ -225,19 +227,36 @@ PhysicsCalculator::~PhysicsCalculator() {
     delete this->emCalculator;
 }
 
-double PhysicsCalculator::compute_dedx(double energy) {
+double PhysicsCalculator::stopping_power(
+    double energy, bool range_cut, double energy_cut) {
     if (this->process.empty()) {
-        return this->emCalculator->ComputeTotalDEDX(
-            energy * CLHEP::MeV,
-            this->particle,
-            this->material
-        );
+        if (range_cut) {
+            return this->emCalculator->GetDEDX(
+                energy * CLHEP::MeV,
+                this->particle,
+                this->material
+            );
+        } else {
+            return this->emCalculator->ComputeTotalDEDX(
+                energy * CLHEP::MeV,
+                this->particle,
+                this->material,
+                energy_cut * CLHEP::MeV
+            );
+        }
     } else {
+        if (range_cut) {
+            energy_cut = this->default_cut;
+        } else {
+            energy_cut *= CLHEP::MeV;
+        }
+
         return this->emCalculator->ComputeDEDX(
             energy * CLHEP::MeV,
             this->particle,
             this->process,
-            this->material
+            this->material,
+            energy_cut
         );
     }
 }
@@ -298,5 +317,11 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
         return nullptr;
     }
 
-    return std::make_unique<PhysicsCalculator>(calc, part, mat, processName);
+    double energy_cut = calc->ComputeEnergyCutFromRangeCut(
+        physics.default_cut * CLHEP::cm, part, mat
+    );
+
+    return std::make_unique<PhysicsCalculator>(
+        calc, energy_cut, part, mat, processName
+    );
 }
