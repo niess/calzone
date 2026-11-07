@@ -170,7 +170,7 @@ private:
 };
 
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
-    Physics, int, rust::Str, rust::Str
+    Physics, int, rust::String, rust::Str
 );
 
 

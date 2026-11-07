@@ -404,7 +404,7 @@ pub mod ffi {
         fn create_physics_calculator(
             physics: Physics,
             pid: i32,
-            material: &str,
+            material: String,
             process: &str,
         ) -> UniquePtr<PhysicsCalculator>;
         fn compute_dedx(self: Pin<&mut PhysicsCalculator>, energy: f64) -> f64;

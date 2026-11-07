@@ -245,17 +245,15 @@ double PhysicsCalculator::compute_dedx(double energy) {
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
     Physics physics,
     int pid,
-    rust::Str material,
+    rust::String material,
     rust::Str process
 ) {
     clear_error();
 
-    G4Material * mat = G4Material::GetMaterial(
-        std::string(material), false
-    );
+    G4Material * mat = get_material(material);
     if (mat == nullptr) {
         std::string msg = fmt::format(
-            "unknown material '{}'", std::string(material)
+            "undefined material '{}'", std::string(material)
         );
         set_error(ErrorType::ValueError, msg.c_str());
         return nullptr;
@@ -267,7 +265,7 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
     G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
     const G4ParticleDefinition * part = particleTable->FindParticle(pid);
     if (part == nullptr) {
-        std::string msg = fmt::format("unknown pid '{}'", pid);
+        std::string msg = fmt::format("undefined pid '{}'", pid);
         set_error(ErrorType::ValueError, msg.c_str());
         return nullptr;
     }
@@ -280,7 +278,7 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
         );
         if (proc == nullptr) {
             std::string msg = fmt::format(
-                "unknown process '{}' for {} (pid={})",
+                "undefined process '{}' for {} (pid={})",
                 std::string(process),
                 part->GetParticleName(),
                 pid
