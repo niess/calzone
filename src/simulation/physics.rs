@@ -1,5 +1,6 @@
 use crate::utils::error::{Error, variant_error};
 use crate::utils::error::ErrorKind::ValueError;
+use crate::utils::numpy::{PyArray, PyArrayMethods};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use super::ffi;
@@ -117,41 +118,92 @@ impl Physics {
     }
 
     #[pyo3(signature=(*, pid, material, energy, process=None, cut=None))]
-    pub fn stopping_power(
+    pub fn stopping_power<'py>(
         &self,
+        py: Python<'py>,
         pid: i32,
         material: String,
-        energy: f64,
+        energy: FloatArg<'py>,
         process: Option<&str>,
         cut: Option<CutArg>,
-    ) -> PyResult<f64> {
+    ) -> PyResult<Py<PyAny>> {
         let process = process.unwrap_or("");
         let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack();
         let mut calc = ffi::create_physics_calculator(self.0, pid, material, process);
         ffi::get_error().take_result()?;
-        let sp = calc.as_mut().unwrap().stopping_power(energy, range_cut, energy_cut);
-        Ok(sp)
+        let result = match energy {
+            FloatArg::Scalar(energy) => match energy_cut {
+                FloatArg::Scalar(energy_cut) => {
+                    let s = calc.as_mut().unwrap().stopping_power(energy, range_cut, energy_cut);
+                    s.to_object(py)
+                },
+                FloatArg::Array(energy_cut) => {
+                    let result = PyArray::<f64>::empty(py, &energy_cut.shape())?;
+                    for i in 0..energy_cut.size() {
+                        let ci = energy_cut.get(i)?;
+                        let si = calc.as_mut().unwrap().stopping_power(energy, range_cut, ci);
+                        result.set(i, si)?;
+                    }
+                    result.into_any().unbind()
+                },
+            },
+            FloatArg::Array(energy) => {
+                if let FloatArg::Array(a) = energy_cut {
+                    if a.size() != energy.size() {
+                        let why = format!(
+                            "expected a size {} array, found size {}",
+                            energy.size(),
+                            a.size(),
+                        );
+                        let err = Error::new(ValueError).what("cut").why(&why);
+                        return Err(err.into())
+                    }
+                }
+                let result = PyArray::<f64>::empty(py, &energy.shape())?;
+                for i in 0..energy.size() {
+                    let ei = energy.get(i)?;
+                    let ci = match energy_cut {
+                        FloatArg::Scalar(s) => s,
+                        FloatArg::Array(a) => a.get(i)?,
+                    };
+                    let si = calc.as_mut().unwrap().stopping_power(ei, range_cut, ci);
+                    result.set(i, si)?;
+                }
+                result.into_any().unbind()
+            },
+        };
+        Ok(result)
     }
 }
 
 #[derive(FromPyObject)]
-pub enum CutArg {
+pub enum CutArg<'py> {
     Flag(bool),
-    Value(f64),
+    Scalar(f64),
+    Array(&'py PyArray<f64>),
 }
 
-impl CutArg {
+#[derive(FromPyObject)]
+pub enum FloatArg<'py> {
+    Scalar(f64),
+    Array(&'py PyArray<f64>),
+}
+
+impl<'py> CutArg<'py> {
     const FALSE: Self = Self::Flag(false);
 
-    fn unpack(self) -> (bool, f64) {
+    fn unpack(self) -> (bool, FloatArg<'py>) {
         match self {
             Self::Flag(b) => if b {
-                (true, 0.0)
+                (true, FloatArg::Scalar(0.0))
             } else {
-                (false, f64::MAX)
+                (false, FloatArg::Scalar(f64::MAX))
             },
-            Self::Value(v) => {
-                (false, v)
+            Self::Scalar(s) => {
+                (false, FloatArg::Scalar(s))
+            },
+            Self::Array(a) => {
+                (false, FloatArg::Array(a))
             },
         }
     }
