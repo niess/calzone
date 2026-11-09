@@ -227,6 +227,28 @@ PhysicsCalculator::~PhysicsCalculator() {
     delete this->emCalculator;
 }
 
+double PhysicsCalculator::cross_section(
+    double energy, bool range_cut, double energy_cut) {
+    double cs = 0.0;
+    if (range_cut) {
+        cs = this->emCalculator->GetCrossSectionPerVolume(
+            energy * CLHEP::MeV,
+            this->particle,
+            this->process,
+            this->material
+        );
+    } else {
+        cs = this->emCalculator->ComputeCrossSectionPerVolume(
+            energy * CLHEP::MeV,
+            this->particle,
+            this->process,
+            this->material,
+            energy_cut * CLHEP::MeV
+        );
+    }
+    return cs * CLHEP::cm;
+}
+
 double PhysicsCalculator::stopping_power(
     double energy, bool range_cut, double energy_cut) {
     if (this->process.empty()) {

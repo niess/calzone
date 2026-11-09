@@ -117,6 +117,63 @@ impl Physics {
         }
     }
 
+    #[pyo3(signature=(*, pid, material, energy, process, cut=None))]
+    pub fn cross_section<'py>(
+        &self,
+        py: Python<'py>,
+        pid: i32,
+        material: String,
+        energy: FloatArg<'py>,
+        process: &str,
+        cut: Option<CutArg>,
+    ) -> PyResult<Py<PyAny>> {
+        let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack(0.0);
+        let mut calc = ffi::create_physics_calculator(self.0, pid, material, process);
+        ffi::get_error().take_result()?;
+        let result = match energy {
+            FloatArg::Scalar(energy) => match energy_cut {
+                FloatArg::Scalar(energy_cut) => {
+                    let s = calc.as_mut().unwrap().cross_section(energy, range_cut, energy_cut);
+                    s.to_object(py)
+                },
+                FloatArg::Array(energy_cut) => {
+                    let result = PyArray::<f64>::empty(py, &energy_cut.shape())?;
+                    for i in 0..energy_cut.size() {
+                        let ci = energy_cut.get(i)?;
+                        let si = calc.as_mut().unwrap().cross_section(energy, range_cut, ci);
+                        result.set(i, si)?;
+                    }
+                    result.into_any().unbind()
+                },
+            },
+            FloatArg::Array(energy) => {
+                if let FloatArg::Array(a) = energy_cut {
+                    if a.size() != energy.size() {
+                        let why = format!(
+                            "expected a size {} array, found size {}",
+                            energy.size(),
+                            a.size(),
+                        );
+                        let err = Error::new(ValueError).what("cut").why(&why);
+                        return Err(err.into())
+                    }
+                }
+                let result = PyArray::<f64>::empty(py, &energy.shape())?;
+                for i in 0..energy.size() {
+                    let ei = energy.get(i)?;
+                    let ci = match energy_cut {
+                        FloatArg::Scalar(s) => s,
+                        FloatArg::Array(a) => a.get(i)?,
+                    };
+                    let si = calc.as_mut().unwrap().cross_section(ei, range_cut, ci);
+                    result.set(i, si)?;
+                }
+                result.into_any().unbind()
+            },
+        };
+        Ok(result)
+    }
+
     #[pyo3(signature=(*, pid, material, energy, process=None, cut=None))]
     pub fn stopping_power<'py>(
         &self,
@@ -128,7 +185,7 @@ impl Physics {
         cut: Option<CutArg>,
     ) -> PyResult<Py<PyAny>> {
         let process = process.unwrap_or("");
-        let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack();
+        let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack(f64::MAX);
         let mut calc = ffi::create_physics_calculator(self.0, pid, material, process);
         ffi::get_error().take_result()?;
         let result = match energy {
@@ -192,12 +249,12 @@ pub enum FloatArg<'py> {
 impl<'py> CutArg<'py> {
     const FALSE: Self = Self::Flag(false);
 
-    fn unpack(self) -> (bool, FloatArg<'py>) {
+    fn unpack(self, default: f64) -> (bool, FloatArg<'py>) {
         match self {
             Self::Flag(b) => if b {
                 (true, FloatArg::Scalar(0.0))
             } else {
-                (false, FloatArg::Scalar(f64::MAX))
+                (false, FloatArg::Scalar(default))
             },
             Self::Scalar(s) => {
                 (false, FloatArg::Scalar(s))

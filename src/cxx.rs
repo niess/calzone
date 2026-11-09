@@ -407,6 +407,12 @@ pub mod ffi {
             material: String,
             process: &str,
         ) -> UniquePtr<PhysicsCalculator>;
+        fn cross_section(
+            self: Pin<&mut PhysicsCalculator>,
+            energy: f64,
+            range_cut: bool,
+            energy_cut: f64,
+        ) -> f64;
         fn stopping_power(
             self: Pin<&mut PhysicsCalculator>,
             energy: f64,

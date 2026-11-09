@@ -159,6 +159,7 @@ struct PhysicsCalculator {
     PhysicsCalculator(const PhysicsCalculator &) = delete; // Forbid copy.
 
     // User interface.
+    double cross_section(double, bool, double);
     double stopping_power(double, bool, double);
 
     static inline G4Material * DRY_WORLD_MATERIAL = nullptr;
