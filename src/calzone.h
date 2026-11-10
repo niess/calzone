@@ -160,6 +160,9 @@ struct PhysicsCalculator {
 
     // User interface.
     double cross_section(double, bool, double);
+    double energy_cut(bool, double);
+    bool production_cuts() const;
+    double range(double, bool);
     double stopping_power(double, bool, double);
 
     static inline G4Material * DRY_WORLD_MATERIAL = nullptr;

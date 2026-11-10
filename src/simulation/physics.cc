@@ -249,31 +249,61 @@ double PhysicsCalculator::cross_section(
     return cs * CLHEP::cm;
 }
 
+double PhysicsCalculator::energy_cut(bool default_cut, double range_cut) {
+    if (default_cut) {
+        range_cut = this->default_cut;
+    }
+    double energy_cut = this->emCalculator->ComputeEnergyCutFromRangeCut(
+        range_cut * CLHEP::cm,
+        this->particle,
+        this->material
+    );
+    return energy_cut / CLHEP::MeV;
+}
+
+bool PhysicsCalculator::production_cuts() const {
+    auto index = G4ProductionCuts::GetIndex(this->particle);
+    return index >= 0;
+}
+
+double PhysicsCalculator::range(
+    double energy, bool range_cut) {
+    double r = 0.0;
+    if (range_cut) {
+        r = this->emCalculator->GetRange(
+            energy * CLHEP::MeV,
+            this->particle,
+            this->material
+        );
+    } else {
+        r = this->emCalculator->GetCSDARange(
+            energy * CLHEP::MeV,
+            this->particle,
+            this->material
+        );
+    }
+    return r / CLHEP::cm;
+}
+
 double PhysicsCalculator::stopping_power(
     double energy, bool range_cut, double energy_cut) {
+    double s = 0.0;
     if (this->process.empty()) {
         if (range_cut) {
-            return this->emCalculator->GetDEDX(
+            s = this->emCalculator->GetDEDX(
                 energy * CLHEP::MeV,
                 this->particle,
                 this->material
             );
         } else {
-            return this->emCalculator->ComputeTotalDEDX(
+            s = this->emCalculator->ComputeTotalDEDX(
                 energy * CLHEP::MeV,
                 this->particle,
-                this->material,
-                energy_cut * CLHEP::MeV
+                this->material
             );
         }
     } else {
-        if (range_cut) {
-            energy_cut = this->default_cut;
-        } else {
-            energy_cut *= CLHEP::MeV;
-        }
-
-        return this->emCalculator->ComputeDEDX(
+        s = this->emCalculator->ComputeDEDX(
             energy * CLHEP::MeV,
             this->particle,
             this->process,
@@ -281,6 +311,7 @@ double PhysicsCalculator::stopping_power(
             energy_cut
         );
     }
+    return s * CLHEP::cm / CLHEP::MeV;
 }
 
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
@@ -301,6 +332,7 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
     }
 
     PhysicsCalculator::DRY_WORLD_MATERIAL = mat;
+    G4EmParameters::Instance()->SetBuildCSDARange(true);
     dry_simulation(physics); // Configure / update Geant4 kernel.
 
     G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
@@ -339,11 +371,7 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
         return nullptr;
     }
 
-    double energy_cut = calc->ComputeEnergyCutFromRangeCut(
-        physics.default_cut * CLHEP::cm, part, mat
-    );
-
     return std::make_unique<PhysicsCalculator>(
-        calc, energy_cut, part, mat, processName
+        calc, physics.default_cut, part, mat, processName
     );
 }

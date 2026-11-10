@@ -413,6 +413,17 @@ pub mod ffi {
             range_cut: bool,
             energy_cut: f64,
         ) -> f64;
+        fn energy_cut(
+            self: Pin<&mut PhysicsCalculator>,
+            default_cut: bool,
+            range_cut: f64,
+        ) -> f64;
+        fn production_cuts(self: &PhysicsCalculator) -> bool;
+        fn range(
+            self: Pin<&mut PhysicsCalculator>,
+            energy: f64,
+            range_cut: bool,
+        ) -> f64;
         fn stopping_power(
             self: Pin<&mut PhysicsCalculator>,
             energy: f64,

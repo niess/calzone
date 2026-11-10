@@ -1,5 +1,5 @@
 use crate::utils::error::{Error, variant_error};
-use crate::utils::error::ErrorKind::ValueError;
+use crate::utils::error::ErrorKind::{TypeError, ValueError};
 use crate::utils::numpy::{PyArray, PyArrayMethods};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
@@ -174,6 +174,79 @@ impl Physics {
         Ok(result)
     }
 
+    #[pyo3(signature=(*, pid, material, range_cut=None))]
+    pub fn energy_cut<'py>(
+        &self,
+        py: Python<'py>,
+        pid: i32,
+        material: String,
+        range_cut: Option<FloatArg<'py>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut calc = ffi::create_physics_calculator(self.0, pid, material, "");
+        ffi::get_error().take_result()?;
+        if !calc.production_cuts() {
+            let why = format!(
+                "no production cuts for pid={}",
+                pid,
+            );
+            let err = Error::new(ValueError).what("pid").why(&why);
+            return Err(err.into())
+        }
+
+        let result = match range_cut {
+            Some(range_cut) => match range_cut {
+                FloatArg::Scalar(range_cut) => {
+                    let e = calc.as_mut().unwrap().energy_cut(false, range_cut);
+                    e.to_object(py)
+                },
+                FloatArg::Array(range_cut) => {
+                    let result = PyArray::<f64>::empty(py, &range_cut.shape())?;
+                    for i in 0..range_cut.size() {
+                        let ri = range_cut.get(i)?;
+                        let ei = calc.as_mut().unwrap().energy_cut(false, ri);
+                        result.set(i, ei)?;
+                    }
+                    result.into_any().unbind()
+                },
+            },
+            None => {
+                let e = calc.as_mut().unwrap().energy_cut(true, 0.0);
+                e.to_object(py)
+            },
+        };
+        Ok(result)
+    }
+
+    #[pyo3(signature=(*, pid, material, energy, cut=None))]
+    pub fn range<'py>(
+        &self,
+        py: Python<'py>,
+        pid: i32,
+        material: String,
+        energy: FloatArg<'py>,
+        cut: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let cut = cut.unwrap_or(false);
+        let mut calc = ffi::create_physics_calculator(self.0, pid, material, "");
+        ffi::get_error().take_result()?;
+        let result = match energy {
+            FloatArg::Scalar(energy) => {
+                let r = calc.as_mut().unwrap().range(energy, cut);
+                r.to_object(py)
+            },
+            FloatArg::Array(energy) => {
+                let result = PyArray::<f64>::empty(py, &energy.shape())?;
+                for i in 0..energy.size() {
+                    let ei = energy.get(i)?;
+                    let ri = calc.as_mut().unwrap().range(ei, cut);
+                    result.set(i, ri)?;
+                }
+                result.into_any().unbind()
+            },
+        };
+        Ok(result)
+    }
+
     #[pyo3(signature=(*, pid, material, energy, process=None, cut=None))]
     pub fn stopping_power<'py>(
         &self,
@@ -184,8 +257,42 @@ impl Physics {
         process: Option<&str>,
         cut: Option<CutArg>,
     ) -> PyResult<Py<PyAny>> {
-        let process = process.unwrap_or("");
-        let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack(f64::MAX);
+        let (process, range_cut, energy_cut) = match process {
+            Some(process) => {
+                let energy_cut = match cut {
+                    Some(cut) => match cut {
+                        CutArg::Flag(_) => {
+                            let why = "expected a scalar or an array, found a boolean";
+                            let err = Error::new(TypeError).what("cut").why(why);
+                            return Err(err.into())
+                        },
+                        CutArg::Scalar(s) => FloatArg::Scalar(s),
+                        CutArg::Array(a) => FloatArg::Array(a),
+                    },
+                    None => FloatArg::Scalar(f64::MAX),
+                };
+                (process, false, energy_cut)
+            },
+            None => {
+                let range_cut = match cut {
+                    Some(cut) => match cut {
+                        CutArg::Flag(b) => b,
+                        _ => {
+                            let found = match cut {
+                                CutArg::Scalar(_) => "a scalar",
+                                CutArg::Array(_) => "an array",
+                                _ => unreachable!(),
+                            };
+                            let why = format!("expected a boolean, found {}", found);
+                            let err = Error::new(TypeError).what("cut").why(&why);
+                            return Err(err.into())
+                        },
+                    },
+                    None => false,
+                };
+                ("", range_cut, FloatArg::Scalar(0.0))
+            },
+        };
         let mut calc = ffi::create_physics_calculator(self.0, pid, material, process);
         ffi::get_error().take_result()?;
         let result = match energy {
