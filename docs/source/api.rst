@@ -383,6 +383,8 @@ Python interface
         - :python:`"(f8, 3)"`
         - 
 
+   .. _topic-pid:
+
    .. topic:: Particle ID
 
       The type of a Monte Carlo particle (:python:`"pid"`) is encoded according
@@ -541,9 +543,18 @@ Python interface
 
 .. autoclass:: calzone.Physics
 
+   .. important::
+
+      Physics settings are global, i.e., they are shared by all
+      :py:class:`Simulation` instances within the same Python process. Moreover,
+      once the `Geant4`_ kernel has been initialised, it is not possible to
+      modify the :py:attr:`em_model` or :py:attr:`had_model` anymore, e.g.,
+      after the :py:meth:`Physics.cross_section` or :py:meth:`Simulation.run`
+      methods have been invoked.
+
    .. method:: __new__(em_model=None, *, default_cut=None, had_model=None)
 
-      Create a new set of Geant4 physics settings.
+      Specify a new set of Geant4 physics settings.
 
       See the :py:attr:`default_cut`, :py:attr:`em_model` and
       :py:attr:`had_model` attributes below for the meaning of the optional
@@ -552,6 +563,86 @@ Python interface
       electromagnetric physics (the default), and no hadronic physics.
 
       >>> physics = calzone.Physics()
+
+   .. automethod:: cross_section
+
+      This method provides the `macroscopic cross-section`_ of a particle
+      (identified by its :ref:`pid <topic-pid>`) within a given :ref:`material
+      <geometry:Materials definition>` (identified by its name), considering a
+      specific interaction `process` (specified by its `Geant4`_ name). The
+      particle energy may be specified as a :py:class:`float` or as a set of
+      :py:class:`numpy.ndarray` values.
+
+      The `cut` argument may be a :py:class:`bool`, indicating wether `Geant4`_
+      production cuts are to be taken into account or not, or a
+      :py:class:`float` (:py:class:`numpy.ndarray`) indicating the energy cut
+      value(s), in MeV, for soft collisions.
+
+      For instance, the following returns the `macroscopic cross-section`_ for a
+      10 MeV electron (:python:`pid=11`) interacting by Bremsstrahlung
+      (:python:`process="eBrem"`) with a water molecule, taking production cuts
+      into account.
+
+      >>> physics.cross_section( # doctest: +SKIP
+      ...     pid=11, energy=10.0, material="G4_WATER", process="eBrem", cut=True
+      ... )
+      0.2854100303707325  # 1/cm
+
+   .. automethod:: energy_cut
+
+      This method provides the energy cut corresponding to a given `range_cut`
+      for a specific particle (identified by its :ref:`pid <topic-pid>`) and
+      :ref:`material <geometry:Materials definition>` (identified by its name).
+      If the `range_cut` argument is omitted, then the current
+      :py:attr:`default_cut` value is used.
+
+      .. tip::
+
+         Multiple `range_cut` values may be specified as a
+         :py:class:`numpy.ndarray`.
+
+   .. automethod:: range
+
+      This method provides the range of a particle (identified by its :ref:`pid
+      <topic-pid>`) within a given :ref:`material <geometry:Materials
+      definition>` (identified by its name). The particle energy may be
+      specified as a :py:class:`float` or as a set of :py:class:`numpy.ndarray`
+      values.
+
+      The optional `cut` argument must be a :py:class:`bool`, indicating wether
+      `Geant4`_ production cuts are to be taken into account or not.
+
+      For instance, the following returns the range of a 10 MeV electron
+      (:python:`pid=11`) into water (omitting production cuts).
+
+      >>> physics.range( # doctest: +SKIP
+      ...     pid=11, energy=10.0, material="G4_WATER", cut=False
+      ... )
+      4.975501523341526  # cm
+
+   .. automethod:: stopping_power
+
+      This method provides the `stopping power`_ of a :ref:`material
+      <geometry:Materials definition>` (identified by its name) for a given
+      particle (identified by its :ref:`pid <topic-pid>`). The particle energy
+      may be specified as a :py:class:`float` or as a set of
+      :py:class:`numpy.ndarray` values. The `stopping power`_ may be be
+      restricted to a specific interaction `process` (by providing its `Geant4`_
+      name). Additionaly, the `stopping power`_ may be further restricted to
+      soft collisions by specifying a `cut` value, in MeV (or a set of cut
+      values as a :py:class:`numpy.ndarray`).
+
+      If all interaction processes are considered (:python:`process=None`), then
+      the optional `cut` argument must be a :py:class:`bool`, indicating wether
+      `Geant4`_ production cuts are to be taken into account or not.
+
+      For instance, the following returns the `stopping power`_ of water for a
+      10 MeV electron (:python:`pid=11`), taking production cuts into account.
+
+      >>> physics.stopping_power( # doctest: +SKIP
+      ...     pid=11, energy=10.0, material="G4_WATER", cut=True
+      ... )
+      1.7168908475719769  # MeV/cm
 
    .. rubric:: Attributes
      :heading-level: 4
@@ -893,12 +984,14 @@ Python interface
 .. _GeoTIFF: https://fr.wikipedia.org/wiki/GeoTIFF
 .. _Goupil: https://goupil.readthedocs.io/en/latest/
 .. _LocalGeometry: https://mulder.readthedocs.io/en/latest/interface.html#mulder.LocalGeometry
+.. _Macroscopic cross-section: https://en.wikipedia.org/wiki/Neutron_cross_section#Microscopic_versus_macroscopic_cross_section
 .. _Mcg128Xsl64: https://docs.rs/rand_pcg/latest/rand_pcg/struct.Mcg128Xsl64.html#
 .. _Mulder: https://mulder.readthedocs.io/en/latest/
 .. _OpenGate: http://www.opengatecollaboration.org/
 .. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
 .. _PNG: https://en.wikipedia.org/wiki/PNG
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
+.. _Stopping power: https://en.wikipedia.org/wiki/Stopping_power_(particle_radiation)
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html
 .. _TOML: https://toml.io/en/
 .. _TreeTRaversal: https://en.wikipedia.org/wiki/Tree_traversal

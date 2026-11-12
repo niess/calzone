@@ -12,7 +12,7 @@ use super::ffi;
 //
 // ===============================================================================================
 
-/// Geant4 physics settings.
+/// Interface to Geant4 physics settings.
 #[derive(Default)]
 #[pyclass(module="calzone")]
 pub struct Physics;
@@ -40,7 +40,7 @@ impl Physics {
         Ok(physics)
     }
 
-    /// Physics default cut, in cm.
+    /// Default value for production cuts, in cm.
     #[getter]
     fn get_default_cut(&self, _py: Python /* Lock */) -> f64 {
         ffi::get_default_cut()
@@ -104,6 +104,7 @@ impl Physics {
         Ok(())
     }
 
+    /// Macroscopic cross-section of a process, in 1/cm.
     #[pyo3(signature=(*, pid, material, energy, process, cut=None))]
     pub fn cross_section<'py>(
         &self,
@@ -161,6 +162,7 @@ impl Physics {
         Ok(result)
     }
 
+    /// Range (cm) to energy (MeV) cut conversion.
     #[pyo3(signature=(*, pid, material, range_cut=None))]
     pub fn energy_cut<'py>(
         &self,
@@ -204,11 +206,14 @@ impl Physics {
         Ok(result)
     }
 
+    // XXX Add a processes method.
+
+    /// Range of a particle, in cm.
     #[pyo3(signature=(*, pid, material, energy, cut=None))]
     pub fn range<'py>(
         &self,
         py: Python<'py>,
-        pid: i32,
+        pid: i32, // XXX Allow for named particles.
         material: String,
         energy: FloatArg<'py>,
         cut: Option<bool>,
@@ -234,6 +239,7 @@ impl Physics {
         Ok(result)
     }
 
+    /// Stopping-power of a material, in MeV / cm.
     #[pyo3(signature=(*, pid, material, energy, process=None, cut=None))]
     pub fn stopping_power<'py>(
         &self,

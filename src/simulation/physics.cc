@@ -86,6 +86,7 @@ void PhysicsImpl::Update() {
         return;
     } else {
         initialised = true;
+
         auto && settings = this->settings;
         this->decayPhysics.reset(new G4DecayPhysics());
 
@@ -152,6 +153,8 @@ void PhysicsImpl::Update() {
                     break;
             }
         }
+
+        G4EmParameters::Instance()->SetBuildCSDARange(true);
     }
 
     bool modified = false;
@@ -329,7 +332,6 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
     }
 
     PhysicsCalculator::DRY_WORLD_MATERIAL = mat;
-    G4EmParameters::Instance()->SetBuildCSDARange(true);
     dry_simulation(); // Configure / update Geant4 kernel.
 
     G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();

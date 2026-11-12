@@ -39,10 +39,10 @@ pub struct Simulation {
     /// The Monte Carlo `Geometry`.
     #[pyo3(get)]
     geometry: Option<Py<Geometry>>,
-    /// Monte Carlo `Physics` settings.
+    /// The Monte Carlo `Physics` settings.
     #[pyo3(get)]
     physics: Py<Physics>,
-    /// Monte Carlo pseudo-random stream.
+    /// The Monte Carlo pseudo-random stream.
     #[pyo3(get, set)]
     random: Py<Random>,
     /// Sampling mode for energy deposits.
