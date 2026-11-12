@@ -1,8 +1,10 @@
 import calzone
 import numpy
 from numpy.testing import assert_allclose
+import pytest
 
 
+@pytest.mark.requires_data
 def test_stopping_power():
     """Test the stopping power function."""
 
@@ -21,8 +23,8 @@ def test_stopping_power():
     energies = numpy.geomspace(1E-01, 1E+01, 21)
     s0 = [
         p.stopping_power(pid=11, material="G4_H", energy=energies[-1],
-                         cut=ei) for ei in energies
+                         cut=ei, process="eIoni") for ei in energies
     ]
     s1 = p.stopping_power(pid=11, material="G4_H", energy=energies[-1],
-                          cut=energies)
+                          cut=energies, process="eIoni")
     assert_allclose(s0, s1)

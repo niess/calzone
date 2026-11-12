@@ -116,11 +116,8 @@ impl Simulation {
     }
 
     #[setter]
-    fn set_physics(&mut self, py: Python, physics: Option<PhysicsArg>) -> PyResult<()> {
-        let physics: Py<Physics> = match physics {
-            None => Py::new(py, Physics::none())?,
-            Some(physics) => physics.try_into()?,
-        };
+    fn set_physics(&mut self, physics: PhysicsArg) -> PyResult<()> {
+        let physics: Py<Physics> = physics.try_into()?;
         self.physics = physics;
         Ok(())
     }
@@ -215,7 +212,7 @@ impl<'py> TryFrom<PhysicsArg<'py>> for Py<Physics> {
                         (Some(model.as_ref()), None)
                     },
                 };
-                let physics = Physics::new(em_model, None, had_model)?;
+                let physics = Physics::new(py, em_model, None, had_model)?;
                 Py::new(py, physics)
             },
         }
@@ -235,7 +232,6 @@ pub fn drop_simulation() {
 
 pub struct RunAgent<'a> {
     geometry: SharedPtr<ffi::GeometryBorrow>,
-    physics: ffi::Physics,
     primaries: source::ParticlesIterator<'a>,
     indices: Option<&'a PyArray<u64>>,
     // Iterator.
@@ -347,7 +343,7 @@ impl<'a> RunAgent<'a> {
     }
 
     fn new(
-        py: Python,
+        _py: Python /* Lock */,
         simulation: &Simulation,
         primaries: source::ParticlesIterator<'a>,
         indices: Option<&'a PyArray<u64>>,
@@ -369,7 +365,6 @@ impl<'a> RunAgent<'a> {
             .as_ref()
             .ok_or_else(|| Error::new(ValueError).what("geometry").why("undefined").to_err())?;
         let geometry = geometry.get().0.clone();
-        let physics = simulation.physics.bind(py).borrow().0;
         let index = 0;
         let random_index = [0, 0];
         let weight = 0.0;
@@ -383,8 +378,8 @@ impl<'a> RunAgent<'a> {
         let tracker_index = Vec::new();
         let secondaries = simulation.secondaries;
         let agent = RunAgent {
-            geometry, physics, primaries, indices, index, random_index, weight, deposits,
-            particles, tracker, tracker_index, secondaries
+            geometry, primaries, indices, index, random_index, weight, deposits, particles,
+            tracker, tracker_index, secondaries
         };
         Ok(Box::pin(agent))
     }
@@ -407,10 +402,6 @@ impl<'a> RunAgent<'a> {
             indices.get(2 * self.index).unwrap(),
             indices.get(2 * self.index + 1).unwrap(),
         ]
-    }
-
-    pub fn physics<'b>(&'b self) -> &'b ffi::Physics {
-        &self.physics
     }
 
     pub fn push_deposit(

@@ -225,13 +225,6 @@ pub mod ffi {
         None,
     }
 
-    #[derive(Clone, Copy)]
-    struct Physics {
-        default_cut: f64,
-        em_model: EmPhysicsModel,
-        had_model: HadPhysicsModel,
-    }
-
     // ===========================================================================================
     //
     // Sampler interface.
@@ -262,6 +255,23 @@ pub mod ffi {
         weight: f64,
         random_index: [u64; 2],
         tid: i32,
+    }
+
+    // ===========================================================================================
+    //
+    // Simulation interface.
+    //
+    // ===========================================================================================
+
+    #[repr(i32)]
+    enum G4ApplicationState {
+        G4State_PreInit,
+        G4State_Init,
+        G4State_Idle,
+        G4State_GeomClosed,
+        G4State_EventProc,
+        G4State_Quit,
+        G4State_Abort,
     }
 
     // ===========================================================================================
@@ -325,6 +335,7 @@ pub mod ffi {
     // ===========================================================================================
 
     unsafe extern "C++" {
+        include!("G4ApplicationState.hh");
         include!("calzone.h");
 
         // Errors interface.
@@ -399,10 +410,16 @@ pub mod ffi {
         fn add_molecule(element: &Molecule) -> SharedPtr<Error>;
         fn describe_material(name: &str) -> Mixture;
 
-        // Physics calculator interface.
+        // Physics interface.
+        fn get_default_cut() -> f64;
+        fn set_default_cut(value: f64);
+        fn get_em_model() -> EmPhysicsModel;
+        fn set_em_model(model: EmPhysicsModel);
+        fn get_had_model() -> HadPhysicsModel;
+        fn set_had_model(model: HadPhysicsModel);
+
         type PhysicsCalculator;
         fn create_physics_calculator(
-            physics: Physics,
             pid: i32,
             material: String,
             process: &str,
@@ -438,6 +455,9 @@ pub mod ffi {
             random: &mut RandomContext,
             verbose: bool
         ) -> SharedPtr<Error>;
+
+        type G4ApplicationState;
+        fn simulation_state() -> G4ApplicationState;
 
         type G4VPhysicalVolume;
         fn GetName(self: &G4VPhysicalVolume) -> &G4String;
@@ -533,7 +553,6 @@ pub mod ffi {
         fn is_tracker(self: &RunAgent) -> bool;
         fn next_random_index(self: &RunAgent) -> [u64; 2];
         unsafe fn next_primary(self: &mut RunAgent, random_index: &[u64; 2]) -> Particle;
-        unsafe fn physics<'b>(self: &'b RunAgent) -> &'b Physics;
         unsafe fn push_deposit(
             self: &mut RunAgent,
             volume: *const G4VPhysicalVolume,

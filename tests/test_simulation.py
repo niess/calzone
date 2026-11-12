@@ -86,6 +86,8 @@ def test_Physics():
     simulation.physics = "dna"
     assert simulation.physics.em_model == "dna"
 
+    simulation.physics = "standard" # Restore default.
+
 
 def test_Random():
     """Test the Random interface."""

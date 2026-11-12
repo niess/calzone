@@ -140,9 +140,16 @@ Mixture describe_material(rust::Str);
 
 // ============================================================================
 //
-// Physics calculator interface.
+// Physics interface.
 //
 // ============================================================================
+
+double get_default_cut();
+void set_default_cut(double);
+EmPhysicsModel get_em_model();
+void set_em_model(EmPhysicsModel);
+HadPhysicsModel get_had_model();
+void set_had_model(HadPhysicsModel);
 
 class G4EmCalculator;
 class G4ParticleDefinition;
@@ -150,7 +157,6 @@ class G4ParticleDefinition;
 struct PhysicsCalculator {
     PhysicsCalculator(
         G4EmCalculator *,
-        double,
         const G4ParticleDefinition *,
         const G4Material *,
         const std::string
@@ -169,14 +175,13 @@ struct PhysicsCalculator {
 
 private:
     G4EmCalculator * emCalculator;
-    double default_cut;
     const G4ParticleDefinition * particle;
     const G4Material * material;
     const std::string process;
 };
 
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
-    Physics, int, rust::String, rust::Str
+    int, rust::String, rust::Str
 );
 
 
@@ -189,8 +194,9 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
 extern RunAgent * RUN_AGENT;
 
 void drop_simulation();
-void dry_simulation(Physics);
+void dry_simulation();
 std::shared_ptr<Error> run_simulation(RunAgent &, RandomContext &, bool);
+G4ApplicationState simulation_state();
 
 
 // ============================================================================

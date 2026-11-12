@@ -10,6 +10,12 @@
 #include "calzone.h"
 
 
+struct PhysicsSettings {
+    double default_cut;
+    EmPhysicsModel em_model;
+    HadPhysicsModel had_model;
+};
+
 struct PhysicsImpl: public G4VUserPhysicsList {
     PhysicsImpl(const PhysicsImpl &) = delete; // Forbid copy.
 
@@ -19,7 +25,8 @@ struct PhysicsImpl: public G4VUserPhysicsList {
 
     // User interface.
     void DisableVerbosity() const;
-    void Update(const Physics &);
+    void Update();
+    PhysicsSettings & Settings() { return this->settings; }
 
     static PhysicsImpl * Get();
 
@@ -36,6 +43,9 @@ private:
     std::unique_ptr<G4IonPhysics> ionPhysics = nullptr;
 
     // User interface.
-    EmPhysicsModel current_em_model = EmPhysicsModel::None;
-    HadPhysicsModel current_had_model = HadPhysicsModel::None;
+    PhysicsSettings settings = {
+        0.1,
+        EmPhysicsModel::Standard,
+        HadPhysicsModel::None
+    };
 };

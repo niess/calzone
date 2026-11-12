@@ -80,106 +80,82 @@ void PhysicsImpl::DisableVerbosity() const
     UImanager->ApplyCommand("/process/had/verbose 0");
 }
 
-void PhysicsImpl::Update(const Physics & definition) {
-    bool modified = false;
-    if (!this->decayPhysics) {
+void PhysicsImpl::Update() {
+    static bool initialised = false;
+    if (initialised) {
+        return;
+    } else {
+        initialised = true;
+        auto && settings = this->settings;
         this->decayPhysics.reset(new G4DecayPhysics());
-        modified = true;
+
+        if (settings.em_model != EmPhysicsModel::None) {
+            switch (settings.em_model) {
+                case EmPhysicsModel::Dna:
+                    get_material("G4_WATER"); // Required by Geant4/DNA.
+                    this->emPhysics.reset(new G4EmDNAPhysics());
+                    break;
+                case EmPhysicsModel::Livermore:
+                    this->emPhysics.reset(new G4EmLivermorePhysics());
+                    break;
+                case EmPhysicsModel::None:
+                    // unreachable.
+                    break;
+                case EmPhysicsModel::Option1:
+                    this->emPhysics.reset(new G4EmStandardPhysics_option1());
+                    break;
+                case EmPhysicsModel::Option2:
+                    this->emPhysics.reset(new G4EmStandardPhysics_option2());
+                    break;
+                case EmPhysicsModel::Option3:
+                    this->emPhysics.reset(new G4EmStandardPhysics_option3());
+                    break;
+                case EmPhysicsModel::Option4:
+                    this->emPhysics.reset(new G4EmStandardPhysics_option4());
+                    break;
+                case EmPhysicsModel::Penelope:
+                    this->emPhysics.reset(new G4EmPenelopePhysics());
+                    break;
+                case EmPhysicsModel::Standard:
+                    this->emPhysics.reset(new G4EmStandardPhysics());
+                    break;
+            }
+            this->extraPhysics.reset(new G4EmExtraPhysics());
+        }
+
+        if (settings.had_model != HadPhysicsModel::None) {
+            this->hePhysics.reset(new G4HadronElasticPhysics());
+            this->stoppingPhysics.reset(new G4StoppingPhysics());
+            this->ionPhysics.reset(new G4IonPhysics());
+
+            switch (settings.had_model) {
+                case HadPhysicsModel::FTFP_BERT:
+                    this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT());
+                    break;
+                case HadPhysicsModel::FTFP_BERT_HP:
+                    this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT_HP());
+                    break;
+                case HadPhysicsModel::QGSP_BERT:
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT());
+                    break;
+                case HadPhysicsModel::QGSP_BERT_HP:
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT_HP());
+                    break;
+                case HadPhysicsModel::QGSP_BIC:
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC());
+                    break;
+                case HadPhysicsModel::QGSP_BIC_HP:
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC_HP());
+                    break;
+                case HadPhysicsModel::None:
+                    // unreachable.
+                    break;
+            }
+        }
     }
 
-    if (this->current_em_model != definition.em_model) {
-        switch (definition.em_model) {
-            case EmPhysicsModel::Dna:
-                this->emPhysics.reset(new G4EmDNAPhysics());
-                break;
-            case EmPhysicsModel::Livermore:
-                this->emPhysics.reset(new G4EmLivermorePhysics());
-                break;
-            case EmPhysicsModel::None:
-                this->emPhysics.reset(nullptr);
-                break;
-            case EmPhysicsModel::Option1:
-                this->emPhysics.reset(new G4EmStandardPhysics_option1());
-                break;
-            case EmPhysicsModel::Option2:
-                this->emPhysics.reset(new G4EmStandardPhysics_option2());
-                break;
-            case EmPhysicsModel::Option3:
-                this->emPhysics.reset(new G4EmStandardPhysics_option3());
-                break;
-            case EmPhysicsModel::Option4:
-                this->emPhysics.reset(new G4EmStandardPhysics_option4());
-                break;
-            case EmPhysicsModel::Penelope:
-                this->emPhysics.reset(new G4EmPenelopePhysics());
-                break;
-            case EmPhysicsModel::Standard:
-                this->emPhysics.reset(new G4EmStandardPhysics());
-                break;
-        }
-        if (definition.em_model == EmPhysicsModel::None) {
-            if (this->extraPhysics) {
-                this->extraPhysics.reset(nullptr);
-            }
-        } else {
-            if (!this->extraPhysics) {
-                this->extraPhysics.reset(new G4EmExtraPhysics());
-            }
-        }
-        this->current_em_model = definition.em_model;
-        modified = true;
-    }
-
-    if (this->current_had_model != definition.had_model) {
-        if (definition.had_model == HadPhysicsModel::None) {
-            if (this->hePhysics) {
-                this->hePhysics.reset(nullptr);
-            }
-            if (this->stoppingPhysics) {
-                this->stoppingPhysics.reset(nullptr);
-            }
-            if (this->ionPhysics) {
-                this->ionPhysics.reset(nullptr);
-            }
-        } else {
-            if (!this->hePhysics) {
-                this->hePhysics.reset(new G4HadronElasticPhysics());
-            }
-            if (!this->stoppingPhysics) {
-                this->stoppingPhysics.reset(new G4StoppingPhysics());
-            }
-            if (!this->ionPhysics) {
-                this->ionPhysics.reset(new G4IonPhysics());
-            }
-        }
-        switch (definition.had_model) {
-            case HadPhysicsModel::FTFP_BERT:
-                this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT());
-                break;
-            case HadPhysicsModel::FTFP_BERT_HP:
-                this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT_HP());
-                break;
-            case HadPhysicsModel::QGSP_BERT:
-                this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT());
-                break;
-            case HadPhysicsModel::QGSP_BERT_HP:
-                this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT_HP());
-                break;
-            case HadPhysicsModel::QGSP_BIC:
-                this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC());
-                break;
-            case HadPhysicsModel::QGSP_BIC_HP:
-                this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC_HP());
-                break;
-            case HadPhysicsModel::None:
-                this->hadPhysics.reset(nullptr);
-                break;
-        }
-        this->current_had_model = definition.had_model;
-        modified = true;
-    }
-
-    double value = definition.default_cut * CLHEP::cm;
+    bool modified = false;
+    double value = this->settings.default_cut * CLHEP::cm;
     if (this->GetDefaultCutValue() != value) {
         if (this->isSetDefaultCutValue) {
             this->SetDefaultCutValue(value);
@@ -202,6 +178,29 @@ PhysicsImpl * PhysicsImpl::Get() {
     return instance;
 }
 
+double get_default_cut() {
+    return PhysicsImpl::Get()->Settings().default_cut;
+}
+
+void set_default_cut(double value) {
+    PhysicsImpl::Get()->Settings().default_cut = value;
+}
+
+EmPhysicsModel get_em_model() {
+    return PhysicsImpl::Get()->Settings().em_model;
+}
+
+void set_em_model(EmPhysicsModel model) {
+    PhysicsImpl::Get()->Settings().em_model = model;
+}
+
+HadPhysicsModel get_had_model() {
+    return PhysicsImpl::Get()->Settings().had_model;
+}
+
+void set_had_model(HadPhysicsModel model) {
+    PhysicsImpl::Get()->Settings().had_model = model;
+}
 
 // ============================================================================
 //
@@ -211,12 +210,10 @@ PhysicsImpl * PhysicsImpl::Get() {
 
 PhysicsCalculator::PhysicsCalculator(
         G4EmCalculator * calc,
-        double cut,
         const G4ParticleDefinition * part,
         const G4Material * mat,
         const std::string proc
-): emCalculator(calc), default_cut(cut), particle(part), material(mat),
-    process(proc)
+): emCalculator(calc), particle(part), material(mat), process(proc)
 {}
 
 PhysicsCalculator::~PhysicsCalculator() {
@@ -251,10 +248,12 @@ double PhysicsCalculator::cross_section(
 
 double PhysicsCalculator::energy_cut(bool default_cut, double range_cut) {
     if (default_cut) {
-        range_cut = this->default_cut;
+        range_cut = PhysicsImpl::Get()->GetDefaultCutValue();
+    } else {
+        range_cut *= CLHEP::cm;
     }
     double energy_cut = this->emCalculator->ComputeEnergyCutFromRangeCut(
-        range_cut * CLHEP::cm,
+        range_cut,
         this->particle,
         this->material
     );
@@ -266,8 +265,7 @@ bool PhysicsCalculator::production_cuts() const {
     return index >= 0;
 }
 
-double PhysicsCalculator::range(
-    double energy, bool range_cut) {
+double PhysicsCalculator::range(double energy, bool range_cut) {
     double r = 0.0;
     if (range_cut) {
         r = this->emCalculator->GetRange(
@@ -315,7 +313,6 @@ double PhysicsCalculator::stopping_power(
 }
 
 std::unique_ptr<PhysicsCalculator> create_physics_calculator(
-    Physics physics,
     int pid,
     rust::String material,
     rust::Str process
@@ -333,7 +330,7 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
 
     PhysicsCalculator::DRY_WORLD_MATERIAL = mat;
     G4EmParameters::Instance()->SetBuildCSDARange(true);
-    dry_simulation(physics); // Configure / update Geant4 kernel.
+    dry_simulation(); // Configure / update Geant4 kernel.
 
     G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
     const G4ParticleDefinition * part = particleTable->FindParticle(pid);
@@ -371,7 +368,5 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
         return nullptr;
     }
 
-    return std::make_unique<PhysicsCalculator>(
-        calc, physics.default_cut, part, mat, processName
-    );
+    return std::make_unique<PhysicsCalculator>(calc, part, mat, processName);
 }

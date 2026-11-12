@@ -15,52 +15,41 @@ use super::ffi;
 /// Geant4 physics settings.
 #[derive(Default)]
 #[pyclass(module="calzone")]
-pub struct Physics (pub(crate) ffi::Physics);
-
-impl Physics {
-    const DEFAULT_EM_MODEL: ffi::EmPhysicsModel = ffi::EmPhysicsModel::Standard;
-    const DEFAULT_HAD_MODEL: ffi::HadPhysicsModel = ffi::HadPhysicsModel::None;
-
-    pub fn none() ->  Self {
-        let mut physics = ffi::Physics::default();
-        physics.em_model = ffi::EmPhysicsModel::None;
-        physics.had_model = ffi::HadPhysicsModel::None;
-        Self (physics)
-    }
-}
+pub struct Physics;
 
 #[pymethods]
 impl Physics {
     #[new]
     #[pyo3(signature=(em_model=None, *, default_cut=None, had_model=None))]
     pub fn new(
+        py: Python,
         em_model: Option<&str>,
         default_cut: Option<f64>,
         had_model: Option<&str>,
     ) -> PyResult<Self> {
-        let mut physics = Self (ffi::Physics::default());
+        let mut physics = Self;
         if let Some(em_model) = em_model {
-            physics.set_em_model(Some(em_model))?;
+            physics.set_em_model(py, Some(em_model))?;
         }
         if let Some(had_model) = had_model {
-            physics.set_had_model(Some(had_model))?;
+            physics.set_had_model(py, Some(had_model))?;
         }
         if let Some(default_cut) = default_cut {
-            physics.set_default_cut(default_cut)?;
+            physics.set_default_cut(py, default_cut)?;
         }
         Ok(physics)
     }
 
     /// Physics default cut, in cm.
     #[getter]
-    fn get_default_cut(&self) -> f64 {
-        self.0.default_cut
+    fn get_default_cut(&self, _py: Python /* Lock */) -> f64 {
+        ffi::get_default_cut()
     }
 
     #[setter]
-    fn set_default_cut(&mut self, value: f64) -> PyResult<()> {
+    fn set_default_cut(&mut self, _py: Python /* Lock */, value: f64) -> PyResult<()> {
         if value > 0.0 {
-            self.0.default_cut = value;
+            ffi::set_default_cut(value);
             Ok(())
         } else {
             let why = format!("expected a positive value, found {}", value);
@@ -71,50 +60,48 @@ impl Physics {
 
     /// Electromagnetic physics list.
     #[getter]
-    fn get_em_model(&self) -> Option<&'static str> {
-        let model: Option<EmPhysicsModel> = self.0.em_model.into();
+    fn get_em_model(&self, _py: Python /* Lock */) -> Option<&'static str> {
+        let model: Option<EmPhysicsModel> = ffi::get_em_model().into();
         model.map(|m| m.to_str())
     }
 
     #[setter]
-    pub fn set_em_model(&mut self, value: Option<&str>) -> PyResult<()> {
-        match value {
-            None => {
-                self.0.em_model = ffi::EmPhysicsModel::None;
-                Ok(())
-            },
+    pub fn set_em_model(&mut self, _py: Python /* Lock */, value: Option<&str>) -> PyResult<()> {
+        Self::check_state("em_model")?;
+        let model: ffi::EmPhysicsModel = match value {
+            None => ffi::EmPhysicsModel::None,
             Some(value) => match EmPhysicsModel::from_str(value) {
-                Ok(model) => {
-                    self.0.em_model = model.into();
-                    Ok(())
+                Ok(model) => model.into(),
+                Err(options) => {
+                    return Err(variant_error("bad model", value, options))
                 },
-                Err(options) => Err(variant_error("bad model", value, options)),
             },
-        }
+        };
+        ffi::set_em_model(model);
+        Ok(())
     }
 
     /// Hadronic physics list.
     #[getter]
-    fn get_had_model(&self) -> Option<&'static str> {
-        let model: Option<HadPhysicsModel> = self.0.had_model.into();
+    fn get_had_model(&self, _py: Python /* Lock */) -> Option<&'static str> {
+        let model: Option<HadPhysicsModel> = ffi::get_had_model().into();
         model.map(|m| m.to_str())
     }
 
     #[setter]
-    pub fn set_had_model(&mut self, value: Option<&str>) -> PyResult<()> {
-        match value {
-            None => {
-                self.0.had_model = ffi::HadPhysicsModel::None;
-                Ok(())
-            },
+    pub fn set_had_model(&mut self, _py: Python /* Lock */, value: Option<&str>) -> PyResult<()> {
+        Self::check_state("had_model")?;
+        let model: ffi::HadPhysicsModel = match value {
+            None => ffi::HadPhysicsModel::None,
             Some(value) => match HadPhysicsModel::from_str(value) {
-                Ok(model) => {
-                    self.0.had_model = model.into();
-                    Ok(())
+                Ok(model) => model.into(),
+                Err(options) => {
+                    return Err(variant_error("bad model", value, options))
                 },
-                Err(options) => Err(variant_error("bad model", value, options)),
             },
-        }
+        };
+        ffi::set_had_model(model);
+        Ok(())
     }
 
     #[pyo3(signature=(*, pid, material, energy, process, cut=None))]
@@ -128,7 +115,7 @@ impl Physics {
         cut: Option<CutArg>,
     ) -> PyResult<Py<PyAny>> {
         let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack(0.0);
-        let mut calc = ffi::create_physics_calculator(self.0, pid, material, process);
+        let mut calc = ffi::create_physics_calculator(pid, material, process);
         ffi::get_error().take_result()?;
         let result = match energy {
             FloatArg::Scalar(energy) => match energy_cut {
@@ -182,7 +169,7 @@ impl Physics {
         material: String,
         range_cut: Option<FloatArg<'py>>,
     ) -> PyResult<Py<PyAny>> {
-        let mut calc = ffi::create_physics_calculator(self.0, pid, material, "");
+        let mut calc = ffi::create_physics_calculator(pid, material, "");
         ffi::get_error().take_result()?;
         if !calc.production_cuts() {
             let why = format!(
@@ -227,7 +214,7 @@ impl Physics {
         cut: Option<bool>,
     ) -> PyResult<Py<PyAny>> {
         let cut = cut.unwrap_or(false);
-        let mut calc = ffi::create_physics_calculator(self.0, pid, material, "");
+        let mut calc = ffi::create_physics_calculator(pid, material, "");
         ffi::get_error().take_result()?;
         let result = match energy {
             FloatArg::Scalar(energy) => {
@@ -293,7 +280,7 @@ impl Physics {
                 ("", range_cut, FloatArg::Scalar(0.0))
             },
         };
-        let mut calc = ffi::create_physics_calculator(self.0, pid, material, process);
+        let mut calc = ffi::create_physics_calculator(pid, material, process);
         ffi::get_error().take_result()?;
         let result = match energy {
             FloatArg::Scalar(energy) => match energy_cut {
@@ -337,6 +324,18 @@ impl Physics {
             },
         };
         Ok(result)
+    }
+}
+
+impl Physics {
+    fn check_state(model: &str) -> PyResult<()> {
+        if ffi::simulation_state() == ffi::G4ApplicationState::G4State_PreInit {
+            Ok(())
+        } else {
+            let why = "cannot modify physics model after Geant4 init";
+            let err = Error::new(TypeError).what(model).why(why);
+            Err(err.into())
+        }
     }
 }
 
@@ -462,14 +461,5 @@ impl From<HadPhysicsModel> for ffi::HadPhysicsModel {
             HadPhysicsModel::QGSP_BIC => Self::QGSP_BIC,
             HadPhysicsModel::QGSP_BIC_HP => Self::QGSP_BIC_HP,
         }
-    }
-}
-
-impl Default for ffi::Physics {
-    fn default() -> Self {
-        let default_cut = 0.1; // cm
-        let em_model = Physics::DEFAULT_EM_MODEL;
-        let had_model = Physics::DEFAULT_HAD_MODEL;
-        Self { default_cut, em_model, had_model }
     }
 }

@@ -8,12 +8,12 @@
 #include "simulation/tracker.h"
 // Geant4 interface.
 #include "G4RunManager.hh"
+#include "G4StateManager.hh"
 #include "G4UImanager.hh"
 #include "Randomize.hh"
 
 
 RunAgent * RUN_AGENT = nullptr;
-
 
 void drop_simulation() {
     // Gracefully exit Geant4. That is, detach any pending geometry before
@@ -23,12 +23,12 @@ void drop_simulation() {
     delete manager;
 }
 
-static G4RunManager * init_manager(const Physics & physics) {
+static G4RunManager * init_manager() {
     auto physicsImpl = PhysicsImpl::Get();
     auto geometryImpl = GeometryImpl::Get();
 
     geometryImpl->Update();
-    physicsImpl->Update(physics);
+    physicsImpl->Update();
 
     physicsImpl->DisableVerbosity();
     static G4RunManager * manager = G4RunManager::GetRunManager();
@@ -51,9 +51,9 @@ static G4RunManager * init_manager(const Physics & physics) {
     return manager;
 }
 
-void dry_simulation(Physics physics) {
+void dry_simulation() {
     RUN_AGENT = nullptr;
-    G4RunManager * manager = init_manager(physics);
+    G4RunManager * manager = init_manager();
     manager->RunInitialization();
 }
 
@@ -66,7 +66,7 @@ std::shared_ptr<Error> run_simulation(
 
     // Configure the simulation.
     RUN_AGENT = &agent;
-    G4RunManager * manager = init_manager(RUN_AGENT->physics());
+    G4RunManager * manager = init_manager();
 
     if (RUN_AGENT->is_tracker()) {
         manager->SetUserAction(TrackingImpl::Get());
@@ -99,4 +99,8 @@ std::shared_ptr<Error> run_simulation(
     }
 
     return get_error();
+}
+
+G4ApplicationState simulation_state() {
+    return G4StateManager::GetStateManager()->GetCurrentState();
 }
