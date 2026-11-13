@@ -251,6 +251,14 @@ static void ensure_initialised() {
     }
 }
 
+static void ensure_finalised() {
+    auto state = G4StateManager::GetStateManager()->GetCurrentState();
+    if (state != G4State_Idle) {
+        static G4RunManager * manager = G4RunManager::GetRunManager();
+        manager->RunTermination();
+    }
+}
+
 void get_active_particles(rust::Vec<ParticleInfo> & particles) {
     clear_error();
     ensure_initialised();
@@ -275,6 +283,8 @@ void get_active_particles(rust::Vec<ParticleInfo> & particles) {
             pid
         });
     }
+
+    ensure_finalised();
 }
 
 void get_active_processes(
@@ -289,11 +299,13 @@ void get_active_processes(
     if (particle == nullptr) {
         std::string msg = fmt::format("undefined pid '{}'", pid);
         set_error(ErrorType::ValueError, msg.c_str());
+        ensure_finalised();
         return;
     }
 
     G4ProcessManager * manager = particle->GetProcessManager();
     if (manager == nullptr) {
+        ensure_finalised();
         return;
     }
 
@@ -304,6 +316,8 @@ void get_active_processes(
             processes.push_back(rust::String(name));
         }
     }
+
+    ensure_finalised();
 }
 
 
