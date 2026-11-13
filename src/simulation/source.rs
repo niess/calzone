@@ -956,6 +956,7 @@ impl TryFrom<ParticleName> for i32 {
 
     fn try_from(value: ParticleName) -> PyResult<i32> {
         let pid = match value.0.as_str() {
+            "alpha" => 1000020040,
             "e-" => 11,
             "e+" => -11,
             "mu-" => 13,
@@ -963,8 +964,8 @@ impl TryFrom<ParticleName> for i32 {
             "tau-" => 15,
             "tau+" => -15,
             "gamma" => 22,
-            "p" => 2212,
             "n" => 2112,
+            "p" => 2212,
             _ => {
                 let why = format!("unknown particle '{}'", value.0);
                 let err = Error::new(ValueError)

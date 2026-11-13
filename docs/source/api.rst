@@ -420,6 +420,9 @@ Python interface
       * - :python:`"n"`
         - :python:`2112`
         - A neutron.
+      * - :python:`"alpha"`
+        - :python:`1000020040`
+        - An helium-4 nucleus.
 
 ----
 
