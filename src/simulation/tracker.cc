@@ -23,7 +23,7 @@ struct Translator {
         this->dictionary["eIoni"] = "Ionisation";
         this->dictionary["electronNuclear"] = "Photonuclear";
         this->dictionary["hadElastic"] = "Elastic";
-        this->dictionary["hBrems"] = "Bresstrahlung";
+        this->dictionary["hBrems"] = "Bremsstrahlung";
         this->dictionary["hIoni"] = "Ionisation";
         this->dictionary["hPairProd"] = "PairProduction";
         this->dictionary["ionIoni"] = "Ionisation";

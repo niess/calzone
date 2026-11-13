@@ -21,6 +21,7 @@
 #include "G4HadronPhysicsQGSP_BIC_HP.hh"
 #include "G4ProcessTable.hh"
 #include "G4RunManager.hh"
+#include "G4StateManager.hh"
 #include "G4UImanager.hh"
 
 
@@ -204,6 +205,71 @@ HadPhysicsModel get_had_model() {
 void set_had_model(HadPhysicsModel model) {
     PhysicsImpl::Get()->Settings().had_model = model;
 }
+
+static void ensure_initialised() {
+    auto state = G4StateManager::GetStateManager()->GetCurrentState();
+    if (state == G4State_PreInit) {
+        auto material = get_material(rust::String("G4_WATER"));
+        PhysicsCalculator::DRY_WORLD_MATERIAL = material;
+        dry_simulation(); // Configure / update Geant4 kernel.
+    }
+}
+
+void get_active_particles(rust::Vec<ParticleInfo> & particles) {
+    clear_error();
+    ensure_initialised();
+
+    G4ParticleTable * table = G4ParticleTable::GetParticleTable();
+    G4ParticleTable::G4PTblDicIterator * iter = table->GetIterator();
+
+    iter->reset();
+    while ((*iter)()) {
+        G4ParticleDefinition * particle = iter->value();
+
+        int pid = particle->GetPDGEncoding();
+        if ((pid == 0) || particle->IsShortLived()) continue;
+
+        G4ProcessManager * manager = particle->GetProcessManager();
+        if (manager == nullptr) continue;
+        G4ProcessVector * p = manager->GetProcessList();
+        if (p->size() <= 1) continue;
+
+        particles.push_back(ParticleInfo {
+            rust::String(particle->GetParticleName().c_str()),
+            pid
+        });
+    }
+}
+
+void get_active_processes(
+    int pid,
+    rust::Vec<rust::String> & processes
+) {
+    clear_error();
+    ensure_initialised();
+
+    G4ParticleTable * particleTable = G4ParticleTable::GetParticleTable();
+    const G4ParticleDefinition * particle = particleTable->FindParticle(pid);
+    if (particle == nullptr) {
+        std::string msg = fmt::format("undefined pid '{}'", pid);
+        set_error(ErrorType::ValueError, msg.c_str());
+        return;
+    }
+
+    G4ProcessManager * manager = particle->GetProcessManager();
+    if (manager == nullptr) {
+        return;
+    }
+
+    G4ProcessVector * p = manager->GetProcessList();
+    for (size_t i = 0; i < p->size(); ++i) {
+        if (manager->GetProcessActivation(i)) {
+            const G4String & name = (*p)[i]->GetProcessName();
+            processes.push_back(rust::String(name));
+        }
+    }
+}
+
 
 // ============================================================================
 //

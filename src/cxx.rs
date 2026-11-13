@@ -225,6 +225,11 @@ pub mod ffi {
         None,
     }
 
+    struct ParticleInfo {
+        name: String,
+        pid: i32,
+    }
+
     // ===========================================================================================
     //
     // Sampler interface.
@@ -411,6 +416,11 @@ pub mod ffi {
         fn describe_material(name: &str) -> Mixture;
 
         // Physics interface.
+        fn get_active_particles(particles: &mut Vec<ParticleInfo>);
+        fn get_active_processes(
+            pid: i32,
+            processes: &mut Vec<String>,
+        );
         fn get_default_cut() -> f64;
         fn set_default_cut(value: f64);
         fn get_em_model() -> EmPhysicsModel;

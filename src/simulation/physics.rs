@@ -209,7 +209,28 @@ impl Physics {
         Ok(result)
     }
 
-    // XXX Add a processes method.
+    /// Active particles for the physics.
+    #[pyo3(signature=())]
+    pub fn particles<'py>(&self, _py: Python<'py>) -> PyResult<Vec<(String, i32)>> {
+        let mut particles = Vec::new();
+        ffi::get_active_particles(&mut particles);
+        ffi::get_error().take_result()?;
+        let particles = particles
+            .into_iter()
+            .map(|e| (e.name, e.pid))
+            .collect();
+        Ok(particles)
+    }
+
+    /// Active processes for a particle.
+    #[pyo3(signature=(pid))]
+    pub fn processes<'py>(&self, _py: Python<'py>, pid: PidArg) -> PyResult<Vec<String>> {
+        let pid: i32 = pid.try_into()?;
+        let mut processes = Vec::new();
+        ffi::get_active_processes(pid, &mut processes);
+        ffi::get_error().take_result()?;
+        Ok(processes)
+    }
 
     /// Range of a particle, in cm.
     #[pyo3(signature=(*, pid, material, energy, cut=None))]

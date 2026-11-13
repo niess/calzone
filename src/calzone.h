@@ -144,6 +144,9 @@ Mixture describe_material(rust::Str);
 //
 // ============================================================================
 
+
+void get_active_particles(rust::Vec<ParticleInfo> &);
+void get_active_processes(int, rust::Vec<rust::String> &);
 double get_default_cut();
 void set_default_cut(double);
 EmPhysicsModel get_em_model();
