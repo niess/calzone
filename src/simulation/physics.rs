@@ -272,17 +272,18 @@ impl Physics {
 
     /// Active particles for the physics.
     #[pyo3(signature=())]
-    pub fn particles<'py>(&self, _py: Python<'py>) -> PyResult<HashMap<i32, String>> {
+    pub fn particles<'py>(&self, _py: Python<'py>) -> PyResult<HashMap<String, i32>> {
         let mut particles = Vec::new();
         ffi::get_active_particles(&mut particles);
         ffi::get_error().take_result()?;
-        let particles: HashMap<i32, String> = particles
+        let particles: HashMap<String, i32> = particles
             .into_iter()
-            .map(|e| (e.pid, e.name))
+            .map(|e| (e.name, e.pid))
             .collect();
         Ok(particles)
     }
 
+    // XXX Use nicknames for processes, as in tracking.
     /// Active processes for a particle.
     #[pyo3(signature=(pid))]
     pub fn processes<'py>(&self, _py: Python<'py>, pid: PidArg) -> PyResult<Vec<String>> {

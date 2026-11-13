@@ -607,8 +607,9 @@ Python interface
 
    .. automethod:: particles
 
-      Returns a :py:class:`dict` mapping the :ref:`pid <topic-pid>` of all
-      active particles to their `Geant4`_ name, for the selected physics.
+      Returns a :py:class:`dict` mapping the `Geant4`_ name of all active
+      particles to their :ref:`pid <topic-pid>`, for the selected
+      :py:attr:`em_model` and :py:attr:`had_model`.
 
       .. note::
 
