@@ -30,7 +30,6 @@ static G4RunManager * init_manager() {
     geometryImpl->Update();
     physicsImpl->Update();
 
-    physicsImpl->DisableVerbosity();
     static G4RunManager * manager = G4RunManager::GetRunManager();
     if (manager == nullptr) {
         auto buffer = std::cout.rdbuf();
@@ -54,7 +53,10 @@ static G4RunManager * init_manager() {
 void dry_simulation() {
     RUN_AGENT = nullptr;
     G4RunManager * manager = init_manager();
+    auto buffer = std::cout.rdbuf();
+    std::cout.rdbuf(nullptr); // Disable cout temporarly.
     manager->RunInitialization();
+    std::cout.rdbuf(buffer);
 }
 
 std::shared_ptr<Error> run_simulation(
@@ -85,18 +87,39 @@ std::shared_ptr<Error> run_simulation(
         ui->ApplyCommand("/tracking/verbose 1");
     }
 
+    // Initialize the run.
+    if (!manager->ConfirmBeamOnCondition()) {
+        return get_error();
+    }
+
+    manager->ConstructScoringWorlds();
+
+    const std::uint64_t n = agent.events();
+    manager->SetNumberOfEventsToBeProcessed(n);
+    auto buffer = std::cout.rdbuf();
+    std::cout.rdbuf(nullptr); // Disable cout temporarly.
+    manager->RunInitialization();
+    std::cout.rdbuf(buffer);
+    manager->InitializeEventLoop(n);
+
     // Process events in bunches (in order to check for Ctrl+C).
     constexpr int bunch_size = 100;
-    const std::uint64_t n = agent.events();
     const std::uint64_t a = n / bunch_size;
     const int b = n % bunch_size;
+    std::uint64_t i_event = 0;
     for (std::uint64_t i = 0; i <= a; i++) {
         int r = (i < a) ? bunch_size : b;
         if (r > 0) {
-            manager->BeamOn(r);
+            for (int j  = 0; j < r; j++) {
+                manager->ProcessOneEvent(i_event++);
+                manager->TerminateOneEvent();
+            }
         }
         if (any_error()) break;
     }
+
+    manager->TerminateEventLoop();
+    manager->RunTermination();
 
     return get_error();
 }

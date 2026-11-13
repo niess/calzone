@@ -24,7 +24,6 @@ struct PhysicsImpl: public G4VUserPhysicsList {
     void ConstructProcess();
 
     // User interface.
-    void DisableVerbosity() const;
     void Update();
     PhysicsSettings & Settings() { return this->settings; }
 

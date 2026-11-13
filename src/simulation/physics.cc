@@ -74,13 +74,6 @@ void PhysicsImpl::ConstructProcess() {
     }
 }
 
-void PhysicsImpl::DisableVerbosity() const
-{
-    auto UImanager = G4UImanager::GetUIpointer();
-    UImanager->ApplyCommand("/process/em/verbose 0");
-    UImanager->ApplyCommand("/process/had/verbose 0");
-}
-
 void PhysicsImpl::Update() {
     static bool initialised = false;
     if (initialised) {
@@ -88,74 +81,84 @@ void PhysicsImpl::Update() {
     } else {
         initialised = true;
 
-        auto && settings = this->settings;
-        this->decayPhysics.reset(new G4DecayPhysics());
+        G4EmParameters * parameters = G4EmParameters::Instance();
+        this->decayPhysics.reset(new G4DecayPhysics(0));
 
+        auto && settings = this->settings;
         if (settings.em_model != EmPhysicsModel::None) {
+            this->extraPhysics.reset(new G4EmExtraPhysics(0));
+
             switch (settings.em_model) {
                 case EmPhysicsModel::Dna:
                     get_material("G4_WATER"); // Required by Geant4/DNA.
-                    this->emPhysics.reset(new G4EmDNAPhysics());
+                    this->emPhysics.reset(new G4EmDNAPhysics(0));
                     break;
                 case EmPhysicsModel::Livermore:
-                    this->emPhysics.reset(new G4EmLivermorePhysics());
+                    this->emPhysics.reset(new G4EmLivermorePhysics(0));
+                    parameters->SetPixe(true);
                     break;
                 case EmPhysicsModel::None:
                     // unreachable.
                     break;
                 case EmPhysicsModel::Option1:
-                    this->emPhysics.reset(new G4EmStandardPhysics_option1());
+                    this->emPhysics.reset(new G4EmStandardPhysics_option1(0));
                     break;
                 case EmPhysicsModel::Option2:
-                    this->emPhysics.reset(new G4EmStandardPhysics_option2());
+                    this->emPhysics.reset(new G4EmStandardPhysics_option2(0));
                     break;
                 case EmPhysicsModel::Option3:
-                    this->emPhysics.reset(new G4EmStandardPhysics_option3());
+                    this->emPhysics.reset(new G4EmStandardPhysics_option3(0));
                     break;
                 case EmPhysicsModel::Option4:
-                    this->emPhysics.reset(new G4EmStandardPhysics_option4());
+                    this->emPhysics.reset(new G4EmStandardPhysics_option4(0));
+                    parameters->SetPixe(true);
                     break;
                 case EmPhysicsModel::Penelope:
-                    this->emPhysics.reset(new G4EmPenelopePhysics());
+                    this->emPhysics.reset(new G4EmPenelopePhysics(0));
+                    parameters->SetPixe(true);
+                    parameters->SetPIXEElectronCrossSectionModel("Penelope");
+                    parameters->SetPIXECrossSectionModel("ECPSSR_FormFactor");
                     break;
                 case EmPhysicsModel::Standard:
-                    this->emPhysics.reset(new G4EmStandardPhysics());
+                    this->emPhysics.reset(new G4EmStandardPhysics(0));
                     break;
             }
-            this->extraPhysics.reset(new G4EmExtraPhysics());
+
+            parameters->SetFluo(true);
+            parameters->SetAuger(true);
+            parameters->SetAugerCascade(true);
         }
+        parameters->SetBuildCSDARange(true);
 
         if (settings.had_model != HadPhysicsModel::None) {
-            this->hePhysics.reset(new G4HadronElasticPhysics());
-            this->stoppingPhysics.reset(new G4StoppingPhysics());
-            this->ionPhysics.reset(new G4IonPhysics());
+            this->hePhysics.reset(new G4HadronElasticPhysics(0));
+            this->stoppingPhysics.reset(new G4StoppingPhysics(0));
+            this->ionPhysics.reset(new G4IonPhysics(0));
 
             switch (settings.had_model) {
                 case HadPhysicsModel::FTFP_BERT:
-                    this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT());
+                    this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT(0));
                     break;
                 case HadPhysicsModel::FTFP_BERT_HP:
-                    this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT_HP());
+                    this->hadPhysics.reset(new G4HadronPhysicsFTFP_BERT_HP(0));
                     break;
                 case HadPhysicsModel::QGSP_BERT:
-                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT());
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT(0));
                     break;
                 case HadPhysicsModel::QGSP_BERT_HP:
-                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT_HP());
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BERT_HP(0));
                     break;
                 case HadPhysicsModel::QGSP_BIC:
-                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC());
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC(0));
                     break;
                 case HadPhysicsModel::QGSP_BIC_HP:
-                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC_HP());
+                    this->hadPhysics.reset(new G4HadronPhysicsQGSP_BIC_HP(0));
                     break;
                 case HadPhysicsModel::None:
                     // unreachable.
                     break;
             }
         }
-
-        G4EmParameters::Instance()->SetBuildCSDARange(true);
     }
 
     bool modified = false;
