@@ -92,32 +92,25 @@ std::shared_ptr<Error> run_simulation(
         return get_error();
     }
 
-    manager->ConstructScoringWorlds();
-
     const std::uint64_t n = agent.events();
+    manager->ConstructScoringWorlds();
     manager->SetNumberOfEventsToBeProcessed(n);
+
     auto buffer = std::cout.rdbuf();
     std::cout.rdbuf(nullptr); // Disable cout temporarly.
     manager->RunInitialization();
     std::cout.rdbuf(buffer);
+
     manager->InitializeEventLoop(n);
 
-    // Process events in bunches (in order to check for Ctrl+C).
-    constexpr int bunch_size = 100;
-    const std::uint64_t a = n / bunch_size;
-    const int b = n % bunch_size;
-    std::uint64_t i_event = 0;
-    for (std::uint64_t i = 0; i <= a; i++) {
-        int r = (i < a) ? bunch_size : b;
-        if (r > 0) {
-            for (int j  = 0; j < r; j++) {
-                manager->ProcessOneEvent(i_event++);
-                manager->TerminateOneEvent();
-            }
-        }
+    // Process events (checking for Ctrl+C).
+    for (std::uint64_t i = 0; i < n; i++) {
         if (any_error()) break;
+        manager->ProcessOneEvent(i);
+        manager->TerminateOneEvent();
     }
 
+    // Terminate the run.
     manager->TerminateEventLoop();
     manager->RunTermination();
 
