@@ -3,6 +3,7 @@ use crate::utils::error::ErrorKind::{TypeError, ValueError};
 use crate::utils::numpy::{PyArray, PyArrayMethods};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
+use std::collections::HashMap;
 use super::ffi;
 use super::source::PidArg;
 
@@ -271,13 +272,13 @@ impl Physics {
 
     /// Active particles for the physics.
     #[pyo3(signature=())]
-    pub fn particles<'py>(&self, _py: Python<'py>) -> PyResult<Vec<(String, i32)>> {
+    pub fn particles<'py>(&self, _py: Python<'py>) -> PyResult<HashMap<i32, String>> {
         let mut particles = Vec::new();
         ffi::get_active_particles(&mut particles);
         ffi::get_error().take_result()?;
-        let particles = particles
+        let particles: HashMap<i32, String> = particles
             .into_iter()
-            .map(|e| (e.name, e.pid))
+            .map(|e| (e.pid, e.name))
             .collect();
         Ok(particles)
     }
