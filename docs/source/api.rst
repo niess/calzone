@@ -579,12 +579,12 @@ Python interface
       value(s), in MeV, for soft collisions.
 
       For instance, the following returns the `macroscopic cross-section`_ for a
-      10 MeV electron (:python:`pid=11`) interacting by Bremsstrahlung
+      10 MeV electron (:python:`pid="e-"`) interacting by Bremsstrahlung
       (:python:`process="eBrem"`) with a water molecule, taking production cuts
       into account.
 
       >>> physics.cross_section( # doctest: +SKIP
-      ...     pid=11, energy=10.0, material="G4_WATER", process="eBrem", cut=True
+      ...     pid="e-", energy=10.0, material="G4_WATER", process="eBrem", cut=True
       ... )
       0.2854100303707325  # 1/cm
 

@@ -4,6 +4,7 @@ use crate::utils::numpy::{PyArray, PyArrayMethods};
 use enum_variants_strings::EnumVariantsStrings;
 use pyo3::prelude::*;
 use super::ffi;
+use super::source::PidArg;
 
 
 // ===============================================================================================
@@ -109,12 +110,13 @@ impl Physics {
     pub fn cross_section<'py>(
         &self,
         py: Python<'py>,
-        pid: i32,
+        pid: PidArg,
         material: String,
         energy: FloatArg<'py>,
         process: &str,
         cut: Option<CutArg>,
     ) -> PyResult<Py<PyAny>> {
+        let pid: i32 = pid.try_into()?;
         let (range_cut, energy_cut) = cut.unwrap_or(CutArg::FALSE).unpack(0.0);
         let mut calc = ffi::create_physics_calculator(pid, material, process);
         ffi::get_error().take_result()?;
@@ -167,10 +169,11 @@ impl Physics {
     pub fn energy_cut<'py>(
         &self,
         py: Python<'py>,
-        pid: i32,
+        pid: PidArg,
         material: String,
         range_cut: Option<FloatArg<'py>>,
     ) -> PyResult<Py<PyAny>> {
+        let pid: i32 = pid.try_into()?;
         let mut calc = ffi::create_physics_calculator(pid, material, "");
         ffi::get_error().take_result()?;
         if !calc.production_cuts() {
@@ -213,11 +216,12 @@ impl Physics {
     pub fn range<'py>(
         &self,
         py: Python<'py>,
-        pid: i32, // XXX Allow for named particles.
+        pid: PidArg,
         material: String,
         energy: FloatArg<'py>,
         cut: Option<bool>,
     ) -> PyResult<Py<PyAny>> {
+        let pid: i32 = pid.try_into()?;
         let cut = cut.unwrap_or(false);
         let mut calc = ffi::create_physics_calculator(pid, material, "");
         ffi::get_error().take_result()?;
@@ -244,12 +248,13 @@ impl Physics {
     pub fn stopping_power<'py>(
         &self,
         py: Python<'py>,
-        pid: i32,
+        pid: PidArg,
         material: String,
         energy: FloatArg<'py>,
         process: Option<&str>,
         cut: Option<CutArg>,
     ) -> PyResult<Py<PyAny>> {
+        let pid: i32 = pid.try_into()?;
         let (process, range_cut, energy_cut) = match process {
             Some(process) => {
                 let energy_cut = match cut {

@@ -949,7 +949,7 @@ impl <'a> OntoGenerator<'a> {
 // ===============================================================================================
 
 #[derive(FromPyObject)]
-struct ParticleName (String);
+pub struct ParticleName (String);
 
 impl TryFrom<ParticleName> for i32 {
     type Error = PyErr;
@@ -978,7 +978,7 @@ impl TryFrom<ParticleName> for i32 {
 }
 
 #[derive(FromPyObject)]
-enum PidArg {
+pub enum PidArg {
     Name(ParticleName),
     Number(i32),
 }
