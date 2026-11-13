@@ -151,6 +151,12 @@ double get_default_cut();
 void set_default_cut(double);
 EmPhysicsModel get_em_model();
 void set_em_model(EmPhysicsModel);
+bool get_em_auger();
+void set_em_auger(bool);
+bool get_em_fluo();
+void set_em_fluo(bool);
+bool get_em_pixe();
+void set_em_pixe(bool);
 HadPhysicsModel get_had_model();
 void set_had_model(HadPhysicsModel);
 

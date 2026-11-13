@@ -604,6 +604,10 @@ Python interface
          Multiple `range_cut` values may be specified as a
          :py:class:`numpy.ndarray`.
 
+   .. automethod:: particles
+
+   .. automethod:: processes
+
    .. automethod:: range
 
       This method provides the range of a particle (identified by its :ref:`pid
@@ -652,6 +656,32 @@ Python interface
 
    .. autoattribute:: default_cut
 
+   .. autoattribute:: em_auger
+
+      This flag controls the detailed simulation of `Auger electrons`_. It is
+      enabled by default when selecting the :python:`"option4"`
+      :py:attr:`em_model`.
+
+      .. note::
+
+         Setting :py:attr:`em_auger` to :python:`True` automatically enables the
+         simulation of X-fluorescence, by switching :py:attr:`em_fluo` to
+         :python:`True`.
+
+   .. autoattribute:: em_fluo
+
+      This flag controls de detailed simulation of atomic de-excitation,
+      allowing ionized atoms to emit characteristic fluorescence X-ray photons.
+      This flag is enabled by default when selecting one of
+      :python:`"livermore"`, :python:`"option4"` or :python:`"penelope"`
+      :py:attr:`em_model`.
+
+      .. note::
+
+         Setting :py:attr:`em_fluo` to :python:`False` automatically disables
+         the simulation of `Auger electrons`_ and `PIXE`_, by switching the
+         corresponding flags to :python:`False`.
+
    .. autoattribute:: em_model
 
       Must be one of :python:`"dna"`, :python:`"livermore"`,
@@ -669,6 +699,23 @@ Python interface
          `G4EmExtraPhysics`_ is automatically enabled, in addition to the
          selected model of electromagnetic interactions.
 
+      .. caution::
+
+         Selecting the :py:attr:`em_model` resets the :py:attr:`em_auger`,
+         :py:attr:`em_fluo` and :py:attr:`em_pixe` flags.
+
+   .. autoattribute:: em_pixe
+
+      This flag controls Particle-Induced X-ray Emission (`PIXE`_), which allows
+      heavy particles (hadrons, ions, muons, etc.) to knock out inner-shell
+      atomic electrons and trigger X-ray fluorescence. It is disabled by
+      default.
+
+      .. note::
+
+         Setting :py:attr:`em_pixe` to :python:`True` automatically enables the
+         simulation of X-fluorescence, by switching :py:attr:`em_fluo` to
+         :python:`True`.
 
    .. autoattribute:: had_model
 
@@ -971,6 +1018,7 @@ Python interface
 .. 
 .. ============================================================================
 
+.. _Auger electrons: https://en.wikipedia.org/wiki/Auger_effect
 .. _ASCII Grid: https://modis.ornl.gov/documentation/ascii_grid_format.html
 .. _builder: https://en.wikipedia.org/wiki/Builder_pattern
 .. _calzone-display: https://pypi.org/project/calzone-display
@@ -993,6 +1041,7 @@ Python interface
 .. _OpenGate: http://www.opengatecollaboration.org/
 .. _PdgScheme: https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
 .. _PNG: https://en.wikipedia.org/wiki/PNG
+.. _PIXE: https://en.wikipedia.org/wiki/Particle-induced_X-ray_emission
 .. _STL: https://en.wikipedia.org/wiki/STL_(file_format)
 .. _Stopping power: https://en.wikipedia.org/wiki/Stopping_power_(particle_radiation)
 .. _StructuredArray: https://numpy.org/doc/stable/user/basics.rec.html

@@ -14,6 +14,9 @@ struct PhysicsSettings {
     double default_cut;
     EmPhysicsModel em_model;
     HadPhysicsModel had_model;
+    bool auger;
+    bool fluo;
+    bool pixe;
 };
 
 struct PhysicsImpl: public G4VUserPhysicsList {
@@ -45,6 +48,9 @@ private:
     PhysicsSettings settings = {
         0.1,
         EmPhysicsModel::Standard,
-        HadPhysicsModel::None
+        HadPhysicsModel::None,
+        false,
+        true,
+        false
     };
 };

@@ -425,6 +425,12 @@ pub mod ffi {
         fn set_default_cut(value: f64);
         fn get_em_model() -> EmPhysicsModel;
         fn set_em_model(model: EmPhysicsModel);
+        fn get_em_auger() -> bool;
+        fn set_em_auger(value: bool);
+        fn get_em_fluo() -> bool;
+        fn set_em_fluo(value: bool);
+        fn get_em_pixe() -> bool;
+        fn set_em_pixe(value: bool);
         fn get_had_model() -> HadPhysicsModel;
         fn set_had_model(model: HadPhysicsModel);
 

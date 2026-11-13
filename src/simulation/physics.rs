@@ -59,6 +59,35 @@ impl Physics {
         }
     }
 
+    /// Simulation of Auger electrons.
+    #[getter]
+    fn get_em_auger(&self, _py: Python /* Lock */) -> bool {
+        ffi::get_em_auger()
+    }
+
+    #[setter]
+    pub fn set_em_auger(&mut self, _py: Python /* Lock */, value: bool) {
+        ffi::set_em_auger(value);
+        if value {
+            ffi::set_em_fluo(true);
+        }
+    }
+
+    /// Simulation of X-fluorescence.
+    #[getter]
+    fn get_em_fluo(&self, _py: Python /* Lock */) -> bool {
+        ffi::get_em_fluo()
+    }
+
+    #[setter]
+    pub fn set_em_fluo(&mut self, _py: Python /* Lock */, value: bool) {
+        ffi::set_em_fluo(value);
+        if !value {
+            ffi::set_em_auger(false);
+            ffi::set_em_pixe(false);
+        }
+    }
+
     /// Electromagnetic physics list.
     #[getter]
     fn get_em_model(&self, _py: Python /* Lock */) -> Option<&'static str> {
@@ -79,7 +108,38 @@ impl Physics {
             },
         };
         ffi::set_em_model(model);
+        match model {
+            ffi::EmPhysicsModel::Livermore | ffi::EmPhysicsModel::Penelope => {
+                ffi::set_em_auger(false);
+                ffi::set_em_fluo(true);
+                ffi::set_em_pixe(false);
+            },
+            ffi::EmPhysicsModel::Option4 => {
+                ffi::set_em_auger(true);
+                ffi::set_em_fluo(true);
+                ffi::set_em_pixe(false);
+            },
+            _ => {
+                ffi::set_em_auger(false);
+                ffi::set_em_fluo(false);
+                ffi::set_em_pixe(false);
+            },
+        }
         Ok(())
+    }
+
+    /// Simulation of Particle-Induced X-Emission.
+    #[getter]
+    fn get_em_pixe(&self, _py: Python /* Lock */) -> bool {
+        ffi::get_em_pixe()
+    }
+
+    #[setter]
+    pub fn set_em_pixe(&mut self, _py: Python /* Lock */, value: bool) {
+        ffi::set_em_pixe(value);
+        if value {
+            ffi::set_em_fluo(true);
+        }
     }
 
     /// Hadronic physics list.

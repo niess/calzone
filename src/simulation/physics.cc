@@ -76,15 +76,16 @@ void PhysicsImpl::ConstructProcess() {
 
 void PhysicsImpl::Update() {
     static bool initialised = false;
+    G4EmParameters * parameters = G4EmParameters::Instance();
+    auto && settings = this->settings;
+
     if (initialised) {
         return;
     } else {
         initialised = true;
 
-        G4EmParameters * parameters = G4EmParameters::Instance();
         this->decayPhysics.reset(new G4DecayPhysics(0));
 
-        auto && settings = this->settings;
         if (settings.em_model != EmPhysicsModel::None) {
             this->extraPhysics.reset(new G4EmExtraPhysics(0));
 
@@ -95,7 +96,6 @@ void PhysicsImpl::Update() {
                     break;
                 case EmPhysicsModel::Livermore:
                     this->emPhysics.reset(new G4EmLivermorePhysics(0));
-                    parameters->SetPixe(true);
                     break;
                 case EmPhysicsModel::None:
                     // unreachable.
@@ -111,22 +111,14 @@ void PhysicsImpl::Update() {
                     break;
                 case EmPhysicsModel::Option4:
                     this->emPhysics.reset(new G4EmStandardPhysics_option4(0));
-                    parameters->SetPixe(true);
                     break;
                 case EmPhysicsModel::Penelope:
                     this->emPhysics.reset(new G4EmPenelopePhysics(0));
-                    parameters->SetPixe(true);
-                    parameters->SetPIXEElectronCrossSectionModel("Penelope");
-                    parameters->SetPIXECrossSectionModel("ECPSSR_FormFactor");
                     break;
                 case EmPhysicsModel::Standard:
                     this->emPhysics.reset(new G4EmStandardPhysics(0));
                     break;
             }
-
-            parameters->SetFluo(true);
-            parameters->SetAuger(true);
-            parameters->SetAugerCascade(true);
         }
         parameters->SetBuildCSDARange(true);
 
@@ -161,6 +153,23 @@ void PhysicsImpl::Update() {
         }
     }
 
+    // Configure optional EM-physics (does not require a table re-build).
+    if (settings.fluo) {
+        parameters->SetFluo(true);
+    }
+    if (settings.auger) {
+        parameters->SetAuger(true);
+        parameters->SetAugerCascade(true);
+    }
+    if (settings.pixe) {
+        parameters->SetPixe(true);
+        if (settings.em_model == EmPhysicsModel::Penelope) {
+            parameters->SetPIXEElectronCrossSectionModel("Penelope");
+            parameters->SetPIXECrossSectionModel("ECPSSR_FormFactor");
+        }
+    }
+
+    // Configure physics tables.
     bool modified = false;
     double value = this->settings.default_cut * CLHEP::cm;
     if (this->GetDefaultCutValue() != value) {
@@ -199,6 +208,30 @@ EmPhysicsModel get_em_model() {
 
 void set_em_model(EmPhysicsModel model) {
     PhysicsImpl::Get()->Settings().em_model = model;
+}
+
+bool get_em_auger() {
+    return PhysicsImpl::Get()->Settings().auger;
+}
+
+void set_em_auger(bool value) {
+    PhysicsImpl::Get()->Settings().auger = value;
+}
+
+bool get_em_fluo() {
+    return PhysicsImpl::Get()->Settings().fluo;
+}
+
+void set_em_fluo(bool value) {
+    PhysicsImpl::Get()->Settings().fluo = value;
+}
+
+bool get_em_pixe() {
+    return PhysicsImpl::Get()->Settings().pixe;
+}
+
+void set_em_pixe(bool value) {
+    PhysicsImpl::Get()->Settings().pixe = value;
 }
 
 HadPhysicsModel get_had_model() {
