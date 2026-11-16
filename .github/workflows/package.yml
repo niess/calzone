@@ -6,7 +6,7 @@ on:
         description: 'Geant4 version'
         required: true
         type: string
-        default: '11.4.0'
+        default: '11.4.3'
       sdist:
         description: 'Build sdist'
         required: true
@@ -24,6 +24,7 @@ on:
         default: false
 
 env:
+  MACOS_DEPLOYMENT_TARGET: '11.0'
   MACOSX_DEPLOYMENT_TARGET: '11.0'
 
 jobs:
@@ -50,7 +51,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-14, windows-2022, windows-11-arm]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-26, windows-2022, windows-11-arm]
         include:
           - os: ubuntu-24.04
             tag: manylinux2014_x86_64
@@ -58,7 +59,7 @@ jobs:
             tag: manylinux2014_aarch64
           - os: macos-15-intel
             tag: macosx_11_0_x86_64  # match MACOSX_DEPLOYMENT_TARGET
-          - os: macos-14
+          - os: macos-26
             tag: macosx_11_0_arm64   # match MACOSX_DEPLOYMENT_TARGET
           - os: windows-2022
             tag: win_amd64
@@ -102,7 +103,7 @@ jobs:
           python -s -m calzone download
           python -s -m pytest --doctest-glob="*.rst" -v -m "${{ matrix.markers }}" ../tests ../docs/source
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: artifact-${{ matrix.os }}
           path: ./wheelhouse/*.whl
@@ -117,7 +118,7 @@ jobs:
 
     if: ${{ inputs.upload }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           merge-multiple: true
           path: dist
