@@ -54,3 +54,21 @@ private:
         false
     };
 };
+
+struct ProcessTranslator {
+    ProcessTranslator(const ProcessTranslator &) = delete; // Forbid copy.
+
+    // User interface.
+    G4VProcess * FindProcess(
+        const std::string &, const G4ParticleDefinition *
+    );
+    const std::string & Translate(const std::string &);
+
+    static ProcessTranslator * Get();
+
+private:
+    ProcessTranslator();
+
+    // User interface.
+    std::map<std::string, std::string> dictionary;
+};

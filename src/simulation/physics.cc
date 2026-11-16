@@ -310,10 +310,12 @@ void get_active_processes(
     }
 
     G4ProcessVector * p = manager->GetProcessList();
+    auto translator = ProcessTranslator::Get();
     for (size_t i = 0; i < p->size(); ++i) {
         if (manager->GetProcessActivation(i)) {
             const G4String & name = (*p)[i]->GetProcessName();
-            processes.push_back(rust::String(name));
+            auto nickname = translator->Translate(name);
+            processes.push_back(rust::String(nickname));
         }
     }
 
@@ -460,8 +462,7 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
 
     std::string processName = "";
     if (!process.empty()) {
-        G4ProcessTable * processTable = G4ProcessTable::GetProcessTable();
-        G4VProcess * proc = processTable->FindProcess(
+        G4VProcess * proc = ProcessTranslator::Get()->FindProcess(
             std::string(process), part
         );
         if (proc == nullptr) {
@@ -487,4 +488,64 @@ std::unique_ptr<PhysicsCalculator> create_physics_calculator(
     }
 
     return std::make_unique<PhysicsCalculator>(calc, part, mat, processName);
+}
+
+
+// ============================================================================
+//
+// Processes translation rules.
+//
+// ============================================================================
+
+ProcessTranslator::ProcessTranslator() {
+    this->dictionary["annihil"] = "Annihilation";
+    this->dictionary["compt"] = "Compton";
+    this->dictionary["conv"] = "Conversion";
+    this->dictionary["CoulombScat"] = "Coulomb";
+    this->dictionary["eBrem"] = "Bremsstrahlung";
+    this->dictionary["eIoni"] = "Ionisation";
+    this->dictionary["electronNuclear"] = "Photonuclear";
+    this->dictionary["hadElastic"] = "Elastic";
+    this->dictionary["hBrems"] = "Bremsstrahlung";
+    this->dictionary["hIoni"] = "Ionisation";
+    this->dictionary["hPairProd"] = "PairProduction";
+    this->dictionary["ionIoni"] = "Ionisation";
+    this->dictionary["muIoni"] = "Ionisation";
+    this->dictionary["muMinusCaptureAtRest"] = "Capture";
+    this->dictionary["muonNuclear"] = "Photonuclear";
+    this->dictionary["muPairProd"] = "PairProduction";
+    this->dictionary["msc"] = "Elastic";
+    this->dictionary["nCapture"] = "Capture";
+    this->dictionary["neutronInelastic"] = "Inelastic";
+    this->dictionary["phot"] = "Photoelectric";
+    this->dictionary["protonInelastic"] = "Inelastic";
+    this->dictionary["Rayl"] = "Rayleigh";
+    this->dictionary["Transportation"] = "Transport";
+}
+
+const std::string & ProcessTranslator::Translate(const std::string & name) {
+    try {
+        return this->dictionary.at(name);
+    } catch (std::out_of_range & e) {
+        return name;
+    }
+}
+
+G4VProcess * ProcessTranslator::FindProcess(
+    const std::string & name, const G4ParticleDefinition * particle) {
+    G4ProcessTable * processTable = G4ProcessTable::GetProcessTable();
+    for (const auto & [g4Name, nickname] : this->dictionary) {
+        if (name == nickname) {
+            auto process = processTable->FindProcess(g4Name, particle);
+            if (process != nullptr) {
+                return process;
+            }
+        }
+    }
+    return processTable->FindProcess(name, particle);
+}
+
+ProcessTranslator * ProcessTranslator::Get() {
+    static ProcessTranslator * instance = new ProcessTranslator();
+    return instance;
 }

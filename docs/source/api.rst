@@ -572,10 +572,9 @@ Python interface
       This method provides the `macroscopic cross-section`_ of a particle
       (identified by its :ref:`pid <topic-pid>`) within a given :ref:`material
       <geometry:Materials definition>` (identified by its name), considering a
-      specific interaction `process` (specified by its `Geant4`_ name, as
-      returned by the :py:meth:`processes` method). The particle energy may be
-      specified as a :py:class:`float` or as a set of :py:class:`numpy.ndarray`
-      values.
+      specific interaction `process` (specified by its name, as returned by the
+      :py:meth:`processes` method). The particle energy may be specified as a
+      :py:class:`float` or as a set of :py:class:`numpy.ndarray` values.
 
       The `cut` argument may be a :py:class:`bool`, indicating wether `Geant4`_
       production cuts are to be taken into account or not, or a
@@ -583,12 +582,12 @@ Python interface
       value(s), in MeV, for soft collisions.
 
       For instance, the following returns the `macroscopic cross-section`_ for a
-      10 MeV electron (:python:`pid="e-"`) interacting by Bremsstrahlung
-      (:python:`process="eBrem"`) with a water molecule, taking production cuts
-      into account.
+      10 MeV electron (:python:`pid="e-"`) interacting by Bremsstrahlung with a
+      water molecule, taking production cuts into account.
 
       >>> physics.cross_section( # doctest: +SKIP
-      ...     pid="e-", energy=10.0, material="G4_WATER", process="eBrem", cut=True
+      ...     pid="e-", energy=10.0, material="G4_WATER", process="Bremsstrahlung",
+      ...     cut=True
       ... )
       0.2854100303707325  # 1/cm
 
@@ -613,12 +612,19 @@ Python interface
 
       .. note::
 
-         Short-lived particles are exluded from the returned mapping.
+         Short-lived particles are excluded from the returned mapping.
 
    .. automethod:: processes
 
       Returns the :py:class:`list` of all active processes for a given particle
       (identified by its :ref:`pid <topic-pid>`).
+
+      .. note::
+
+         Process names are translated from `Geant4`_ for convenience. For
+         instance, :python:`"eBrem"` is translated to
+         :python:`"Bremsstrahlung"`. When specifying a process, either the
+         native `Geant4`_ name or its `Calzone` translation may be used.
 
    .. automethod:: range
 
@@ -646,11 +652,10 @@ Python interface
       particle (identified by its :ref:`pid <topic-pid>`). The particle energy
       may be specified as a :py:class:`float` or as a set of
       :py:class:`numpy.ndarray` values. The `stopping power`_ may be be
-      restricted to a specific interaction `process` (by providing its `Geant4`_
-      name, as returned by the :py:meth:`processes` method). Additionaly, the
-      `stopping power`_ may be further restricted to soft collisions by
-      specifying a `cut` value, in MeV (or a set of cut values as a
-      :py:class:`numpy.ndarray`).
+      restricted to a specific interaction `process` (by providing its name, as
+      returned by the :py:meth:`processes` method). Additionaly, the `stopping
+      power`_ may be further restricted to soft collisions by specifying a `cut`
+      value, in MeV (or a set of cut values as a :py:class:`numpy.ndarray`).
 
       If all interaction processes are considered (:python:`process=None`), then
       the optional `cut` argument must be a :py:class:`bool`, indicating wether

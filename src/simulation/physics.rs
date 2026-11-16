@@ -283,7 +283,6 @@ impl Physics {
         Ok(particles)
     }
 
-    // XXX Use nicknames for processes, as in tracking.
     /// Active processes for a particle.
     #[pyo3(signature=(pid))]
     pub fn processes<'py>(&self, _py: Python<'py>, pid: PidArg) -> PyResult<Vec<String>> {

@@ -1,57 +1,11 @@
 #include "calzone.h"
+#include "physics.h"
 #include "sampler.h"
 #include "tracker.h"
 // Geant4 interface.
 #include "G4Step.hh"
 #include "G4Track.hh"
 #include "G4VProcess.hh"
-
-
-// ============================================================================
-//
-// Translation rules.
-//
-// ============================================================================
-
-struct Translator {
-    Translator() {
-        this->dictionary["annihil"] = "Annihilation";
-        this->dictionary["compt"] = "Compton";
-        this->dictionary["conv"] = "Conversion";
-        this->dictionary["CoulombScat"] = "Coulomb";
-        this->dictionary["eBrem"] = "Bremsstrahlung";
-        this->dictionary["eIoni"] = "Ionisation";
-        this->dictionary["electronNuclear"] = "Photonuclear";
-        this->dictionary["hadElastic"] = "Elastic";
-        this->dictionary["hBrems"] = "Bremsstrahlung";
-        this->dictionary["hIoni"] = "Ionisation";
-        this->dictionary["hPairProd"] = "PairProduction";
-        this->dictionary["ionIoni"] = "Ionisation";
-        this->dictionary["muIoni"] = "Ionisation";
-        this->dictionary["muMinusCaptureAtRest"] = "Capture";
-        this->dictionary["muonNuclear"] = "Photonuclear";
-        this->dictionary["muPairProd"] = "PairProduction";
-        this->dictionary["msc"] = "Elastic";
-        this->dictionary["nCapture"] = "Capture";
-        this->dictionary["neutronInelastic"] = "Inelastic";
-        this->dictionary["phot"] = "Photoelectric";
-        this->dictionary["protonInelastic"] = "Inelastic";
-        this->dictionary["Rayl"] = "Rayleigh";
-        this->dictionary["Transportation"] = "Transport";
-    }
-
-    const std::string & translate(const std::string & word) {
-        try {
-            return this->dictionary.at(word);
-        } catch (std::out_of_range & e) {
-            return word;
-        }
-    }
-
-    std::map<std::string, std::string> dictionary;
-};
-
-static Translator TRANSLATOR;
 
 
 // ============================================================================
@@ -97,7 +51,9 @@ void TrackingImpl::PreUserTrackingAction(const G4Track * track) {
     };
     auto creator = track->GetCreatorProcess();
     if (creator != nullptr) {
-        auto && name = TRANSLATOR.translate(creator->GetProcessName());
+        auto && name = ProcessTranslator::Get()->Translate(
+            creator->GetProcessName()
+        );
         auto dst = (char *)(&data.creator);
         std::strncpy(
             dst,
@@ -200,7 +156,9 @@ void SteppingImpl::UserSteppingAction(const G4Step * step) {
         }
         auto process = p->GetProcessDefinedStep();
         if (process != nullptr) {
-            auto && name = TRANSLATOR.translate(process->GetProcessName());
+            auto && name = ProcessTranslator::Get()->Translate(
+                process->GetProcessName()
+            );
             auto dst = (char *)(&vertex.process);
             std::strncpy(
                 dst,

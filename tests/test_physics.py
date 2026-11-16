@@ -23,8 +23,8 @@ def test_stopping_power():
     energies = numpy.geomspace(1E-01, 1E+01, 21)
     s0 = [
         p.stopping_power(pid=11, material="G4_H", energy=energies[-1],
-                         cut=ei, process="eIoni") for ei in energies
+                         cut=ei, process="Ionisation") for ei in energies
     ]
     s1 = p.stopping_power(pid=11, material="G4_H", energy=energies[-1],
-                          cut=energies, process="eIoni")
+                          cut=energies, process="Ionisation")
     assert_allclose(s0, s1)
