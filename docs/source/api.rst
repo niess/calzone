@@ -552,8 +552,7 @@ Python interface
       :py:class:`Simulation` instances within the same Python process. Moreover,
       once the `Geant4`_ kernel has been initialised, it is not possible to
       modify the :py:attr:`em_model` or :py:attr:`had_model` anymore, e.g.,
-      after the :py:meth:`Physics.cross_section` or :py:meth:`Simulation.run`
-      methods have been invoked.
+      after the :py:meth:`Simulation.run` method has been invoked.
 
    .. method:: __new__(em_model=None, *, default_cut=None, had_model=None)
 
@@ -562,8 +561,8 @@ Python interface
       See the :py:attr:`default_cut`, :py:attr:`em_model` and
       :py:attr:`had_model` attributes below for the meaning of the optional
       arguments. If an argument is left :python:`None`, then its default value
-      is used. For instance, the following creates settings with standard
-      electromagnetric physics (the default), and no hadronic physics.
+      is used. For instance, the following selects `Geant4`_ standard
+      electromagnetric physics (the default), without hadronic physics.
 
       >>> physics = calzone.Physics()
 
@@ -582,8 +581,8 @@ Python interface
       value(s), in MeV, for soft collisions.
 
       For instance, the following returns the `macroscopic cross-section`_ for a
-      10 MeV electron (:python:`pid="e-"`) interacting by Bremsstrahlung with a
-      water molecule, taking production cuts into account.
+      10 MeV electron interacting by Bremsstrahlung with a water molecule,
+      taking production cuts into account.
 
       >>> physics.cross_section( # doctest: +SKIP
       ...     pid="e-", energy=10.0, material="G4_WATER", process="Bremsstrahlung",
@@ -606,13 +605,13 @@ Python interface
 
    .. automethod:: particles
 
-      Returns a :py:class:`dict` mapping the `Geant4`_ name of all active
-      particles to their :ref:`pid <topic-pid>`, for the selected
-      :py:attr:`em_model` and :py:attr:`had_model`.
+      Returns a :py:class:`dict` mapping the `Geant4`_ names of active particles
+      to their :ref:`pids <topic-pid>`, for the selected :py:attr:`em_model` and
+      :py:attr:`had_model`.
 
       .. note::
 
-         Short-lived particles are excluded from the returned mapping.
+         Short-lived particles are excluded from the set of active particles.
 
    .. automethod:: processes
 
@@ -621,7 +620,7 @@ Python interface
 
       .. note::
 
-         Process names are translated from `Geant4`_ for convenience. For
+         Native `Geant4`_ process names are translated for convenience. For
          instance, :python:`"eBrem"` is translated to
          :python:`"Bremsstrahlung"`. When specifying a process, either the
          native `Geant4`_ name or its `Calzone` translation may be used.
@@ -637,11 +636,11 @@ Python interface
       The optional `cut` argument must be a :py:class:`bool`, indicating wether
       `Geant4`_ production cuts are to be taken into account or not.
 
-      For instance, the following returns the range of a 10 MeV electron
-      (:python:`pid=11`) into water (omitting production cuts).
+      For instance, the following returns the range of a 10 MeV electron into
+      water (omitting production cuts).
 
       >>> physics.range( # doctest: +SKIP
-      ...     pid=11, energy=10.0, material="G4_WATER", cut=False
+      ...     pid="e-", energy=10.0, material="G4_WATER", cut=False
       ... )
       4.975501523341526  # cm
 
@@ -662,10 +661,10 @@ Python interface
       `Geant4`_ production cuts are to be taken into account or not.
 
       For instance, the following returns the `stopping power`_ of water for a
-      10 MeV electron (:python:`pid=11`), taking production cuts into account.
+      10 MeV electron, taking production cuts into account.
 
       >>> physics.stopping_power( # doctest: +SKIP
-      ...     pid=11, energy=10.0, material="G4_WATER", cut=True
+      ...     pid="e-", energy=10.0, material="G4_WATER", cut=True
       ... )
       1.7168908475719769  # MeV/cm
 
