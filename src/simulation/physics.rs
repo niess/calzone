@@ -98,7 +98,6 @@ impl Physics {
 
     #[setter]
     pub fn set_em_model(&mut self, _py: Python /* Lock */, value: Option<&str>) -> PyResult<()> {
-        Self::check_state("em_model")?;
         let model: ffi::EmPhysicsModel = match value {
             None => ffi::EmPhysicsModel::None,
             Some(value) => match EmPhysicsModel::from_str(value) {
@@ -108,7 +107,10 @@ impl Physics {
                 },
             },
         };
-        ffi::set_em_model(model);
+        if ffi::get_em_model() != model {
+            Self::check_state("em_model")?;
+            ffi::set_em_model(model);
+        }
         match model {
             ffi::EmPhysicsModel::Livermore | ffi::EmPhysicsModel::Penelope => {
                 ffi::set_em_auger(false);
@@ -152,7 +154,6 @@ impl Physics {
 
     #[setter]
     pub fn set_had_model(&mut self, _py: Python /* Lock */, value: Option<&str>) -> PyResult<()> {
-        Self::check_state("had_model")?;
         let model: ffi::HadPhysicsModel = match value {
             None => ffi::HadPhysicsModel::None,
             Some(value) => match HadPhysicsModel::from_str(value) {
@@ -162,7 +163,10 @@ impl Physics {
                 },
             },
         };
-        ffi::set_had_model(model);
+        if ffi::get_had_model() != model {
+            Self::check_state("had_model")?;
+            ffi::set_had_model(model);
+        }
         Ok(())
     }
 
